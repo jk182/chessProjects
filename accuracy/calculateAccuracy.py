@@ -47,7 +47,7 @@ def winP(centipawns: int) -> float:
     return 50 + 50*(2/(1+np.exp(-0.00368208 * centipawns)) - 1)
 
 
-def gameAccuracy(gamesFile: str, engine: engine, depth: int) -> list:
+def gameAccuracy(gamesFile: str, engine: engine, depth: int, outfile: str) -> list:
     """
     This function goes through the games in a PGN file and returns the accuracies of the games.
     gamesFile: str
@@ -56,6 +56,8 @@ def gameAccuracy(gamesFile: str, engine: engine, depth: int) -> list:
         A configured chess engine
     depth: int
         The depth used on every move
+    outfile: str
+        The path to the output file
     return -> list
         A list of all the accuracies of the games
     """
@@ -64,6 +66,7 @@ def gameAccuracy(gamesFile: str, engine: engine, depth: int) -> list:
     with open(gamesFile, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
             print(f'Starting with game {gameNR}...')
+            print(f'{game.headers["White"]} - {game.headers["Black"]}')
             gameNR += 1
 
             acc = (list(), list())
@@ -75,13 +78,18 @@ def gameAccuracy(gamesFile: str, engine: engine, depth: int) -> list:
                 board.push(move)
                 if not board.is_game_over():
                     cp2 = engine.analyse(board, chess.engine.Limit(depth=depth))["score"].pov(c).score()
-                    if c:
-                        acc[0].append(accuracy(winP(cp1), winP(cp2)))
+                    if cp1 != None and cp2 != None:
+                        if c:
+                            acc[0].append(accuracy(winP(cp1), winP(cp2)))
+                        else:
+                            acc[1].append(accuracy(winP(cp1), winP(cp2)))
                     else:
-                        acc[1].append(accuracy(winP(cp1), winP(cp2)))
+                        print(cp1, cp2)
             print(sum(acc[0])/len(acc[0]))
             gameAccuracies.append((sum(acc[0])/len(acc[0]), sum(acc[1])/len(acc[1])))
-
+    print(gameAccuracies)
+    for acc in gameAccuracies:
+        print(acc, file=open(outfile, 'a+'))
     engine.quit()
     return gameAccuracies
 
@@ -89,5 +97,5 @@ def gameAccuracy(gamesFile: str, engine: engine, depth: int) -> list:
 if __name__ == '__main__':
     sf = configureEngine('stockfish', {'Threads': '8', 'Hash': '8192'})
     wijk = '../resources/wijkMasters2024.pgn'
-    gameAccuracy(wijk, sf, 15)
-
+    outfile = '../out/accuracy'
+    gameAccuracy(wijk, sf, 12, outfile)
