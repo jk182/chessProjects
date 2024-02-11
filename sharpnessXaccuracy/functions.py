@@ -1,5 +1,6 @@
 from chess import engine, pgn
 import chess
+import numpy as np
 
 
 def configureEngine(engineName: str, uci_options: dict) -> engine:

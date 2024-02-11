@@ -1,8 +1,8 @@
 from chess import engine, pgn
 import chess
-import numpy as np
 import matplotlib.pyplot as plt
 import functions
+import numpy as np
 
 
 def annotate(gamesFile: str, outfile: str, lc0: engine, sf: engine, nodes: int) -> list:
@@ -65,9 +65,112 @@ def annotate(gamesFile: str, outfile: str, lc0: engine, sf: engine, nodes: int) 
     # print(s, file=open(outfile, 'w'))
 
 
+def readComments(pgnfile: str) -> list:
+    """
+    This function takes a PGN files and reads the WDL comments and converts them to an accuracy-sharpness-list
+    pgnfile: str
+        The path of the PGN file
+    return -> list
+        The accuracy-sharpness-list created from the WDL comments of the PGN file
+    """
+
+    out = list()
+    with open(pgnfile, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            cp = -29
+            wdl = [210, 620, 170]
+            whiteMove = True
+            node = game
+            game = list()
+
+            while not node.is_end():
+                node = node.variations[0]
+                # None should only happen if there is a forced mate
+                if node.comment.split(';')[1] != 'None':
+                    # sharpness = sharpnessOG(wdl)
+                    sharpness = functions.sharpnessLC0(wdl)
+                    winP = functions.winP(cp*(-1))
+
+                    wdll = node.comment.split(';')[0]
+                    wdl = [ int(w) for w in wdll.replace('[', '').replace(']', '').strip().split(',') ]
+                    cp = int(node.comment.split(';')[1])
+
+                    newWinP = functions.winP(cp)
+                    acc = functions.accuracy(winP, newWinP)
+
+                    game.append((acc, sharpness))
+                whiteMove = not whiteMove
+            out.append(game)
+
+    return out
+
+
+def accuracySharpnessCorr(accSharp: list, plys: int = 0):
+    """
+    This function plots the accuracy and sharpness on a graph
+    accSharp: list
+        The list containing accuracy and sharpness for the moves in the format of analyseFile
+    plys: int
+        The number of plys which will be ignored at the beginning of each game (opening theory)
+    """
+    # Testing on the candidates_5000n.pgn gave the highest correlation (-0.16) for plys=30
+    acc = list()
+    sharp = list()
+
+    for game in accSharp:
+        for i, g in enumerate(game):
+            if i >= plys:
+                acc.append(g[0])
+                sharp.append(g[1])
+    
+    print(np.corrcoef(sharp, acc))
+    plt.scatter(sharp, acc, c='grey', alpha=0.3, s=3)
+    plt.show()
+
+
+def accuracyPerSharpness(accSharp: list, maxSharpness: float, intervalls: int, plys: int = 0):
+    """
+    This function calculates and plots the accuracy in different sharpness ranges
+    accSharp: list
+        The list containing accuracy and sharpness for the moves in the format of analyseFile
+    maxSharpness: float
+        The maximum sharpness, all positions with a higher sharpness are placed in the last intervall
+    intervalls: int
+        The number of intervalls in which the sharpness should be devided
+    plys: int
+        The number of plys which will be ignored at the start (opening theory)
+    """
+    acc = list()
+    sharp = list()
+
+    for game in accSharp:
+        for i, g in enumerate(game):
+            if i >= plys:
+                acc.append(g[0])
+                sharp.append(g[1])
+    
+    accPerS = list()
+    for i in range(intervalls + 1):
+        accPerS.append(list())
+    for i, s in enumerate(sharp):
+        if s >= maxSharpness:
+            accPerS[intervalls].append(acc[i])
+        else:
+            accPerS[int((s * intervalls)/maxSharpness)].append(acc[i])
+    
+    averages = [ sum(a)/len(a) for a in accPerS ]
+    print(averages)
+    x = [ i * maxSharpness / intervalls for i in range(len(averages)) ]
+    plt.plot(x, averages)
+    plt.show()
+
+
 if __name__ == '__main__':
-    leela = functions.configureEngine('/home/julian/lc0/build/release/lc0', {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'})
-    stockfish = functions.configureEngine('stockfish', {'Threads': '9', 'Hash': '8192'})
-    annotate('../resources/candidates_5000n.pgn', '../resources/candidates_out.pgn', leela, stockfish, 5000)
-    leela.quit()
-    stockfish.quit()
+    # leela = functions.configureEngine('/home/julian/lc0/build/release/lc0', {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'})
+    # stockfish = functions.configureEngine('stockfish', {'Threads': '9', 'Hash': '8192'})
+    # annotate('../resources/candidates_5000n.pgn', '../resources/candidates_out.pgn', leela, stockfish, 5000)
+    # leela.quit()
+    # stockfish.quit()
+    sharpAcc = readComments('../resources/candidates_out.pgn')
+    # print(accuracySharpnessCorr(sharpAcc, 10))
+    accuracyPerSharpness(sharpAcc, 2, 8, 20)
