@@ -71,7 +71,7 @@ def sharpnessLC0(wdl: list) -> float:
     # max() in order to prevent negative values
     # I added the *min(W, L) to reduce the sharpness of completely winning positions
     # The *4 is just a scaling factor
-    return max(2/(np.log((1/W)-1) + np.log((1/L)-1)), 0) * min(W, L) * 4
+    return (max(2/(np.log((1/W)-1) + np.log((1/L)-1)), 0))**2
 
 
 def accuracy(winPercentBefore: float, winPercentAfter: float) -> float:
