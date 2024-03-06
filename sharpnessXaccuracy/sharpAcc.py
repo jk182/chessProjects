@@ -173,4 +173,4 @@ if __name__ == '__main__':
     # stockfish.quit()
     sharpAcc = readComments('../resources/candidates_out.pgn')
     # print(accuracySharpnessCorr(sharpAcc, 10))
-    accuracyPerSharpness(sharpAcc, 2, 8, 20)
+    accuracyPerSharpness(sharpAcc, 4, 16, 20)

@@ -120,8 +120,8 @@ if __name__ == '__main__':
                     '7r/ppp5/3b1k2/4r2p/2BR4/2P3p1/PP3P1P/2K4R w - - 0 28': '27...fxg3',
                     '7r/ppp5/3b4/4k3/2B4p/2P3P1/PP1K3P/5R2 w - - 2 33': '32...Ke5'}
 
-    config1 = 'config/engine1.ini'
-    config2 = 'config/engine2.ini'
-    pgnFile = 'out/gameAnalysis.pgn'
+    config1 = 'config/leelaContemptWhite.ini'
+    config2 = 'config/leelaContemptWhite.ini'
+    pgnFile = 'out/contempt.pgn'
     
-    play(4, gameAnalysis, config1, config2, pgnFile)
+    play(4, {'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1': 'Starting Pos'}, config1, config2, pgnFile)
