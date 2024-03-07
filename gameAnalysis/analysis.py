@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from functions import configureEngine
 
 
-def makeComments(gamesFile: str, outfile: str, analysis) -> list:
+def makeComments(gamesFile: str, outfile: str, analysis, nodes) -> list:
     """
     This function plays thorugh the games in a file and makes comments to them.
     The specific comments depend on the analysis method chosen
@@ -46,7 +46,7 @@ def makeComments(gamesFile: str, outfile: str, analysis) -> list:
 
                 board.push(move)
                 # Adds a comment after every move with the wdl
-                node.comment = analysis(board, leela, 2000)
+                node.comment = analysis(board, leela, nodes)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
     leela.quit()
     return []
@@ -115,7 +115,7 @@ def plotWDL(pgn: str):
 
 
 if __name__ == '__main__':
-    pgn = '../out/Rubinstein-Duras.pgn'
-    outf = '../out/Rubinstein-Duras-WDL2.pgn'
-    makeComments(pgn, outf, analysisWDL)
+    pgn = '../resources/Carlsen-Nepo-6.pgn'
+    outf = '../out/Carlsen-Nepo-6-WDL2.pgn'
+    makeComments(pgn, outf, analysisWDL, 1)
     plotWDL(outf)
