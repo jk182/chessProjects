@@ -1,10 +1,10 @@
 # This file should contain different functions to analyse a chess game
 
-from chess import engine, pgn
+from chess import engine, pgn, Board
 import chess
 import numpy as np
 import matplotlib.pyplot as plt
-from chessProjects.sharpnessXaccuracy.functions import configureEngine
+from functions import configureEngine
 
 
 def makeComments(gamesFile: str, outfile: str, analysis) -> list:
@@ -51,7 +51,7 @@ def makeComments(gamesFile: str, outfile: str, analysis) -> list:
     return []
 
 
-def analysisWDL(position: board, lc0: engine, limit: int, time: bool = False) -> str:
+def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) -> str:
     """
     This function analyses a given chess position with LC0 to get the WDL from whtie's perspective.
     position:baord
@@ -70,12 +70,48 @@ def analysisWDL(position: board, lc0: engine, limit: int, time: bool = False) ->
         return ""
     
     if time:
-        info = lc0.analyse(board, chess.engine.Limit(time=limit))
+        info = lc0.analyse(position, chess.engine.Limit(time=limit))
     else:
-        info = lc0.analyse(board, chess.engine.Limit(node=limit))
+        info = lc0.analyse(position, chess.engine.Limit(nodes=limit))
 
     wdl = []
     wdl_w = engine.PovWdl.white(info['wdl'])
     for w in wdl_w:
         wdl.append(w)
     return str(wdl)
+
+
+def plotWDL(pgn: str):
+    """
+    This method plots the WDL from the comments of a PGN file
+    pgn: str
+        The path to a PGN file where the comments are the WDLs
+    """
+    with open(pgn, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            w = []
+            d = []
+            l = []
+
+            while not node.is_end():
+                node = node.variations[0]
+                # None should only happen if there is a forced mate
+                if node.comment != 'None':
+                    wdl = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+                    w.append(wdl[0])
+                    d.append(wdl[1])
+                    l.append(wdl[2])
+            y = np.vstack([w, d, l])
+            
+            fig, ax = plt.subplots()
+            ax.stackplot(range(len(w)), y)
+
+            plt.show()
+
+
+
+if __name__ == '__main__':
+    pgn = '../resources/Carlsen-Nepo-6.pgn'
+    outf = '../out/Carlsen-Nepo-6-WDL.pgn'
+    makeComments(pgn, outf, analysisWDL)
