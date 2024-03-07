@@ -37,6 +37,7 @@ def makeComments(gamesFile: str, outfile: str, analysis) -> list:
             newGame.headers = game.headers
 
             for move in game.mainline_moves():
+                print(move)
                 # Checks if we have the starting position and need to make a new node
                 if board == game.board():
                     node = newGame.add_variation(move)
@@ -45,9 +46,9 @@ def makeComments(gamesFile: str, outfile: str, analysis) -> list:
 
                 board.push(move)
                 # Adds a comment after every move with the wdl
-                node.comment = analysis(board, leela, 10000)
+                node.comment = analysis(board, leela, 20000)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
-
+    leela.quit()
     return []
 
 
@@ -105,6 +106,8 @@ def plotWDL(pgn: str):
             y = np.vstack([w, d, l])
             
             fig, ax = plt.subplots()
+            plt.ylim(0,1000)
+            plt.xlim(0,len(w)-1)
             ax.stackplot(range(len(w)), y)
 
             plt.show()
@@ -112,6 +115,7 @@ def plotWDL(pgn: str):
 
 
 if __name__ == '__main__':
-    pgn = '../resources/Carlsen-Nepo-6.pgn'
-    outf = '../out/Carlsen-Nepo-6-WDL.pgn'
+    pgn = '../out/Anand-Carlsen-2013-6.pgn'
+    outf = '../out/Anand-Carlsen-2013-6-WDL.pgn'
     makeComments(pgn, outf, analysisWDL)
+    plotWDL(outf)
