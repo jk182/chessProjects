@@ -46,7 +46,7 @@ def makeComments(gamesFile: str, outfile: str, analysis) -> list:
 
                 board.push(move)
                 # Adds a comment after every move with the wdl
-                node.comment = analysis(board, leela, 20000)
+                node.comment = analysis(board, leela, 2000)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
     leela.quit()
     return []
@@ -115,7 +115,7 @@ def plotWDL(pgn: str):
 
 
 if __name__ == '__main__':
-    pgn = '../out/Anand-Carlsen-2013-6.pgn'
-    outf = '../out/Anand-Carlsen-2013-6-WDL.pgn'
+    pgn = '../out/Rubinstein-Duras.pgn'
+    outf = '../out/Rubinstein-Duras-WDL2.pgn'
     makeComments(pgn, outf, analysisWDL)
     plotWDL(outf)
