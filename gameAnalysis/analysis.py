@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from functions import configureEngine
 
 
-def makeComments(gamesFile: str, outfile: str, analysis, nodes) -> list:
+def makeComments(gamesFile: str, outfile: str, analysis, nodes: int, options: dict) -> list:
     """
     This function plays thorugh the games in a file and makes comments to them.
     The specific comments depend on the analysis method chosen
@@ -22,7 +22,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, nodes) -> list:
         A list of lists for each game, containing the WDL and score after every move
     """
     
-    leela = configureEngine('/home/julian/lc0/build/release/lc0', {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'})
+    leela = configureEngine('/home/julian/lc0/build/release/lc0', options)
 
     gameNR = 1
     with open(gamesFile, 'r') as pgn:
@@ -89,7 +89,10 @@ def plotWDL(pgn: str):
         The path to a PGN file where the comments are the WDLs
     """
     with open(pgn, 'r') as pgn:
+        gameNr = 1
         while (game := chess.pgn.read_game(pgn)):
+            print(gameNr)
+            gameNr += 1
             node = game
             w = []
             d = []
@@ -115,7 +118,12 @@ def plotWDL(pgn: str):
 
 
 if __name__ == '__main__':
-    pgn = '../resources/Carlsen-Nepo-6.pgn'
-    outf = '../out/Carlsen-Nepo-6-WDL2.pgn'
-    makeComments(pgn, outf, analysisWDL, 1)
+    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
+    pgn = '../resources/carlsen-caruana-g1.pgn'
+    outf = '../out/carlsen-caruana-g1-WDL10000.pgn'
+    # makeComments(pgn, outf, analysisWDL, 10000, op)
+    outf2 = '../out/carlsen-caruana-g1-2500Elo.pgn'
+    op2 = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2500', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
+    makeComments(pgn, outf2, analysisWDL, 10000, op2)
     plotWDL(outf)
+    plotWDL(outf2)
