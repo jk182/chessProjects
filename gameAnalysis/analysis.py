@@ -82,13 +82,13 @@ def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) ->
     return str(wdl)
 
 
-def plotWDL(pgn: str):
+def plotWDL(pgnPath: str):
     """
     This method plots the WDL from the comments of a PGN file
-    pgn: str
+    pgnPath: str
         The path to a PGN file where the comments are the WDLs
     """
-    with open(pgn, 'r') as pgn:
+    with open(pgnPath, 'r') as pgn:
         gameNr = 1
         while (game := chess.pgn.read_game(pgn)):
             print(gameNr)
@@ -112,18 +112,49 @@ def plotWDL(pgn: str):
             plt.ylim(0,1000)
             plt.xlim(0,len(w)-1)
             ax.stackplot(range(len(w)), y)
+            plt.savefig(f'../out/WDLplots/{pgnPath.split("/")[-1][:-4]}.png')
 
-            plt.show()
+            # plt.show()
 
 
 
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    pgn = '../resources/carlsen-caruana-g1.pgn'
-    outf = '../out/carlsen-caruana-g1-WDL10000.pgn'
-    # makeComments(pgn, outf, analysisWDL, 10000, op)
-    outf2 = '../out/carlsen-caruana-g1-2500Elo.pgn'
-    op2 = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2500', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
-    makeComments(pgn, outf2, analysisWDL, 10000, op2)
+    pgns = ['../resources/Tal-Koblents-1957.pgn',
+            '../resources/Ding-Nepo-G12.pgn',
+            '../resources/AZ-SF-Qh1.pgn',
+            '../resources/AZ-SF-Matrix.pgn']
+    nodes = [1, 10, 100, 1000, 10000]
+    """
+    for pgn in pgns:
+        print(f'Analysing {pgn}')
+        for n in nodes:
+            name = pgn.split('/')[-1]
+            outf = f'../out/{name[:-4]}-N{n}.pgn'
+            makeComments(pgn, outf, analysisWDL, n, op)
+            plotWDL(outf)
+    """
+    """
+    pgn = '../resources/Ponomariov-Carlsen-2010.pgn'
+    outf = '../out/Ponomariov-Carlsen-2010-15000.pgn'
+    makeComments(pgn, outf, analysisWDL, nodes, op)
+    outf2 = '../out/Ponomariov-Carlsen-2010-15000-2800.pgn'
+    """
+    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'ContemptMode':'white_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
+    for pgn in pgns:
+        name = pgn.split('/')[-1]
+        outf = f'../out/{name[:-4]}-N10000-2800.pgn'
+        makeComments(pgn, outf, analysisWDL, 10000, op)
+        plotWDL(outf)
+    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'Contempt': '150', 'ContemptMode':'white_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
+
+    for pgn in pgns:
+        name = pgn.split('/')[-1]
+        outf = f'../out/{name[:-4]}-N10000-2800-150.pgn'
+        makeComments(pgn, outf, analysisWDL, 10000, op)
+        plotWDL(outf)
+    """
     plotWDL(outf)
     plotWDL(outf2)
+    plotWDL(outf3)
+    """
