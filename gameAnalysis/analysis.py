@@ -124,8 +124,8 @@ if __name__ == '__main__':
             '../resources/Ding-Nepo-G12.pgn',
             '../resources/AZ-SF-Qh1.pgn',
             '../resources/AZ-SF-Matrix.pgn']
+    pgns = ['../resources/Anand-Carlsen-2013-G4.pgn']
     nodes = [1, 10, 100, 1000, 10000]
-    """
     for pgn in pgns:
         print(f'Analysing {pgn}')
         for n in nodes:
@@ -134,19 +134,18 @@ if __name__ == '__main__':
             makeComments(pgn, outf, analysisWDL, n, op)
             plotWDL(outf)
     """
-    """
     pgn = '../resources/Ponomariov-Carlsen-2010.pgn'
     outf = '../out/Ponomariov-Carlsen-2010-15000.pgn'
     makeComments(pgn, outf, analysisWDL, nodes, op)
     outf2 = '../out/Ponomariov-Carlsen-2010-15000-2800.pgn'
     """
-    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'ContemptMode':'white_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
+    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'ContemptMode':'black_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
     for pgn in pgns:
         name = pgn.split('/')[-1]
         outf = f'../out/{name[:-4]}-N10000-2800.pgn'
         makeComments(pgn, outf, analysisWDL, 10000, op)
         plotWDL(outf)
-    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'Contempt': '150', 'ContemptMode':'white_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
+    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'Contempt': '100', 'ContemptMode':'black_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
 
     for pgn in pgns:
         name = pgn.split('/')[-1]
