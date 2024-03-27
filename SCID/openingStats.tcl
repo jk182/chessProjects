@@ -1,3 +1,6 @@
+# TODO: add the option to search starting from a given year
+# novelty report
+
 set db [lindex $argv 0]
 set player "Caruana"
 
