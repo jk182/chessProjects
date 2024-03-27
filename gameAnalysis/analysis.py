@@ -103,13 +103,13 @@ def plotWDL(pgnPath: str):
                 # None should only happen if there is a forced mate
                 if node.comment != 'None':
                     wdl = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
-                    w.append(wdl[0])
-                    d.append(wdl[1])
-                    l.append(wdl[2])
+                    w.append(wdl[0]/1000)
+                    d.append(wdl[1]/1000)
+                    l.append(wdl[2]/1000)
             y = np.vstack([w, d, l])
             
             fig, ax = plt.subplots()
-            plt.ylim(0,1000)
+            plt.ylim(0,1)
             plt.xlim(0,len(w)-1)
             ax.stackplot(range(len(w)), y)
             plt.savefig(f'../out/WDLplots/{pgnPath.split("/")[-1][:-4]}.png')
@@ -122,16 +122,16 @@ if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
     pgns = ['../resources/Tal-Koblents-1957.pgn',
             '../resources/Ding-Nepo-G12.pgn',
-            '../resources/AZ-SF-Qh1.pgn',
-            '../resources/AZ-SF-Matrix.pgn']
-    pgns = ['../resources/Anand-Carlsen-2013-G4.pgn']
+            '../resources/Ponomariov-Carlsen-2010.pgn',
+            '../resources/Vidit-Carlsen-2023.pgn']
+    # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     nodes = [1, 10, 100, 1000, 10000]
     for pgn in pgns:
         print(f'Analysing {pgn}')
         for n in nodes:
             name = pgn.split('/')[-1]
             outf = f'../out/{name[:-4]}-N{n}.pgn'
-            makeComments(pgn, outf, analysisWDL, n, op)
+            # makeComments(pgn, outf, analysisWDL, n, op)
             plotWDL(outf)
     """
     pgn = '../resources/Ponomariov-Carlsen-2010.pgn'
@@ -143,14 +143,14 @@ if __name__ == '__main__':
     for pgn in pgns:
         name = pgn.split('/')[-1]
         outf = f'../out/{name[:-4]}-N10000-2800.pgn'
-        makeComments(pgn, outf, analysisWDL, 10000, op)
+        # makeComments(pgn, outf, analysisWDL, 10000, op)
         plotWDL(outf)
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'Contempt': '100', 'ContemptMode':'black_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
 
     for pgn in pgns:
         name = pgn.split('/')[-1]
         outf = f'../out/{name[:-4]}-N10000-2800-150.pgn'
-        makeComments(pgn, outf, analysisWDL, 10000, op)
+        # makeComments(pgn, outf, analysisWDL, 10000, op)
         plotWDL(outf)
     """
     plotWDL(outf)
