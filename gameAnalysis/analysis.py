@@ -82,6 +82,40 @@ def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) ->
     return str(wdl)
 
 
+def findMistakes(pgnPath: str) -> list:
+    """
+    This function takes a PGN with WDL evaluations and finds the mistakes in the game
+    pgnPath: str
+        The path to the PGN file
+    return: list
+        A list with the positions where mistakes occured
+    """
+    # The number by which the win percentage has to decrease for the move to count as a mistake
+    # Note that the WDL adds up to 1000, so 100 is equivalent to 10%
+    mis = 100
+    lastWDL = None
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            while not node.is_end():
+                if node.comment:
+                    lastWDL = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+                else:
+                    node = node.variations[0]
+                    continue
+                node = node.variations[0]
+                if node.comment:
+                    currWDL = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+                    if node.turn() == chess.WHITE:
+                        diff = currWDL[0]+currWDL[1]*0.5-(lastWDL[0]+lastWDL[1]*0.5)
+                    else:
+                        diff = currWDL[2]+currWDL[1]*0.5-(lastWDL[2]+lastWDL[1]*0.5)
+                    if diff > mis:
+                        # Note that the colours are inverted since we are looking at the game after the mistake
+                        print(node.turn())
+                        print(diff)
+
+
 def plotWDL(pgnPath: str):
     """
     This method plots the WDL from the comments of a PGN file
@@ -180,4 +214,5 @@ if __name__ == '__main__':
     """
     fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
     maiaFolder = '/home/julian/chess/maiaNets'
-    print(maiaMoves(fen, maiaFolder))
+    # print(maiaMoves(fen, maiaFolder))
+    print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
