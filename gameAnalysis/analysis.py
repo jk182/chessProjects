@@ -117,6 +117,29 @@ def plotWDL(pgnPath: str):
             # plt.show()
 
 
+def maiaMoves(pos: str, maiaFolder: str) -> list:
+    """
+    This function analyses a given position with various Maia models and returns the best move as a string
+    pos: str
+        The position as a FEN string
+    maiaFolder: str
+        The folder containing the Maia models, which should be named 'maia-{rating}.pb'
+    return: list
+        The moves from the various models in a list
+    """
+    board = Board(pos)
+    moves = list()
+    for i in range(1, 10):
+        # starting the engine new each loop seems wasteful but it gets rid of a caching problem
+        maia = configureEngine('/home/julian/lc0/build/release/lc0', {'UCI_ShowWDL': 'true'})
+        w = f'{maiaFolder}/maia-1{i}00.pb'
+        maia.configure({'WeightsFile': w})
+        info = maia.analyse(board, chess.engine.Limit(nodes=1))
+        print(info)
+        moves.append(board.san(info['pv'][0]))
+        maia.quit()
+    return moves
+
 
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
@@ -125,6 +148,7 @@ if __name__ == '__main__':
             '../resources/Ponomariov-Carlsen-2010.pgn',
             '../resources/Vidit-Carlsen-2023.pgn']
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
+    """
     nodes = [1, 10, 100, 1000, 10000]
     for pgn in pgns:
         print(f'Analysing {pgn}')
@@ -133,12 +157,10 @@ if __name__ == '__main__':
             outf = f'../out/{name[:-4]}-N{n}.pgn'
             # makeComments(pgn, outf, analysisWDL, n, op)
             plotWDL(outf)
-    """
     pgn = '../resources/Ponomariov-Carlsen-2010.pgn'
     outf = '../out/Ponomariov-Carlsen-2010-15000.pgn'
     makeComments(pgn, outf, analysisWDL, nodes, op)
     outf2 = '../out/Ponomariov-Carlsen-2010-15000-2800.pgn'
-    """
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true', 'WDLDrawRateReference': '0.58', 'WDLCalibrationElo': '2800', 'ContemptMode':'black_side_analysis', 'WDLEvalObjectivity': '0.0', 'ScoreType':'WDL_mu'}
     for pgn in pgns:
         name = pgn.split('/')[-1]
@@ -152,8 +174,10 @@ if __name__ == '__main__':
         outf = f'../out/{name[:-4]}-N10000-2800-150.pgn'
         # makeComments(pgn, outf, analysisWDL, 10000, op)
         plotWDL(outf)
-    """
     plotWDL(outf)
     plotWDL(outf2)
     plotWDL(outf3)
     """
+    fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
+    maiaFolder = '/home/julian/chess/maiaNets'
+    print(maiaMoves(fen, maiaFolder))
