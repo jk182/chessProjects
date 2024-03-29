@@ -5,6 +5,7 @@ import chess
 import numpy as np
 import matplotlib.pyplot as plt
 from functions import configureEngine
+import logging
 
 
 def makeComments(gamesFile: str, outfile: str, analysis, nodes: int, options: dict) -> list:
@@ -94,6 +95,7 @@ def findMistakes(pgnPath: str) -> list:
     # Note that the WDL adds up to 1000, so 100 is equivalent to 10%
     mis = 100
     lastWDL = None
+    positions = list()
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
             node = game
@@ -103,6 +105,7 @@ def findMistakes(pgnPath: str) -> list:
                 else:
                     node = node.variations[0]
                     continue
+                pos = node.board().fen()
                 node = node.variations[0]
                 if node.comment:
                     currWDL = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
@@ -111,9 +114,8 @@ def findMistakes(pgnPath: str) -> list:
                     else:
                         diff = currWDL[2]+currWDL[1]*0.5-(lastWDL[2]+lastWDL[1]*0.5)
                     if diff > mis:
-                        # Note that the colours are inverted since we are looking at the game after the mistake
-                        print(node.turn())
-                        print(diff)
+                        positions.append(pos)
+    return positions
 
 
 def plotWDL(pgnPath: str):
@@ -217,9 +219,13 @@ if __name__ == '__main__':
     plotWDL(outf3)
     """
     # Testing for Maia mistake analysis
+    logging.basicConfig(level=logging.WARNING)
     pgn = '../resources/jkGames15.pgn'
     fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
     maiaFolder = '/home/julian/chess/maiaNets'
     # print(maiaMoves(fen, maiaFolder))
     # print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
-    makeComments(pgn, '../out/jkGames15-10000.pgn', analysisWDL, 10000, op)
+    # makeComments(pgn, '../out/jkGames15-10000.pgn', analysisWDL, 10000, op)
+    mistakes = findMistakes('../out/jkGames15-10000.pgn')
+    print(mistakes)
+    print(maiaMoves(mistakes, maiaFolder))
