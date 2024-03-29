@@ -93,9 +93,10 @@ def findMistakes(pgnPath: str) -> list:
     """
     # The number by which the win percentage has to decrease for the move to count as a mistake
     # Note that the WDL adds up to 1000, so 100 is equivalent to 10%
-    mis = 100
+    mis = 150
     lastWDL = None
     positions = list()
+    sf = configureEngine('stockfish', {'Threads': '9', 'Hash': '8192'})
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
             node = game
@@ -105,7 +106,8 @@ def findMistakes(pgnPath: str) -> list:
                 else:
                     node = node.variations[0]
                     continue
-                pos = node.board().fen()
+                board = node.board()
+                pos = board.fen()
                 node = node.variations[0]
                 if node.comment:
                     currWDL = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
@@ -114,7 +116,9 @@ def findMistakes(pgnPath: str) -> list:
                     else:
                         diff = currWDL[2]+currWDL[1]*0.5-(lastWDL[2]+lastWDL[1]*0.5)
                     if diff > mis:
-                        positions.append(pos)
+                        bestMove = sf.analyse(board, chess.engine.Limit(depth=20))['pv'][0]
+                        positions.append((board.san(node.move), pos, board.san(bestMove)))
+    sf.quit()
     return positions
 
 
@@ -153,19 +157,19 @@ def plotWDL(pgnPath: str):
             # plt.show()
 
 
-def maiaMoves(positions: list, maiaFolder: str) -> list:
+def maiaMoves(positions: list, maiaFolder: str) -> dict:
     """
     This function analyses a given position with various Maia models and returns the best move as a string
     positions: list
         The positions as a list of FEN strings
     maiaFolder: str
         The folder containing the Maia models, which should be named 'maia-{rating}.pb'
-    return: list
-        The moves from the various models in a list
+    return: dict
+        The the positions and moves from the various models in a dictionary
     """
-    ret = list()
-    for i in range(len(positions)):
-        ret.append(list())
+    ret = dict()
+    for pos in positions:
+        ret[pos] = list()
 
     for i in range(1, 10):
         # starting the engine new each loop seems wasteful but it gets rid of a caching problem
@@ -177,10 +181,8 @@ def maiaMoves(positions: list, maiaFolder: str) -> list:
             board = Board(pos)
             info = maia.analyse(board, chess.engine.Limit(nodes=1))
             print(info)
-            moves.append(board.san(info['pv'][0]))
+            ret[pos].append(board.san(info['pv'][0]))
         maia.quit()
-        for j in range(len(ret)):
-            ret[j].append(moves[j])
     return ret
 
 
@@ -224,12 +226,18 @@ if __name__ == '__main__':
     """
     # Testing for Maia mistake analysis
     logging.basicConfig(level=logging.FATAL)
-    pgn = '../resources/jkGames15.pgn'
+    pgn = '../resources/jkGames50.pgn'
     fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
     maiaFolder = '/home/julian/chess/maiaNets'
     # print(maiaMoves(fen, maiaFolder))
     # print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
-    # makeComments(pgn, '../out/jkGames15-10000.pgn', analysisWDL, 10000, op)
-    mistakes = findMistakes('../out/jkGames15-10000.pgn')
+    makeComments(pgn, '../out/jkGames50-10000.pgn', analysisWDL, 10000, op)
+    mistakes = findMistakes('../out/jkGames50-10000.pgn')
     print(mistakes)
-    print(maiaMoves(mistakes, maiaFolder))
+    mistakePositions = [ m[1] for m in mistakes ]
+    maiaM = maiaMoves(mistakePositions, maiaFolder)
+    for m in mistakes:
+        print(f'Position: {m[1]}')
+        print(f'Game move: {m[0]}')
+        print(f'Best move: {m[2]}')
+        print(maiaM[m[1]])
