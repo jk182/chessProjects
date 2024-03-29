@@ -151,28 +151,31 @@ def plotWDL(pgnPath: str):
             # plt.show()
 
 
-def maiaMoves(pos: str, maiaFolder: str) -> list:
+def maiaMoves(positions: list, maiaFolder: str) -> list:
     """
     This function analyses a given position with various Maia models and returns the best move as a string
-    pos: str
-        The position as a FEN string
+    positions: list
+        The positions as a list of FEN strings
     maiaFolder: str
         The folder containing the Maia models, which should be named 'maia-{rating}.pb'
     return: list
         The moves from the various models in a list
     """
-    board = Board(pos)
-    moves = list()
-    for i in range(1, 10):
-        # starting the engine new each loop seems wasteful but it gets rid of a caching problem
-        maia = configureEngine('/home/julian/lc0/build/release/lc0', {'UCI_ShowWDL': 'true'})
-        w = f'{maiaFolder}/maia-1{i}00.pb'
-        maia.configure({'WeightsFile': w})
-        info = maia.analyse(board, chess.engine.Limit(nodes=1))
-        print(info)
-        moves.append(board.san(info['pv'][0]))
-        maia.quit()
-    return moves
+    ret = list()
+    for pos in positions:
+        board = Board(pos)
+        moves = list()
+        for i in range(1, 10):
+            # starting the engine new each loop seems wasteful but it gets rid of a caching problem
+            maia = configureEngine('/home/julian/lc0/build/release/lc0', {'UCI_ShowWDL': 'true'})
+            w = f'{maiaFolder}/maia-1{i}00.pb'
+            maia.configure({'WeightsFile': w})
+            info = maia.analyse(board, chess.engine.Limit(nodes=1))
+            print(info)
+            moves.append(board.san(info['pv'][0]))
+            maia.quit()
+        ret.append(moves)
+    return ret
 
 
 if __name__ == '__main__':
@@ -182,6 +185,7 @@ if __name__ == '__main__':
             '../resources/Ponomariov-Carlsen-2010.pgn',
             '../resources/Vidit-Carlsen-2023.pgn']
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
+    # Testing for WDL graphs post
     """
     nodes = [1, 10, 100, 1000, 10000]
     for pgn in pgns:
@@ -212,7 +216,10 @@ if __name__ == '__main__':
     plotWDL(outf2)
     plotWDL(outf3)
     """
+    # Testing for Maia mistake analysis
+    pgn = '../resources/jkGames15.pgn'
     fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
     maiaFolder = '/home/julian/chess/maiaNets'
     # print(maiaMoves(fen, maiaFolder))
-    print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
+    # print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
+    makeComments(pgn, '../out/jkGames15-10000.pgn', analysisWDL, 10000, op)
