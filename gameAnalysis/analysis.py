@@ -164,19 +164,23 @@ def maiaMoves(positions: list, maiaFolder: str) -> list:
         The moves from the various models in a list
     """
     ret = list()
-    for pos in positions:
-        board = Board(pos)
+    for i in range(len(positions)):
+        ret.append(list())
+
+    for i in range(1, 10):
+        # starting the engine new each loop seems wasteful but it gets rid of a caching problem
+        maia = configureEngine('/home/julian/lc0/build/release/lc0', {'UCI_ShowWDL': 'true'})
+        w = f'{maiaFolder}/maia-1{i}00.pb'
+        maia.configure({'WeightsFile': w})
         moves = list()
-        for i in range(1, 10):
-            # starting the engine new each loop seems wasteful but it gets rid of a caching problem
-            maia = configureEngine('/home/julian/lc0/build/release/lc0', {'UCI_ShowWDL': 'true'})
-            w = f'{maiaFolder}/maia-1{i}00.pb'
-            maia.configure({'WeightsFile': w})
+        for pos in positions:
+            board = Board(pos)
             info = maia.analyse(board, chess.engine.Limit(nodes=1))
             print(info)
             moves.append(board.san(info['pv'][0]))
-            maia.quit()
-        ret.append(moves)
+        maia.quit()
+        for j in range(len(ret)):
+            ret[j].append(moves[j])
     return ret
 
 
@@ -219,7 +223,7 @@ if __name__ == '__main__':
     plotWDL(outf3)
     """
     # Testing for Maia mistake analysis
-    logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.FATAL)
     pgn = '../resources/jkGames15.pgn'
     fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
     maiaFolder = '/home/julian/chess/maiaNets'
