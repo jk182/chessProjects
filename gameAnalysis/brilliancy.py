@@ -32,6 +32,6 @@ def getPolicyHead(leela: engine, positions: list) -> list:
 if __name__ == '__main__':
     weights = '/home/julian/Desktop/largeNet'
     leela = configureEngine('lc0', {'WeightsFile': weights, 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
-    positions = ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1']
+    positions = ['r2q1rk1/1pp1bppp/p1n5/3np3/PPB1N1b1/2PP1N2/2Q2PPP/R1B2RK1 w - - 5 14']
     print(getPolicyHead(leela, positions))
     leela.quit()
