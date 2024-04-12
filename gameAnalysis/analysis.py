@@ -8,7 +8,7 @@ from functions import configureEngine
 import logging
 
 
-def makeComments(gamesFile: str, outfile: str, analysis, nodes: int, options: dict) -> list:
+def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: engine) -> list:
     """
     This function plays thorugh the games in a file and makes comments to them.
     The specific comments depend on the analysis method chosen
@@ -23,8 +23,6 @@ def makeComments(gamesFile: str, outfile: str, analysis, nodes: int, options: di
         A list of lists for each game, containing the WDL and score after every move
     """
     
-    leela = configureEngine('/home/julian/lc0/build/release/lc0', options)
-
     gameNR = 1
     with open(gamesFile, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
@@ -47,16 +45,16 @@ def makeComments(gamesFile: str, outfile: str, analysis, nodes: int, options: di
 
                 board.push(move)
                 # Adds a comment after every move with the wdl
-                node.comment = analysis(board, leela, nodes)
+                node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
-    leela.quit()
+    engine.quit()
     return []
 
 
 def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) -> str:
     """
     This function analyses a given chess position with LC0 to get the WDL from whtie's perspective.
-    position:baord
+    position:Board
         The position to analyse
     lc0:engine
         LC0 already as a chess engine
@@ -81,6 +79,25 @@ def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) ->
     for w in wdl_w:
         wdl.append(w)
     return str(wdl)
+
+
+def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
+    """
+    This function analyses a given position with Stockfish and returns the centipawn score.
+    position: Board:
+        The position to analyse
+    sf:engine
+        Stockfish as a configured chess engine
+    timeLimit:int
+        The time in seconds spent on the position
+    return -> str
+        The centipawn score
+    """
+    if position.is_game_over():
+        return ""
+
+    info = sf.analyse(position, chess.engine.Limit(time=timeLimit))
+    return str(info['score'].white())
 
 
 def findMistakes(pgnPath: str) -> list:
@@ -129,10 +146,7 @@ def plotWDL(pgnPath: str):
         The path to a PGN file where the comments are the WDLs
     """
     with open(pgnPath, 'r') as pgn:
-        gameNr = 1
         while (game := chess.pgn.read_game(pgn)):
-            print(gameNr)
-            gameNr += 1
             node = game
             white = game.headers["White"]
             black = game.headers["Black"]
@@ -158,6 +172,44 @@ def plotWDL(pgnPath: str):
             plt.savefig(f'../out/WDLplots/{white}-{black},{event}.png')
 
             # plt.show()
+
+
+def plotCPLDistribution(pgnPath: str):
+    """
+    This method plots a centipawn distribution from the comments of a PGN file
+    pgnPath: str
+        The path to the PGN file
+    """
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            wCPL = dict()
+            bCPL = dict()
+            lastCP = None
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment != 'None':
+                    cp = int(node.comment)
+                    if lastCP:
+                        if node.turn():
+                            cpl = max(0, cp-lastCP)
+                            if cpl in wCPL.keys():
+                                wCPL[cpl] += 1
+                            else:
+                                wCPL[cpl] = 1
+                        else:
+                            cpl = max(0, lastCP-cp)
+                            if cpl in bCPL.keys():
+                                bCPL[cpl] += 1
+                            else:
+                                bCPL[cpl] = 1
+                    lastCP = cp
+
+        fig, ax = plt.subplots()
+        ax.bar(wCPL.keys(), wCPL.values())
+        ax.bar(bCPL.keys(), bCPL.values())
+        plt.show()
 
 
 def maiaMoves(positions: list, maiaFolder: str) -> dict:
@@ -191,15 +243,20 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 
 if __name__ == '__main__':
+    stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
     pgn = '../resources/candidatesRound1.pgn'
     outf = '../out/candidatesRound1-50000.pgn'
-    makeComments(pgn, outf, analysisWDL, 50000, op)
-    plotWDL(outf)
+    # makeComments(pgn, outf, analysisWDL, 50000, op)
+    # plotWDL(outf)
     pgns = ['../resources/Tal-Koblents-1957.pgn',
             '../resources/Ding-Nepo-G12.pgn',
             '../resources/Ponomariov-Carlsen-2010.pgn',
             '../resources/Vidit-Carlsen-2023.pgn']
+    praggNepo = '../resources/Pragg-Nepo.pgn'
+    adventOpen = '../resources/Advent-Open.pgn'
+    makeComments(adventOpen, '../out/Advent-Open-sf.pgn',  analysisCP, 4, stockfish)
+    # plotCPLDistribution('../out/Pragg-Nepo-sf.pgn')
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     # Testing for WDL graphs post
     """
