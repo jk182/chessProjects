@@ -189,27 +189,81 @@ def plotCPLDistribution(pgnPath: str):
 
             while not node.is_end():
                 node = node.variations[0]
-                if node.comment != 'None':
+                if node.comment != 'None' and node.comment:
+                    if '#' in node.comment:
+                        break
                     cp = int(node.comment)
-                    if lastCP:
-                        if node.turn():
-                            cpl = max(0, cp-lastCP)
+                    if lastCP is not None:
+                        if not node.turn():
+                            cpl = max(0, lastCP-cp)
                             if cpl in wCPL.keys():
                                 wCPL[cpl] += 1
                             else:
                                 wCPL[cpl] = 1
                         else:
-                            cpl = max(0, lastCP-cp)
+                            cpl = max(0, cp-lastCP)
                             if cpl in bCPL.keys():
                                 bCPL[cpl] += 1
                             else:
                                 bCPL[cpl] = 1
+                        print(node.turn(), node.move, node.comment, lastCP, cp)
                     lastCP = cp
 
-        fig, ax = plt.subplots()
-        ax.bar(wCPL.keys(), wCPL.values())
-        ax.bar(bCPL.keys(), bCPL.values())
-        plt.show()
+            fig, ax = plt.subplots()
+            ax.bar(wCPL.keys(), wCPL.values(), color="lightgrey")
+            ax.bar(bCPL.keys(), bCPL.values(), color="black")
+            plt.show()
+
+
+def plotCPLDistributionPlayer(pgnPath: str, player: str):
+    """
+    This method plots a centipawn distribution from the comments of a PGN file for a specific player.
+    It plots all games in the file in one graph
+    pgnPath: str
+        The path to the PGN file
+    player: str
+        The name of the player
+    """
+    with open(pgnPath, 'r') as pgn:
+        cpl = dict()
+        while (game := chess.pgn.read_game(pgn)):
+            if player == game.headers["White"]:
+                white = True
+            elif player == game.headers["Black"]:
+                white = False
+            else:
+                continue
+            node = game
+            lastCP = None
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment != 'None' and node.comment:
+                    if '#' in node.comment:
+                        break
+                    cp = int(node.comment)
+                    if lastCP:
+                        if not node.turn() and white:
+                            curCPL = max(0, lastCP-cp)
+                            curCPL = min(curCPL, 300)
+                            if curCPL in cpl.keys():
+                                cpl[curCPL] += 1
+                            else:
+                                cpl[curCPL] = 1
+                        elif node.turn() and not white:
+                            curCPL = max(0, cp-lastCP)
+                            curCPL = min(curCPL, 300)
+                            if curCPL in cpl.keys():
+                                cpl[curCPL] += 1
+                            else:
+                                cpl[curCPL] = 1
+                    lastCP = cp
+
+    fig, ax = plt.subplots()
+    # ax.set_yscale("log")
+    ax.bar(cpl.keys(), cpl.values())
+    plt.show()
+
 
 
 def maiaMoves(positions: list, maiaFolder: str) -> dict:
@@ -243,11 +297,12 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 
 if __name__ == '__main__':
-    stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    pgn = '../resources/candidatesRound1.pgn'
-    outf = '../out/candidatesRound1-50000.pgn'
-    # makeComments(pgn, outf, analysisWDL, 50000, op)
+    # leela = configureEngine('lc0', op)
+    pgn = '../resources/Firouzja-Gukesh.pgn'
+    outf = '../out/Firouzja-Gukesh-30000.pgn'
+    # makeComments(pgn, outf, analysisWDL, 30000, leela)
     # plotWDL(outf)
     pgns = ['../resources/Tal-Koblents-1957.pgn',
             '../resources/Ding-Nepo-G12.pgn',
@@ -255,7 +310,11 @@ if __name__ == '__main__':
             '../resources/Vidit-Carlsen-2023.pgn']
     praggNepo = '../resources/Pragg-Nepo.pgn'
     adventOpen = '../resources/Advent-Open.pgn'
-    makeComments(adventOpen, '../out/Advent-Open-sf.pgn',  analysisCP, 4, stockfish)
+    myGames = '../resources/Austria-Open.pgn'
+    # makeComments(myGames, '../out/myGames-sf.pgn',  analysisCP, 4, stockfish)
+    # makeComments(pgn, '../out/Firouzja-Gukesh-sf.pgn', analysisCP, 4, stockfish)
+    plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
+    # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
     # plotCPLDistribution('../out/Pragg-Nepo-sf.pgn')
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     # Testing for WDL graphs post
