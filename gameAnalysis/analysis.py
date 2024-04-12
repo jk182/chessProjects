@@ -206,12 +206,13 @@ def plotCPLDistribution(pgnPath: str):
                                 bCPL[cpl] += 1
                             else:
                                 bCPL[cpl] = 1
-                        print(node.turn(), node.move, node.comment, lastCP, cp)
+                        # print(node.turn(), node.move, node.comment, lastCP, cp)
                     lastCP = cp
 
             fig, ax = plt.subplots()
-            ax.bar(wCPL.keys(), wCPL.values(), color="lightgrey")
-            ax.bar(bCPL.keys(), bCPL.values(), color="black")
+            ax.set_facecolor("grey")
+            ax.bar(wCPL.keys(), wCPL.values(), color="white", width=1)
+            ax.bar(bCPL.keys(), bCPL.values(), color="black", width=1)
             plt.show()
 
 
@@ -242,16 +243,16 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
                     if '#' in node.comment:
                         break
                     cp = int(node.comment)
-                    if lastCP:
+                    if lastCP is not None:
                         if not node.turn() and white:
-                            curCPL = max(0, lastCP-cp)
+                            curCPL = max(-10, lastCP-cp)
                             curCPL = min(curCPL, 300)
                             if curCPL in cpl.keys():
                                 cpl[curCPL] += 1
                             else:
                                 cpl[curCPL] = 1
                         elif node.turn() and not white:
-                            curCPL = max(0, cp-lastCP)
+                            curCPL = max(-10, cp-lastCP)
                             curCPL = min(curCPL, 300)
                             if curCPL in cpl.keys():
                                 cpl[curCPL] += 1
@@ -261,7 +262,8 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
 
     fig, ax = plt.subplots()
     # ax.set_yscale("log")
-    ax.bar(cpl.keys(), cpl.values())
+    xy = [ (k,v) for k,v in cpl.items() if k > 0]
+    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1)
     plt.show()
 
 
@@ -297,7 +299,7 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 
 if __name__ == '__main__':
-    # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
     # leela = configureEngine('lc0', op)
     pgn = '../resources/Firouzja-Gukesh.pgn'
@@ -312,10 +314,10 @@ if __name__ == '__main__':
     adventOpen = '../resources/Advent-Open.pgn'
     myGames = '../resources/Austria-Open.pgn'
     # makeComments(myGames, '../out/myGames-sf.pgn',  analysisCP, 4, stockfish)
-    # makeComments(pgn, '../out/Firouzja-Gukesh-sf.pgn', analysisCP, 4, stockfish)
-    plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
-    # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
-    # plotCPLDistribution('../out/Pragg-Nepo-sf.pgn')
+    # makeComments('../resources/Vidit-Caruana.pgn', '../out/Vidit-Caruana-sf.pgn', analysisCP, 4, stockfish)
+    # plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
+    plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
+    plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     # Testing for WDL graphs post
     """
