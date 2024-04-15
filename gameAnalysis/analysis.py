@@ -4,7 +4,7 @@ from chess import engine, pgn, Board
 import chess
 import numpy as np
 import matplotlib.pyplot as plt
-from functions import configureEngine
+from functions import configureEngine, sharpnessLC0
 import logging
 
 
@@ -100,6 +100,48 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
     return str(info['score'].white())
 
 
+def sharpnessChangePerPlayer(pgnPath: str) -> dict:
+    """
+    This function takes the path to a PGN file with analysed WDL values and returns the sharpness change per player.
+    pgnPath: str
+        The path to the analysed WDL file
+    return -> dict
+        A dictionary with the player names as keys and their sharpness changes as values
+    """
+    sharpPlayer = dict()
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            white = game.headers["White"]
+            black = game.headers["Black"]
+            # Sharpness of the starting position
+            lastSharp = 0.47
+            w = []
+            d = []
+            l = []
+
+            while not node.is_end():
+                node = node.variations[0]
+                # None should only happen if there is a forced mate
+                if node.comment != 'None' and node.comment:
+                    wdl = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+                    sharp = sharpnessLC0(wdl)
+                    diff = sharp-lastSharp
+                    lastSharp = sharp
+                    if not node.turn():
+                        if white in sharpPlayer.keys():
+                            sharpPlayer[white].append(diff)
+                        else:
+                            sharpPlayer[white] = [diff]
+                    elif node.turn():
+                        if black in sharpPlayer.keys():
+                            sharpPlayer[black].append(diff)
+                        else:
+                            sharpPlayer[black] = [diff]
+    return sharpPlayer
+
+
+
 def findMistakes(pgnPath: str) -> list:
     """
     This function takes a PGN with WDL evaluations and finds the mistakes in the game
@@ -158,7 +200,7 @@ def plotWDL(pgnPath: str):
             while not node.is_end():
                 node = node.variations[0]
                 # None should only happen if there is a forced mate
-                if node.comment != 'None':
+                if node.comment != 'None' and node.comment:
                     wdl = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
                     w.append(wdl[0]/1000)
                     d.append(wdl[1]/1000)
@@ -213,6 +255,8 @@ def plotCPLDistribution(pgnPath: str):
             ax.set_facecolor("grey")
             ax.bar(wCPL.keys(), wCPL.values(), color="white", width=1)
             ax.bar(bCPL.keys(), bCPL.values(), color="black", width=1)
+            plt.xlim(-1, 350)
+            plt.savefig('../out/CPL1.png', dpi=500)
             plt.show()
 
 
@@ -263,7 +307,9 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
     fig, ax = plt.subplots()
     # ax.set_yscale("log")
     xy = [ (k,v) for k,v in cpl.items() if k > 0]
-    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1)
+    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='darkgrey')
+    plt.xlim(0, 305)
+    plt.savefig('../out/CPL2.png', dpi=500)
     plt.show()
 
 
@@ -299,9 +345,20 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 
 if __name__ == '__main__':
-    stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    candidates = '../../projects/chess/candidates_5000n.pgn'
+    playerSharp = sharpnessChangePerPlayer(candidates)
+    for k,v in playerSharp.items():
+        print(k, sum(v)/len(v))
+
+    # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
     # leela = configureEngine('lc0', op)
+    dub = '../resources/dubov.pgn'
+    of = '../out/dubov-wdl.pgn'
+    # makeComments(dub, of, analysisWDL, 5000, leela)
+    for k,v in sharpnessChangePerPlayer(of).items():
+        if 'Dubov' in k:
+            print(k, sum(v)/len(v))
     pgn = '../resources/Firouzja-Gukesh.pgn'
     outf = '../out/Firouzja-Gukesh-30000.pgn'
     # makeComments(pgn, outf, analysisWDL, 30000, leela)
@@ -316,8 +373,8 @@ if __name__ == '__main__':
     # makeComments(myGames, '../out/myGames-sf.pgn',  analysisCP, 4, stockfish)
     # makeComments('../resources/Vidit-Caruana.pgn', '../out/Vidit-Caruana-sf.pgn', analysisCP, 4, stockfish)
     # plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
-    plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
-    plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
+    # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
+    # plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     # Testing for WDL graphs post
     """
