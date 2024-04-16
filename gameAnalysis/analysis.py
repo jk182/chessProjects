@@ -352,12 +352,12 @@ if __name__ == '__main__':
 
     # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    # leela = configureEngine('lc0', op)
+    leela = configureEngine('lc0', op)
     dub = '../resources/dubov.pgn'
     of = '../out/dubov-wdl.pgn'
-    # makeComments(dub, of, analysisWDL, 5000, leela)
-    for k,v in sharpnessChangePerPlayer(of).items():
-        if 'Dubov' in k:
+    makeComments('../resources/carlsen2014.pgn', '../out/carlsen2014-5000.pgn', analysisWDL, 5000, leela)
+    for k,v in sharpnessChangePerPlayer('../out/carlsen2014-5000.pgn').items():
+        if 'Carlsen' in k:
             print(k, sum(v)/len(v))
     pgn = '../resources/Firouzja-Gukesh.pgn'
     outf = '../out/Firouzja-Gukesh-30000.pgn'
