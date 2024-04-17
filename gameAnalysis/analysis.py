@@ -100,11 +100,13 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
     return str(info['score'].white())
 
 
-def sharpnessChangePerPlayer(pgnPath: str) -> dict:
+def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.47) -> dict:
     """
     This function takes the path to a PGN file with analysed WDL values and returns the sharpness change per player.
     pgnPath: str
         The path to the analysed WDL file
+    startSharp: float
+        The sharpness of the starting position
     return -> dict
         A dictionary with the player names as keys and their sharpness changes as values
     """
@@ -115,10 +117,7 @@ def sharpnessChangePerPlayer(pgnPath: str) -> dict:
             white = game.headers["White"]
             black = game.headers["Black"]
             # Sharpness of the starting position
-            lastSharp = 0.47
-            w = []
-            d = []
-            l = []
+            lastSharp = startSharp
 
             while not node.is_end():
                 node = node.variations[0]
@@ -345,14 +344,21 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 
 if __name__ == '__main__':
+    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
+    leela = configureEngine('lc0', op)
+    info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
+    wdl = []
+    wdl_w = engine.PovWdl.white(info['wdl'])
+    for w in wdl_w:
+        wdl.append(w)
+    startSharp = sharpnessLC0(wdl)
+
     candidates = '../../projects/chess/candidates_5000n.pgn'
-    playerSharp = sharpnessChangePerPlayer(candidates)
+    playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
     for k,v in playerSharp.items():
         print(k, sum(v)/len(v))
 
     # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
-    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    leela = configureEngine('lc0', op)
     dub = '../resources/dubov.pgn'
     of = '../out/dubov-wdl.pgn'
     makeComments('../resources/carlsen2014.pgn', '../out/carlsen2014-5000.pgn', analysisWDL, 5000, leela)
