@@ -332,8 +332,9 @@ def plotSharpChange(sharpChange: dict, player: str = ''):
     fig, ax = plt.subplots()
     plt.xticks(rotation=90)
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.2)
-    ax.bar(x,y)
+    fig.subplots_adjust(bottom=0.25, top=0.95, left=0.1, right=0.95)
+    plt.xlim(-1, len(x))
+    ax.bar(x,y, edgecolor='black', linewidth=0.5)
     plt.show()
 
 
@@ -388,16 +389,16 @@ if __name__ == '__main__':
     dub = '../resources/dubov.pgn'
     of = '../out/dubov-wdl.pgn'
     # makeComments('../resources/carlsen2019-2.pgn', '../out/carlsen2019-5000.pgn', analysisWDL, 5000, leela)
-    """
     for k,v in sharpnessChangePerPlayer('../out/tal-botvinnik-1960-5000.pgn', 0.468).items():
         print(k, sum(v)/len(v))
+    carlsen = ['../out/carlsen2014-5000.pgn', '../out/carlsen2019-5000.pgn']
     """
-    carlsen = ['../resources/carlsen2014-5000.pgn', '../resources/carlsen2019-5000.pgn']
     for c in carlsen:
         for k,v in sharpnessChangePerPlayer(c, 0.468).items():
             if 'Carlsen' in k:
                 nv = [val for val in v if not np.isinf(val)]
                 print(k, sum(nv)/len(nv))
+    """
     plotSharpChange(sharpnessChangePerPlayer(candidates))
     pgn = '../resources/Firouzja-Gukesh.pgn'
     outf = '../out/Firouzja-Gukesh-30000.pgn'
