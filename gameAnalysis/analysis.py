@@ -352,19 +352,18 @@ if __name__ == '__main__':
     for w in wdl_w:
         wdl.append(w)
     startSharp = sharpnessLC0(wdl)
-
     candidates = '../../projects/chess/candidates_5000n.pgn'
+    """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
     for k,v in playerSharp.items():
         print(k, sum(v)/len(v))
-
+    """
     # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     dub = '../resources/dubov.pgn'
     of = '../out/dubov-wdl.pgn'
-    makeComments('../resources/carlsen2014.pgn', '../out/carlsen2014-5000.pgn', analysisWDL, 5000, leela)
-    for k,v in sharpnessChangePerPlayer('../out/carlsen2014-5000.pgn').items():
-        if 'Carlsen' in k:
-            print(k, sum(v)/len(v))
+    makeComments('../resources/carlsen2019-2.pgn', '../out/carlsen2019-5000.pgn', analysisWDL, 5000, leela)
+    for k,v in sharpnessChangePerPlayer('../out/tal-botvinnik-1960-5000.pgn', 0.468).items():
+        print(k, sum(v)/len(v))
     pgn = '../resources/Firouzja-Gukesh.pgn'
     outf = '../out/Firouzja-Gukesh-30000.pgn'
     # makeComments(pgn, outf, analysisWDL, 30000, leela)
