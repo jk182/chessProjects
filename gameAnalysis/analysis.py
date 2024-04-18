@@ -100,7 +100,7 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
     return str(info['score'].white())
 
 
-def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.47) -> dict:
+def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
     """
     This function takes the path to a PGN file with analysed WDL values and returns the sharpness change per player.
     pgnPath: str
@@ -312,6 +312,30 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
     plt.show()
 
 
+def plotSharpChange(sharpChange: dict, player: str = ''):
+    """
+    This function takes a dictionary with the sharpness change per move and plots the average as a bar chart.
+    A player name can be specified if one is only interested in the sharpness for this player.
+    sharpChange: dict
+        The sharpness change
+    player: str
+        The name of the player one is interested in
+    """
+    x = list()
+    y = list()
+    for p,sharp in sharpChange.items():
+        if player in p:
+            finSharp = [ s for s in sharp if not np.isinf(s) ]
+            x.append(p.split(',')[0])
+            y.append(sum(finSharp)/len(finSharp))
+
+    fig, ax = plt.subplots()
+    plt.xticks(rotation=90)
+    plt.axhline(0, color='black', linewidth=0.5)
+    fig.subplots_adjust(bottom=0.2)
+    ax.bar(x,y)
+    plt.show()
+
 
 def maiaMoves(positions: list, maiaFolder: str) -> dict:
     """
@@ -345,6 +369,7 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
+    """
     leela = configureEngine('lc0', op)
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
@@ -352,6 +377,7 @@ if __name__ == '__main__':
     for w in wdl_w:
         wdl.append(w)
     startSharp = sharpnessLC0(wdl)
+    """
     candidates = '../../projects/chess/candidates_5000n.pgn'
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
@@ -361,9 +387,18 @@ if __name__ == '__main__':
     # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     dub = '../resources/dubov.pgn'
     of = '../out/dubov-wdl.pgn'
-    makeComments('../resources/carlsen2019-2.pgn', '../out/carlsen2019-5000.pgn', analysisWDL, 5000, leela)
+    # makeComments('../resources/carlsen2019-2.pgn', '../out/carlsen2019-5000.pgn', analysisWDL, 5000, leela)
+    """
     for k,v in sharpnessChangePerPlayer('../out/tal-botvinnik-1960-5000.pgn', 0.468).items():
         print(k, sum(v)/len(v))
+    """
+    carlsen = ['../resources/carlsen2014-5000.pgn', '../resources/carlsen2019-5000.pgn']
+    for c in carlsen:
+        for k,v in sharpnessChangePerPlayer(c, 0.468).items():
+            if 'Carlsen' in k:
+                nv = [val for val in v if not np.isinf(val)]
+                print(k, sum(nv)/len(nv))
+    plotSharpChange(sharpnessChangePerPlayer(candidates))
     pgn = '../resources/Firouzja-Gukesh.pgn'
     outf = '../out/Firouzja-Gukesh-30000.pgn'
     # makeComments(pgn, outf, analysisWDL, 30000, leela)
