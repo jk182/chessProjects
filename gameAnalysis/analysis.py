@@ -1,4 +1,5 @@
 # This file should contain different functions to analyse a chess game
+# TODO: analysis with WDL+CP is very janky
 
 from chess import engine, pgn, Board
 import chess
@@ -6,9 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from functions import configureEngine, sharpnessLC0
 import logging
+import evalDB
 
 
-def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: engine) -> list:
+def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: engine, cache: bool = False) -> list:
     """
     This function plays thorugh the games in a file and makes comments to them.
     The specific comments depend on the analysis method chosen
@@ -19,6 +21,10 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
     analysis
         This is a function which analyses to positions. I kept it separate sicne 
         it's easier to change the type of analysis (WDL, centipawns, ...)
+    engine: engine
+        The engine to analyse. Note that it must fit with the analysis function (a bit inelegant)
+    cache: bool
+        If this is set to true, caching will be enabled, using evalDB
     return -> list
         A list of lists for each game, containing the WDL and score after every move
     """
@@ -45,7 +51,22 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
 
                 board.push(move)
                 # Adds a comment after every move with the wdl
-                node.comment = analysis(board, engine, limit)
+                if cache:
+                    pos = board.fen()
+                    if evalDB.contains(pos):
+                        # TODO: not general enough
+                        wdl = str(evalDB.getEval(pos, True))
+                        cp = str(evalDB.getEval(pos, False))
+                        print('Cache hit!')
+                        node.comment = f'{wdl};{cp}'
+                    else:
+                        ana = analysis(board, engine, limit)
+                        node.comment = ana
+                        cp = int(ana.split(';')[1])
+                        wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
+                        evalDB.insert(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2])
+                else:
+                    node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
     engine.quit()
     return []
@@ -98,6 +119,31 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
 
     info = sf.analyse(position, chess.engine.Limit(time=timeLimit))
     return str(info['score'].white())
+
+
+def analysisCPnWDL(position: Board, lc0: engine, nodes: int) -> str:
+    """
+    This function analyses a position both with LC0 and Stockfish. It returns the WDL and CP score.
+    """
+    if position.is_game_over():
+        return ""
+
+    time = 4
+    # Defining Stockfish here is not ideal, but it's the easiest way right now
+    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    iLC0 = lc0.analyse(position, chess.engine.Limit(nodes=nodes))
+    iSF = sf.analyse(position, chess.engine.Limit(time=time))
+    wdl = []
+    wdl_w = engine.PovWdl.white(iLC0['wdl'])
+    for w in wdl_w:
+        wdl.append(w)
+    cp = str(iSF["score"].white())
+    if '#' in cp:
+        if '+' in cp:
+            cp = 10000
+        else:
+            cp = -10000
+    return f'{str(wdl)};{cp}'
 
 
 def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
@@ -379,7 +425,9 @@ if __name__ == '__main__':
         wdl.append(w)
     startSharp = sharpnessLC0(wdl)
     """
-    candidates = '../../projects/chess/candidates_5000n.pgn'
+    candidates = '../resources/candidtesR1-12.pgn'
+    outCan = '../out/candidates2024-WDL+CP.pgn'
+    makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
     for k,v in playerSharp.items():
@@ -389,8 +437,8 @@ if __name__ == '__main__':
     dub = '../resources/dubov.pgn'
     of = '../out/dubov-wdl.pgn'
     # makeComments('../resources/carlsen2019-2.pgn', '../out/carlsen2019-5000.pgn', analysisWDL, 5000, leela)
-    for k,v in sharpnessChangePerPlayer('../out/tal-botvinnik-1960-5000.pgn', 0.468).items():
-        print(k, sum(v)/len(v))
+    # for k,v in sharpnessChangePerPlayer('../out/tal-botvinnik-1960-5000.pgn', 0.468).items():
+    #     print(k, sum(v)/len(v))
     carlsen = ['../out/carlsen2014-5000.pgn', '../out/carlsen2019-5000.pgn']
     """
     for c in carlsen:
@@ -403,7 +451,7 @@ if __name__ == '__main__':
     pgn = '../resources/naka-nepo.pgn'
     outf = '../out/naka-nepo-30000.pgn'
     # makeComments(pgn, outf, analysisWDL, 30000, leela)
-    plotWDL(outf)
+    # plotWDL(outf)
     pgns = ['../resources/Tal-Koblents-1957.pgn',
             '../resources/Ding-Nepo-G12.pgn',
             '../resources/Ponomariov-Carlsen-2010.pgn',
