@@ -22,18 +22,32 @@ def createTable(name: str):
             )""")
 
 
-def insert(connection, position: str, nodes: int = None, w: int = None, d: int = None, l: int = None, depth: int = None, cp: float = None, mate: int = None, pv: str = None):
+def insert(position: str, nodes: int = -1, w: int = None, d: int = -1, l: int = None, depth: int = None, cp: float = None, mate: int = None, pv: str = None):
+    """
+    Inserting data into the table.
+    Default values of nodes and depth are -1, if there is only an evaluation by LC0 or SF and not by both.
+    """
+    con = sqlite3.connect('evaluation.db')
     cursor = con.cursor()
     cursor.execute(f'INSERT INTO eval VALUES ("{position}", "{nodes}", "{w}", "{d}", "{l}", "{depth}", "{cp}", "{mate}", "{pv}")')
-    connection.commit()
+    con.commit()
+
+
+def update(position: str, nodes: int = -1, w: int = None, d: int = -1, l: int = None, depth: int = None, cp: float = None, mate: int = None, pv: str = None):
+    con = sqlite3.connect('evaluation.db')
+    cur = con.cursor()
+    nd = cur.execute(f'SELECT nodes, depth FROM eval WHERE position="{position}"')
+    # TODO: check if position is in DB and nodes or depth are higher than before, then update
+    print(nd.fetchall())
 
 
 if __name__ == '__main__':
     DBname = 'evaluation.db'
-    con = sqlite3.connect(DBname)
-    cur = con.cursor()
     # cur.execute("DROP TABLE IF EXISTS eval")
     # createTable(DBname)
-    print(cur.execute("SELECT name FROM sqlite_master").fetchone())
-    insert(con, 'test', 5, 200, 1000, 700)
+    # print(cur.execute("SELECT name FROM sqlite_master").fetchone())
+    insert('test2', depth=5)
+    con = sqlite3.connect(DBname)
+    cur = con.cursor()
     print(cur.execute('SELECT * FROM eval').fetchall())
+    update('test')
