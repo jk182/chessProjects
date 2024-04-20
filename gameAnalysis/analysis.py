@@ -212,7 +212,7 @@ def plotWDL(pgnPath: str):
             ax.stackplot(range(len(w)), y, colors=["#FDFDFD", "#989898", "#020202"])
             plt.savefig(f'../out/WDLplots/{white}-{black},{event}.png')
 
-            # plt.show()
+            plt.show()
 
 
 def plotCPLDistribution(pgnPath: str):
@@ -370,8 +370,8 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    """
     leela = configureEngine('lc0', op)
+    """
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
     wdl_w = engine.PovWdl.white(info['wdl'])
@@ -399,11 +399,11 @@ if __name__ == '__main__':
                 nv = [val for val in v if not np.isinf(val)]
                 print(k, sum(nv)/len(nv))
     """
-    plotSharpChange(sharpnessChangePerPlayer(candidates))
-    pgn = '../resources/Firouzja-Gukesh.pgn'
-    outf = '../out/Firouzja-Gukesh-30000.pgn'
+    # plotSharpChange(sharpnessChangePerPlayer(candidates))
+    pgn = '../resources/naka-nepo.pgn'
+    outf = '../out/naka-nepo-30000.pgn'
     # makeComments(pgn, outf, analysisWDL, 30000, leela)
-    # plotWDL(outf)
+    plotWDL(outf)
     pgns = ['../resources/Tal-Koblents-1957.pgn',
             '../resources/Ding-Nepo-G12.pgn',
             '../resources/Ponomariov-Carlsen-2010.pgn',
