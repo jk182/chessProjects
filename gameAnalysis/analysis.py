@@ -61,10 +61,11 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                         node.comment = f'{wdl};{cp}'
                     else:
                         ana = analysis(board, engine, limit)
-                        node.comment = ana
-                        cp = int(ana.split(';')[1])
-                        wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
-                        evalDB.insert(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2])
+                        if ana:
+                            node.comment = ana
+                            cp = int(ana.split(';')[1])
+                            wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
+                            evalDB.insert(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2])
                 else:
                     node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
@@ -425,7 +426,7 @@ if __name__ == '__main__':
         wdl.append(w)
     startSharp = sharpnessLC0(wdl)
     """
-    candidates = '../resources/candidtesR1-12.pgn'
+    candidates = '../resources/candidatesR14.pgn'
     outCan = '../out/candidates2024-WDL+CP.pgn'
     makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
     """
