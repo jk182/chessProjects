@@ -307,50 +307,6 @@ def plotCPLDistribution(pgnPath: str):
             plt.show()
 
 
-def plotAccuracyDistribution(pgnPath: str):
-    """
-    This method plots an accuracy distribution from the comments of a PGN file
-    pgnPath: str
-        The path to the PGN file
-    """
-    with open(pgnPath, 'r') as pgn:
-        while (game := chess.pgn.read_game(pgn)):
-            node = game
-            wAcc = dict()
-            bAcc = dict()
-            lastWp = None
-
-            while not node.is_end():
-                node = node.variations[0]
-                if node.comment != 'None' and node.comment:
-                    if '#' in node.comment:
-                        break
-                    cp = int(node.comment)
-                    wp = functions.winP(cp)
-                    if lastWp is not None:
-                        if not node.turn():
-                            acc = functions.accuracy(lastWp, wp)
-                            if acc in wAcc.keys():
-                                wAcc[acc] += 1
-                            else:
-                                wAcc[acc] = 1
-                        else:
-                            acc = functions.accuracy(wp, lastWp)
-                            if acc in bAcc.keys():
-                                bAcc[acc] += 1
-                            else:
-                                bAcc[acc] = 1
-                        # print(node.turn(), node.move, node.comment, lastCP, cp)
-                    lastWp = wp
-
-            fig, ax = plt.subplots()
-            ax.set_facecolor("grey")
-            ax.bar(wAcc.keys(), wAcc.values(), color="white", width=1)
-            ax.bar(bAcc.keys(), bAcc.values(), color="black", width=1)
-            # plt.savefig('../out/CPL1.png', dpi=500)
-            plt.show()
-
-
 def plotCPLDistributionPlayer(pgnPath: str, player: str):
     """
     This method plots a centipawn distribution from the comments of a PGN file for a specific player.
@@ -432,7 +388,12 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
                 if node.comment != 'None' and node.comment:
                     if '#' in node.comment:
                         break
-                    cp = int(node.comment)
+
+                    if ';' in node.comment:
+                        # int(float()) because '28.0' cannot be converted to an int
+                        cp = int(float(node.comment.split(';')[-1]))
+                    else:
+                        cp = int(node.comment)
                     wp = functions.winP(cp)
                     if lastWp is not None:
                         if not node.turn() and white:
@@ -452,10 +413,10 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
                     lastWp = wp
 
     fig, ax = plt.subplots()
-    # ax.set_yscale("log")
-    xy = [ (k,v) for k,v in accDis.items() if k <= 99]
+    ax.set_yscale("log")
+    xy = [ (k,v) for k,v in accDis.items() if k <= 100]
     ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='darkgrey')
-    plt.xlim(0, 99)
+    plt.xlim(0, 100)
     ax.invert_xaxis()
     if outFile:
         plt.savefig(outFile, dpi=500)

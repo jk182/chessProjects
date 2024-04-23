@@ -15,11 +15,12 @@ def getPlayers(pgnPath: str) -> list:
     """
     players = list()
     with open(pgnPath, 'r') as pgn:
-        while game := chess.pgn.read_game():
-            if w := game.headers["White"] not in players:
+        while (game := chess.pgn.read_game(pgn)):
+            if (w := game.headers["White"]) not in players:
                 players.append(w)
-            if b := game.headers["Black"] not in players:
+            if (b := game.headers["Black"]) not in players:
                 players.append(b)
+    print(players)
     return players
 
 
@@ -31,4 +32,11 @@ def generateAccDistributionGraphs(pgnPath: str, players: list):
     players: list
         A list of the names of the players in the tournament
     """
-    
+    for player in players:
+        analysis.plotAccuracyDistributionPlayer(pgnPath, player, f'../out/{player}-{pgnPath.split("/")[-1][:-4]}')
+
+
+if __name__ == '__main__':
+    t = '../out/candidates2024-WDL+CP.pgn'
+    players = getPlayers(t)
+    generateAccDistributionGraphs(t, players)
