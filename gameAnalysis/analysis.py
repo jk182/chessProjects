@@ -5,6 +5,7 @@ from chess import engine, pgn, Board
 import chess
 import numpy as np
 import matplotlib.pyplot as plt
+import functions
 from functions import configureEngine, sharpnessLC0
 import logging
 import evalDB
@@ -306,6 +307,50 @@ def plotCPLDistribution(pgnPath: str):
             plt.show()
 
 
+def plotAccuracyDistribution(pgnPath: str):
+    """
+    This method plots an accuracy distribution from the comments of a PGN file
+    pgnPath: str
+        The path to the PGN file
+    """
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            wAcc = dict()
+            bAcc = dict()
+            lastWp = None
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment != 'None' and node.comment:
+                    if '#' in node.comment:
+                        break
+                    cp = int(node.comment)
+                    wp = functions.winP(cp)
+                    if lastWp is not None:
+                        if not node.turn():
+                            acc = functions.accuracy(lastWp, wp)
+                            if acc in wAcc.keys():
+                                wAcc[acc] += 1
+                            else:
+                                wAcc[acc] = 1
+                        else:
+                            acc = functions.accuracy(wp, lastWp)
+                            if acc in bAcc.keys():
+                                bAcc[acc] += 1
+                            else:
+                                bAcc[acc] = 1
+                        # print(node.turn(), node.move, node.comment, lastCP, cp)
+                    lastWp = wp
+
+            fig, ax = plt.subplots()
+            ax.set_facecolor("grey")
+            ax.bar(wAcc.keys(), wAcc.values(), color="white", width=1)
+            ax.bar(bAcc.keys(), bAcc.values(), color="black", width=1)
+            # plt.savefig('../out/CPL1.png', dpi=500)
+            plt.show()
+
+
 def plotCPLDistributionPlayer(pgnPath: str, player: str):
     """
     This method plots a centipawn distribution from the comments of a PGN file for a specific player.
@@ -357,6 +402,65 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
     plt.xlim(0, 305)
     plt.savefig('../out/CPL2.png', dpi=500)
     plt.show()
+
+
+def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = None):
+    """
+    This method plots an accuracy distribution from the comments of a PGN file for a specific player.
+    It plots all games in the file in one graph
+    pgnPath: str
+        The path to the PGN file
+    player: str
+        The name of the player
+    outFile: str
+        Filename of the plot if it should be saved instead of shown
+    """
+    with open(pgnPath, 'r') as pgn:
+        accDis = dict()
+        while (game := chess.pgn.read_game(pgn)):
+            if player == game.headers["White"]:
+                white = True
+            elif player == game.headers["Black"]:
+                white = False
+            else:
+                continue
+            node = game
+            lastWp = None
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment != 'None' and node.comment:
+                    if '#' in node.comment:
+                        break
+                    cp = int(node.comment)
+                    wp = functions.winP(cp)
+                    if lastWp is not None:
+                        if not node.turn() and white:
+                            acc = min(100, functions.accuracy(lastWp, wp))
+                            acc = int(acc)
+                            if acc in accDis.keys():
+                                accDis[acc] += 1
+                            else:
+                                accDis[acc] = 1
+                        elif node.turn() and not white:
+                            acc = min(100, functions.accuracy(wp, lastWp))
+                            acc = int(acc)
+                            if acc in accDis.keys():
+                                accDis[acc] += 1
+                            else:
+                                accDis[acc] = 1
+                    lastWp = wp
+
+    fig, ax = plt.subplots()
+    # ax.set_yscale("log")
+    xy = [ (k,v) for k,v in accDis.items() if k <= 99]
+    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='darkgrey')
+    plt.xlim(0, 99)
+    ax.invert_xaxis()
+    if outFile:
+        plt.savefig(outFile, dpi=500)
+    else:
+        plt.show()
 
 
 def plotSharpChange(sharpChange: dict, player: str = ''):
@@ -417,7 +521,7 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    leela = configureEngine('lc0', op)
+    # leela = configureEngine('lc0', op)
     """
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
@@ -428,7 +532,7 @@ if __name__ == '__main__':
     """
     candidates = '../resources/candidatesR14.pgn'
     outCan = '../out/candidates2024-WDL+CP.pgn'
-    makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
+    # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
     for k,v in playerSharp.items():
@@ -465,6 +569,8 @@ if __name__ == '__main__':
     # plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
     # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
     # plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
+    plotAccuracyDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
+    plotAccuracyDistribution('../out/Vidit-Caruana-sf.pgn')
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     # Testing for WDL graphs post
     """
