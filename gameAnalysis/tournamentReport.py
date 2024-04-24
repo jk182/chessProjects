@@ -4,6 +4,7 @@
 import analysis
 import chess
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def getPlayers(pgnPath: str) -> list:
@@ -21,7 +22,6 @@ def getPlayers(pgnPath: str) -> list:
                 players.append(w)
             if (b := game.headers["Black"]) not in players:
                 players.append(b)
-    print(players)
     return players
 
 
@@ -156,20 +156,20 @@ def worseGames(pgnPath: str) -> dict:
     return games
 
 
-def sortPlayersByScore(scores: dict) -> list:
+def sortPlayers(d: dict, index: int) -> list:
     """
-    This function takes a score dictionary and returns a list of the players names sorted by their score
+    This function takes a dictionary with a list as values and sorts the keys by the value at the index of the list
     """
 
     players = list()
-    for i in range(len(scores.keys())):
-        highscore = -1
-        for player, score in scores.items():
-            if player in players:
+    for i in range(len(d.keys())):
+        maximum = -1
+        for k, v in d.items():
+            if k in players:
                 continue
-            if score[1] > highscore:
-                p = player
-                highscore = score[1]
+            if v[index] > maximum:
+                p = k
+                maximum = v[index]
         players.append(p)
     return players
 
@@ -201,7 +201,7 @@ def plotScores(scores: dict, short: dict = None):
     """
     This function plots the scores of the tournament
     """
-    sortedPlayers = sortPlayersByScore(scores)
+    sortedPlayers = sortPlayers(scores, 1)
     colors = {3: 'white', 5: 'black'}
     fig, ax = plt.subplots()
     plt.xticks(rotation=90)
@@ -219,6 +219,30 @@ def plotScores(scores: dict, short: dict = None):
     plt.show()
 
 
+def plotWorseGames(worse: dict, short: dict = None):
+    """
+    This function plots the number of games in which the players were worse and the number of games they lost
+    """
+    sort = list(reversed(sortPlayers(worse, 0)))
+    labels = list()
+    for i, player in enumerate(sort):
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
+        labels.append(p)
+
+    fig, ax = plt.subplots()
+    plt.xticks(rotation=90)
+    plt.yticks(range(0,10))
+    ax.set_facecolor('#e6f7f2')
+    plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
+    for i,player in enumerate(sort):
+        ax.bar(i+1-0.2, worse[player][0], color='blue', edgecolor='black', linewidth=0.5, width=0.4)
+        ax.bar(i+1+0.2, worse[player][1], color='orange', edgecolor='black', linewidth=0.5, width=0.4)
+    plt.show()
+
+
 if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
@@ -229,4 +253,5 @@ if __name__ == '__main__':
     sharpChange = analysis.sharpnessChangePerPlayer(t)
     # analysis.plotSharpChange(sharpChange)
     # plotScores(scores, nicknames)
-    print(worseGames(t))
+    worse = worseGames(t)
+    plotWorseGames(worse, nicknames)
