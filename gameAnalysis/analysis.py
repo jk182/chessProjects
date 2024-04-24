@@ -415,12 +415,14 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
                             else:
                                 accDis[acc] = 1
                     lastWp = wp
+    p = player.split(',')[0]
 
     fig, ax = plt.subplots()
     ax.set_yscale("log")
     xy = [ (k,v) for k,v in accDis.items() if k <= 100]
-    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='darkgrey')
+    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='#689bf2')
     plt.xlim(0, 100)
+    ax.legend([f"Accuracy\n{p}"], loc="upper right")
     ax.invert_xaxis()
     if outFile:
         plt.savefig(outFile, dpi=500)
@@ -450,7 +452,8 @@ def plotSharpChange(sharpChange: dict, player: str = ''):
     plt.axhline(0, color='black', linewidth=0.5)
     fig.subplots_adjust(bottom=0.25, top=0.95, left=0.1, right=0.95)
     plt.xlim(-1, len(x))
-    ax.bar(x,y, edgecolor='black', linewidth=0.5)
+    ax.bar(x,y, edgecolor='black', linewidth=0.5, color='#fa5a5a')
+    ax.legend(['Avg. sharp change per move'])
     plt.show()
 
 

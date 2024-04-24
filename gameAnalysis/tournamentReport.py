@@ -181,7 +181,7 @@ def createMovePlot(moves: dict, short: dict = None):
         This is a dict that replaces names that are too long with shorter alternatives
     """
     # TODO: pick nicer colors
-    colors = ['#1bb007', '#90fc65', '#818181', '#f58522', '#f52922']
+    colors = ['#39b84e', '#6fc97e', '#f5f1b5', '#f08365', '#f24333']
 
     fig, ax = plt.subplots()
     plt.xticks(rotation=90)
@@ -192,7 +192,7 @@ def createMovePlot(moves: dict, short: dict = None):
                 p = short[p]
         bottom = 0
         for i in range(len(m)-1, 0, -1):
-            ax.bar(p, m[i], bottom=bottom, color=colors[i-1])
+            ax.bar(p, m[i], bottom=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2)
             bottom += m[i]
     plt.show()
 
@@ -237,9 +237,9 @@ def plotWorseGames(worse: dict, short: dict = None):
     plt.yticks(range(0,10))
     ax.set_facecolor('#e6f7f2')
     plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
-    for i,player in enumerate(sort):
-        ax.bar(i+1-0.2, worse[player][0], color='blue', edgecolor='black', linewidth=0.5, width=0.4)
-        ax.bar(i+1+0.2, worse[player][1], color='orange', edgecolor='black', linewidth=0.5, width=0.4)
+    ax.bar([ i+1-0.2 for i in range(len(sort)) ], [ worse[p][0] for p in sort ], color='#689bf2', edgecolor='black', linewidth=0.5, width=0.4, label='# of worse games')
+    ax.bar([ i+1+0.2 for i in range(len(sort)) ], [ worse[p][1] for p in sort ], color='#5afa8d', edgecolor='black', linewidth=0.5, width=0.4, label='# of lost games')
+    ax.legend()
     plt.show()
 
 
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     scores = getPlayerScores(t)
     # createMovePlot(getMoveSituation(t), nicknames)
     sharpChange = analysis.sharpnessChangePerPlayer(t)
-    # analysis.plotSharpChange(sharpChange)
-    # plotScores(scores, nicknames)
+    analysis.plotSharpChange(sharpChange)
+    plotScores(scores, nicknames)
     worse = worseGames(t)
     plotWorseGames(worse, nicknames)
