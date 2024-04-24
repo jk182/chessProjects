@@ -171,7 +171,11 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
                 node = node.variations[0]
                 # None should only happen if there is a forced mate
                 if node.comment != 'None' and node.comment:
-                    wdl = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+                    if ';' in node.comment:
+                        c = node.comment.split(';')[0]
+                    else:
+                        c = node.comment
+                    wdl = [ int(w) for w in c.replace('[', '').replace(']', '').strip().split(',') ]
                     sharp = sharpnessLC0(wdl)
                     diff = sharp-lastSharp
                     lastSharp = sharp

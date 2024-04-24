@@ -3,6 +3,7 @@
 
 import analysis
 import chess
+import matplotlib.pyplot as plt
 
 
 def getPlayers(pgnPath: str) -> list:
@@ -38,7 +39,7 @@ def generateAccDistributionGraphs(pgnPath: str, players: list):
 
 def getPlayerScores(pgnPath: str) -> dict:
     """
-    This functions gets the scores for all players in a tournamet
+    This function gets the scores for all players in a tournamet
     pgnPath: str
         The path to the PGN file of the tournament
     return -> dict
@@ -73,8 +74,159 @@ def getPlayerScores(pgnPath: str) -> dict:
     return scores
 
 
+def getMoveSituation(pgnPath: str) -> dict:
+    """
+    This function returns a dictionary index by the players and containing the number of moves where they were:
+        much better (1+), slightly better (1-0.5), equal, slightly worse and much worse
+    """
+    moves = dict()
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            w = game.headers["White"]
+            b = game.headers["Black"]
+            if w not in moves.keys():
+                moves[w] = [0, 0, 0, 0, 0, 0]
+            if b not in moves.keys():
+                moves[b] = [0, 0, 0, 0, 0, 0]
+            node = game
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment != 'None' and node.comment:
+                    cp = int(float(node.comment.split(';')[-1]))
+                    if not node.turn():
+                        moves[w][0] += 1
+                        if cp > 100:
+                            moves[w][1] += 1
+                        elif cp >= 50:
+                            moves[w][2] += 1
+                        elif cp >= -50:
+                            moves[w][3] += 1
+                        elif cp > -100:
+                            moves[w][4] += 1
+                        else:
+                            moves[w][5] += 1
+                    else:
+                        moves[b][0] += 1
+                        if cp > 100:
+                            moves[b][5] += 1
+                        elif cp >= 50:
+                            moves[b][4] += 1
+                        elif cp >= -50:
+                            moves[b][3] += 1
+                        elif cp > -100:
+                            moves[b][2] += 1
+                        else:
+                            moves[b][1] += 1
+    return moves
+
+
+def worseGames(pgnPath: str) -> dict:
+    """
+    This function counts the number of games where a player was worse and the number of lost games.
+    """
+    games = dict()
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            w = game.headers["White"]
+            b = game.headers["Black"]
+            r = game.headers["Result"]
+            if w not in games.keys():
+                games[w] = [0, 0]
+            if b not in games.keys():
+                games[b] = [0, 0]
+            if r == '1-0':
+                games[b][1] += 1
+            elif r == '0-1':
+                games[w][1] += 1
+
+            node = game
+            rec = [False, False]
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment:
+                    cp = int(float(node.comment.split(';')[-1]))
+                    if cp < -100 and not rec[0]:
+                        games[w][0] += 1
+                        rec[0] = True
+                    elif cp > 100 and not rec[1]:
+                        games[b][0] += 1
+                        rec[1] = True
+    return games
+
+
+def sortPlayersByScore(scores: dict) -> list:
+    """
+    This function takes a score dictionary and returns a list of the players names sorted by their score
+    """
+
+    players = list()
+    for i in range(len(scores.keys())):
+        highscore = -1
+        for player, score in scores.items():
+            if player in players:
+                continue
+            if score[1] > highscore:
+                p = player
+                highscore = score[1]
+        players.append(p)
+    return players
+
+
+def createMovePlot(moves: dict, short: dict = None):
+    """
+    This creates a plot with the number of moves a player spent being better or worse
+    short: dict
+        This is a dict that replaces names that are too long with shorter alternatives
+    """
+    # TODO: pick nicer colors
+    colors = ['#1bb007', '#90fc65', '#818181', '#f58522', '#f52922']
+
+    fig, ax = plt.subplots()
+    plt.xticks(rotation=90)
+    for player, m in moves.items():
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
+        bottom = 0
+        for i in range(len(m)-1, 0, -1):
+            ax.bar(p, m[i], bottom=bottom, color=colors[i-1])
+            bottom += m[i]
+    plt.show()
+
+
+def plotScores(scores: dict, short: dict = None):
+    """
+    This function plots the scores of the tournament
+    """
+    sortedPlayers = sortPlayersByScore(scores)
+    colors = {3: 'white', 5: 'black'}
+    fig, ax = plt.subplots()
+    plt.xticks(rotation=90)
+    plt.yticks(range(0,10))
+    ax.set_facecolor('#e6f7f2')
+    for player in sortedPlayers:
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
+        bottom = 0
+        for i in [3, 5]:
+            ax.bar(p, scores[player][i], bottom=bottom, color=colors[i], edgecolor='black', linewidth=0.7)
+            bottom += scores[player][i]
+    plt.show()
+
+
 if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
+    nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
     # generateAccDistributionGraphs(t, players)
-    print(getPlayerScores(t))
+    scores = getPlayerScores(t)
+    # createMovePlot(getMoveSituation(t), nicknames)
+    sharpChange = analysis.sharpnessChangePerPlayer(t)
+    # analysis.plotSharpChange(sharpChange)
+    # plotScores(scores, nicknames)
+    print(worseGames(t))
