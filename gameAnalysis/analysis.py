@@ -424,7 +424,7 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
     plt.xlim(0, 100)
     ax.invert_xaxis()
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
-    plt.title(f'Accuracy per move {p}')
+    plt.title(f'Accuracy per move: {p}')
     if outFile:
         plt.savefig(outFile, dpi=500)
     else:
