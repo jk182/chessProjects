@@ -278,11 +278,11 @@ if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
-    generateAccDistributionGraphs(t, players)
+    # generateAccDistributionGraphs(t, players)
     scores = getPlayerScores(t)
     # createMovePlot(getMoveSituation(t), nicknames, '../out/movePlot.png')
     sharpChange = analysis.sharpnessChangePerPlayer(t)
     # analysis.plotSharpChange(sharpChange, short=nicknames, filename='../out/sharpChange.png')
     # plotScores(scores, nicknames, '../out/scores.png')
     worse = worseGames(t)
-    # plotWorseGames(worse, nicknames, '../out/worse.png')
+    plotWorseGames(worse, nicknames)
