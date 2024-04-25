@@ -420,17 +420,18 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
     fig, ax = plt.subplots()
     ax.set_yscale("log")
     xy = [ (k,v) for k,v in accDis.items() if k <= 100]
-    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='#689bf2')
+    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='#689bf2', edgecolor='black', linewidth=0.5)
     plt.xlim(0, 100)
-    ax.legend([f"Accuracy\n{p}"], loc="upper right")
     ax.invert_xaxis()
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title(f'Accuracy per move {p}')
     if outFile:
         plt.savefig(outFile, dpi=500)
     else:
         plt.show()
 
 
-def plotSharpChange(sharpChange: dict, player: str = ''):
+def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, filename: str = None):
     """
     This function takes a dictionary with the sharpness change per move and plots the average as a bar chart.
     A player name can be specified if one is only interested in the sharpness for this player.
@@ -438,23 +439,38 @@ def plotSharpChange(sharpChange: dict, player: str = ''):
         The sharpness change
     player: str
         The name of the player one is interested in
+    short: dict
+        This a dictionary with a short form of players' names
+    filename: str
+        The name of the file to which the graph should be saved.
+        If no name is specified, the graph will be shown instead of saved
     """
     x = list()
     y = list()
     for p,sharp in sharpChange.items():
         if player in p:
+            # one sharp change was infinite, so I exclude them (TODO: investigate this)
             finSharp = [ s for s in sharp if not np.isinf(s) ]
-            x.append(p.split(',')[0])
+            pl = p.split(',')[0]
+            if short:
+                if pl in short.keys():
+                    pl = short[pl]
+            x.append(pl)
             y.append(sum(finSharp)/len(finSharp))
 
     fig, ax = plt.subplots()
     plt.xticks(rotation=90)
+    ax.set_facecolor('#e6f7f2')
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.25, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
     plt.xlim(-1, len(x))
     ax.bar(x,y, edgecolor='black', linewidth=0.5, color='#fa5a5a')
-    ax.legend(['Avg. sharp change per move'])
-    plt.show()
+    # ax.legend(['Avg. sharp change per move'])
+    plt.title('Average sharpness change per move')
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 def maiaMoves(positions: list, maiaFolder: str) -> dict:

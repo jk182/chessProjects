@@ -174,17 +174,21 @@ def sortPlayers(d: dict, index: int) -> list:
     return players
 
 
-def createMovePlot(moves: dict, short: dict = None):
+def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     """
     This creates a plot with the number of moves a player spent being better or worse
     short: dict
         This is a dict that replaces names that are too long with shorter alternatives
+    filename: str
+        The name of the file to which the graph should be saved. 
+        If no name is specified, the graph will be shown instead of saved
     """
-    # TODO: pick nicer colors
-    colors = ['#39b84e', '#6fc97e', '#f5f1b5', '#f08365', '#f24333']
+    colors = ['#39b84e', '#6fc97e', '#ECECEC', '#F69E7B', '#EF4B4B']
 
     fig, ax = plt.subplots()
+    ax.set_facecolor('#e6f7f2')
     plt.xticks(rotation=90)
+
     for player, m in moves.items():
         p = player.split(',')[0]
         if short:
@@ -194,18 +198,29 @@ def createMovePlot(moves: dict, short: dict = None):
         for i in range(len(m)-1, 0, -1):
             ax.bar(p, m[i], bottom=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2)
             bottom += m[i]
-    plt.show()
+
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    plt.title('Number of moves where players were better, equal and worse')
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
-def plotScores(scores: dict, short: dict = None):
+def plotScores(scores: dict, short: dict = None, filename: str = None):
     """
     This function plots the scores of the tournament
+    filename: str
+        The name of the file to which the graph should be saved. 
+        If no name is specified, the graph will be shown instead of saved
     """
     sortedPlayers = sortPlayers(scores, 1)
-    colors = {3: 'white', 5: 'black'}
+    colors = {3: '#FFFFFF', 5: '#111111'}
+
     fig, ax = plt.subplots()
     plt.xticks(rotation=90)
     plt.yticks(range(0,10))
+
     ax.set_facecolor('#e6f7f2')
     for player in sortedPlayers:
         p = player.split(',')[0]
@@ -216,12 +231,21 @@ def plotScores(scores: dict, short: dict = None):
         for i in [3, 5]:
             ax.bar(p, scores[player][i], bottom=bottom, color=colors[i], edgecolor='black', linewidth=0.7)
             bottom += scores[player][i]
-    plt.show()
+
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    plt.title('Scores with White and Black')
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
-def plotWorseGames(worse: dict, short: dict = None):
+def plotWorseGames(worse: dict, short: dict = None, filename: str = None):
     """
     This function plots the number of games in which the players were worse and the number of games they lost
+    filename: str
+        The name of the file to which the graph should be saved. 
+        If no name is specified, the graph will be shown instead of saved
     """
     sort = list(reversed(sortPlayers(worse, 0)))
     labels = list()
@@ -233,25 +257,32 @@ def plotWorseGames(worse: dict, short: dict = None):
         labels.append(p)
 
     fig, ax = plt.subplots()
+
+    ax.set_facecolor('#e6f7f2')
     plt.xticks(rotation=90)
     plt.yticks(range(0,10))
-    ax.set_facecolor('#e6f7f2')
     plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
+
     ax.bar([ i+1-0.2 for i in range(len(sort)) ], [ worse[p][0] for p in sort ], color='#689bf2', edgecolor='black', linewidth=0.5, width=0.4, label='# of worse games')
     ax.bar([ i+1+0.2 for i in range(len(sort)) ], [ worse[p][1] for p in sort ], color='#5afa8d', edgecolor='black', linewidth=0.5, width=0.4, label='# of lost games')
     ax.legend()
-    plt.show()
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
-    # generateAccDistributionGraphs(t, players)
+    generateAccDistributionGraphs(t, players)
     scores = getPlayerScores(t)
-    # createMovePlot(getMoveSituation(t), nicknames)
+    createMovePlot(getMoveSituation(t), nicknames, '../out/movePlot.png')
     sharpChange = analysis.sharpnessChangePerPlayer(t)
-    analysis.plotSharpChange(sharpChange)
-    plotScores(scores, nicknames)
+    analysis.plotSharpChange(sharpChange, short=nicknames, filename='../out/sharpChange.png')
+    plotScores(scores, nicknames, '../out/scores.png')
     worse = worseGames(t)
-    plotWorseGames(worse, nicknames)
+    plotWorseGames(worse, nicknames, '../out/worse.png')
