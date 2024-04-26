@@ -156,6 +156,38 @@ def worseGames(pgnPath: str) -> dict:
     return games
 
 
+def betterGames(pgnPath: str) -> dict:
+    games = dict()
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            w = game.headers["White"]
+            b = game.headers["Black"]
+            r = game.headers["Result"]
+            if w not in games.keys():
+                games[w] = [0, 0]
+            if b not in games.keys():
+                games[b] = [0, 0]
+            if r == '1-0':
+                games[w][1] += 1
+            elif r == '0-1':
+                games[b][1] += 1
+
+            node = game
+            rec = [False, False]
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment:
+                    cp = int(float(node.comment.split(';')[-1]))
+                    if cp < -100 and not rec[0]:
+                        games[b][0] += 1
+                        rec[0] = True
+                    elif cp > 100 and not rec[1]:
+                        games[w][0] += 1
+                        rec[1] = True
+    return games
+
+
 def sortPlayers(d: dict, index: int) -> list:
     """
     This function takes a dictionary with a list as values and sorts the keys by the value at the index of the list
@@ -285,4 +317,5 @@ if __name__ == '__main__':
     # analysis.plotSharpChange(sharpChange, short=nicknames, filename='../out/sharpChange.png')
     # plotScores(scores, nicknames, '../out/scores.png')
     worse = worseGames(t)
-    plotWorseGames(worse, nicknames)
+    # plotWorseGames(worse, nicknames)
+    plotWorseGames(betterGames(t), nicknames)
