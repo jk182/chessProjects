@@ -89,7 +89,7 @@ def calcPerformanceRating(engine: chess.engine, df) -> tuple:
 
 if __name__=='__main__':
     puzzleDB = '~/chess/resources/lichess_db_puzzle.csv'
-    plays = 30000
+    plays = 25000
     # reduceDataset(puzzleDB, plays)
     newPDB = f'{puzzleDB[:-4]}-{plays}.csv'
     df = pd.read_csv(newPDB)
@@ -97,7 +97,9 @@ if __name__=='__main__':
     pd.set_option('display.max_columns', None)
     print(df)
 
-    op = {'WeightsFile': '/home/julian/chess/maiaNets/maia-1900.pb', 'UCI_ShowWDL': 'true'}
-    maia1900 = functions.configureEngine('lc0', op)
+    maia1100 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1100.pb', 'UCI_ShowWDL': 'true'})
+    maia1900 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1900.pb', 'UCI_ShowWDL': 'true'})
+    print(calcPerformanceRating(maia1100, df))
     print(calcPerformanceRating(maia1900, df))
+    maia1100.quit()
     maia1900.quit()
