@@ -22,6 +22,22 @@ def reduceDataset(puzzles: str, minPlays: int):
     ndf.to_csv(f'{puzzles[:-4]}-{minPlays}.csv')
 
 
+def ratingBand(df, minRating: int, maxRating):
+    """
+    This function filters out all the puzzles in a given dataframe which do not have a rating in the rating band
+    df:
+        The dataframe containing the puzzles
+    minRating: int
+        The minimal rating in the band (included)
+    maxRating: int
+        The maximal rating in the band (excludec)
+    return
+        Dataframe with only the puzzles int the rating band
+    """
+    ndf = df.loc[(df['Rating'] >= minRating) & (df['Rating'] < maxRating)]
+    return ndf.reset_index()
+
+
 def solvePuzzle(engine: chess.engine, FEN: str, solution: str, nodes: int = 1, setup: bool = True) -> int:
     """
     This function takes a puzzle position and evaluates if the engine got the right solution.
@@ -48,13 +64,17 @@ def solvePuzzle(engine: chess.engine, FEN: str, solution: str, nodes: int = 1, s
     if setup:
         board.push_uci(moves[0])
         moves = moves[1:]
+
+    white = board.turn()
     for move in moves:
         info = engine.analyse(board, chess.engine.Limit(nodes=nodes))
         engMove = str(info['pv'][0])
-        if engMove == move:
-            ret = 1
-        else:
-            return ret
+        # Check if we are actually trying to find the best move
+        if white == board.turn():
+            if engMove == move:
+                ret = 1
+            else:
+                return ret
         board.push_uci(move)
     return 2
 
@@ -87,19 +107,24 @@ def calcPerformanceRating(engine: chess.engine, df) -> tuple:
     return (sum(partialSol)/len(partialSol), sum(fullSol)/len(fullSol))
 
 
+
 if __name__=='__main__':
     puzzleDB = '~/chess/resources/lichess_db_puzzle.csv'
-    plays = 25000
+    plays = 20000
     # reduceDataset(puzzleDB, plays)
     newPDB = f'{puzzleDB[:-4]}-{plays}.csv'
     df = pd.read_csv(newPDB)
     # df = df.sort_values('Popularity', ascending=False)
-    pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_columns', None)
     print(df)
+
+    ratings = [0, 1000, 1400, 1800, 2200, 2600, 4000]
+    for i in range(len(ratings)-1):
+        print(ratingBand(df, ratings[i], ratings[i+1]))
 
     maia1100 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1100.pb', 'UCI_ShowWDL': 'true'})
     maia1900 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1900.pb', 'UCI_ShowWDL': 'true'})
-    print(calcPerformanceRating(maia1100, df))
-    print(calcPerformanceRating(maia1900, df))
+    # print(calcPerformanceRating(maia1100, df))
+    # print(calcPerformanceRating(maia1900, df))
     maia1100.quit()
     maia1900.quit()
