@@ -216,6 +216,7 @@ if __name__=='__main__':
     puzzlePerf = dict()
 
     ratings = [0, 1200, 1500, 1800, 2100, 2400, 2700]
+    """
     for i in range(len(ratings)-1):
         lower = ratings[i]
         upper = ratings[i+1]
@@ -232,10 +233,10 @@ if __name__=='__main__':
         pickle.dump(puzzlePerf, f)
 
     """
-    with open('../out/maiaData.pkl', 'rb') as f:
+    with open(f'../out/maiaData-{plays}.pkl', 'rb') as f:
         puzzlePerf = pickle.load(f)
+    print(puzzlePerf)
     plotPuzzlePerformance(puzzlePerf, engineNames)
-    """
 
     maia1100.quit()
     maia1500.quit()
