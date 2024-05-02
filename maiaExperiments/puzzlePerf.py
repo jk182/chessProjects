@@ -6,6 +6,7 @@ import functions
 import chess
 import pandas as pd
 import matplotlib.pyplot as plt
+import pickle
 
 
 def reduceDataset(puzzles: str, minPlays: int):
@@ -86,7 +87,7 @@ def calcPerformanceRating(engine: chess.engine, df) -> tuple:
     engine: chess.engine
         A configured chess engine
     df
-        Datafram containing the puzzles
+        Dataframe containing the puzzles
     return -> tuple
         A tuple containing the performance rating for partial solutions and full solutions
     """
@@ -108,25 +109,62 @@ def calcPerformanceRating(engine: chess.engine, df) -> tuple:
     return (sum(partialSol)/len(partialSol), sum(fullSol)/len(fullSol))
 
 
-def calcPuzzleScore(engine: chess.engine, df) -> tuple:
+def calcPuzzleSolutions(engine: chess.engine, df) -> list:
     """
-    This function calculates the score (0-1) for an engine on a given set of puzzles
+    This function returns a list of tuples with the puzzle FEN and the engine's score on that puzzle
     engine: chess.engine
         A configured chess engine
     df
         Dataframe containing the puzzles
+    retrun -> list
+        A list of tuples (FEN, solution)
+    """
+    solutions = list()
+    for i in df.index:
+        fen = df['FEN'][i]
+        solutions.append((fen, solvePuzzle(engine, fen, df['Moves'][i])))
+    return solutions
+
+
+def filterSolutions(df, solutions: list, fil: dict) -> list:
+    """
+    This function filters out solutions based on criteria given in the filter fil
+    df
+        Dataframe containing the puzzles
+    solutions: list
+        List of positions with the score, as returned by calcPuzzleSolutions
+    fil: dict
+        Dictionary used to filter the soltions. Keys are the column names in the dataframe and the 
+        values are the values in the specified column
+    """
+    filteredSolutions = list()
+    for sol in solutions:
+        ndf = df[df['FEN'] == sol[0]]
+        for k,v in fil.items():
+            if v not in ndf[k]:
+                break
+        else:
+            filteredSolutions.append(sol)
+    return filteredSolutions
+
+
+def calcPuzzleScore(solutions: list) -> tuple:
+    """
+    This function calculates the score (0-1) for a given output of the calcPuzzleSolutions method
+    solutions: list
+        A list containing the FENs ánd scores on the puzzles (see calcPuzzleSolutions)
     return -> tuple
         A tuple containing the score (from 0 to 1) for partial and full solutions
     """
     partialSol = 0
     fullSol = 0
-    for i in df.index:
-        score = solvePuzzle(engine, df['FEN'][i], df['Moves'][i])
+    for s in solutions:
+        score = s[1]
         if score == 1:
             partialSol += 1
         if score == 2:
             fullSol += 1
-    return ((partialSol+fullSol)/len(df.index), fullSol/len(df.index))
+    return ((partialSol+fullSol)/len(solutions), fullSol/len(solutions))
 
 
 def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list):
@@ -144,7 +182,7 @@ def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list):
     plt.xticks(ticks=range(1, len(engineNames)+1), labels=engineNames)
     colors = [('#6096B4', '#93BFCF'), ('#FF87CA', '#FFC4E1'), ('#7ED3B2', '#B9E6D3')]
 
-    width = len(engineNames) / (4 * (len(puzzlePerf.keys())+1))
+    width = 2 / (4 * (len(puzzlePerf.keys())+1))
     offset = -width*(len(puzzlePerf.keys())-0.5)
 
     for puz, perf in puzzlePerf.items():
@@ -159,7 +197,7 @@ def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list):
 
 if __name__=='__main__':
     puzzleDB = '~/chess/resources/lichess_db_puzzle.csv'
-    plays = 30000
+    plays = 20000
     # reduceDataset(puzzleDB, plays)
     newPDB = f'{puzzleDB[:-4]}-{plays}.csv'
     df = pd.read_csv(newPDB)
@@ -169,14 +207,15 @@ if __name__=='__main__':
 
 
     maia1100 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1100.pb', 'UCI_ShowWDL': 'true'})
+    maia1500 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1500.pb', 'UCI_ShowWDL': 'true'})
     maia1900 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1900.pb', 'UCI_ShowWDL': 'true'})
 
-    engineNames = ['Maia 1100', 'Maia 1900']
-    engines = [maia1100, maia1900]
+    engineNames = ['Maia 1100', 'Maia 1500', 'Maia 1900']
+    engines = [maia1100, maia1500, maia1900]
 
     puzzlePerf = dict()
 
-    ratings = [0, 1200, 1500, 1800, 2100, 2400, 4000]
+    ratings = [0, 1200, 1500, 1800, 2100, 2400, 2700]
     for i in range(len(ratings)-1):
         lower = ratings[i]
         upper = ratings[i+1]
@@ -184,9 +223,20 @@ if __name__=='__main__':
         
         puzzlePerf[f'{lower}-{upper}'] = list()
         for e in engines:
-            puzzlePerf[f'{lower}-{upper}'].append(calcPuzzleScore(e, bandDF))
+            solutions = calcPuzzleSolutions(e, bandDF)
+            with open(f'../out/puzzleSol{engineNames[engines.index(e)]}-{upper}-{plays}.pkl', 'wb+') as f:
+                pickle.dump(solutions, f)
+            puzzlePerf[f'{lower}-{upper}'].append(calcPuzzleScore(solutions))
 
+    with open(f'../out/maiaData-{plays}.pkl', 'wb+') as f:
+        pickle.dump(puzzlePerf, f)
+
+    """
+    with open('../out/maiaData.pkl', 'rb') as f:
+        puzzlePerf = pickle.load(f)
     plotPuzzlePerformance(puzzlePerf, engineNames)
+    """
 
     maia1100.quit()
+    maia1500.quit()
     maia1900.quit()
