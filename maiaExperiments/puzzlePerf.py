@@ -255,7 +255,7 @@ if __name__=='__main__':
                     solution = pickle.load(f)
                 fil = {'Themes': phase}
                 filteredSolutions += filterSolutions(df, solution, fil)
-            score = calcPuzzleScore(solution)
+            score = calcPuzzleScore(filteredSolutions)
             print(e, phase, score)
             if phase not in pPerfPhase.keys():
                 pPerfPhase[phase] = [score]
