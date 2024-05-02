@@ -70,9 +70,9 @@ def solvePuzzle(engine: chess.engine, FEN: str, solution: str, nodes: int = 1, s
     white = board.turn
     for move in moves:
         info = engine.analyse(board, chess.engine.Limit(nodes=nodes))
-        engMove = str(info['pv'][0])
         # Check if we are actually trying to find the best move
         if white == board.turn:
+            engMove = str(info['pv'][0])
             if engMove == move:
                 ret = 1
             else:
