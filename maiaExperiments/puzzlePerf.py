@@ -138,12 +138,16 @@ def filterSolutions(df, solutions: list, fil: dict) -> list:
         values are the values in the specified column
     """
     filteredSolutions = list()
-    for sol in solutions:
-        ndf = df[df['FEN'] == sol[0]]
+    positions = [s[0] for s in solutions]
+    for i in df.index:
+        fen = df['FEN'][i]
+        if fen not in positions:
+            continue
         for k,v in fil.items():
-            if v not in ndf[k]:
+            if v not in df[k][i]:
                 break
         else:
+            sol = solutions[positions.index(fen)]
             filteredSolutions.append(sol)
     return filteredSolutions
 
@@ -180,15 +184,15 @@ def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list):
     ax.set_facecolor('#e6f7f2')
 
     plt.xticks(ticks=range(1, len(engineNames)+1), labels=engineNames)
-    colors = [('#6096B4', '#93BFCF'), ('#FF87CA', '#FFC4E1'), ('#7ED3B2', '#B9E6D3')]
+    colors = [('#93BFCF', '#6096B4'), ('#b9e6d3', '#7ed3b2'), ('#FFC4E1', '#FF87CA'), ('#FF9F9F', '#E97777'), ('#6E7C7C', '#435560')] 
 
     width = 2 / (4 * (len(puzzlePerf.keys())+1))
     offset = -width*(len(puzzlePerf.keys())-0.5)
 
     for puz, perf in puzzlePerf.items():
         colorIndex = list(puzzlePerf.keys()).index(puz) % len(colors)
-        ax.bar([ i+1+offset for i in range(len(perf)) ], [ p[0] for p in perf ], color=colors[colorIndex][0], edgecolor='black', linewidth=0.5, width=width, label=f'{puz} (partial solution)')
-        ax.bar([ i+1+offset+width for i in range(len(perf)) ], [ p[1] for p in perf ], color=colors[colorIndex][1], edgecolor='black', linewidth=0.5, width=width, label=f'{puz} (full solution)')
+        ax.bar([ i+1+offset for i in range(len(perf)) ], [ p[0] for p in perf ], color=colors[colorIndex][0], edgecolor='black', linewidth=0.5, width=width) 
+        ax.bar([ i+1+offset+width for i in range(len(perf)) ], [ p[1] for p in perf ], color=colors[colorIndex][1], edgecolor='black', linewidth=0.5, width=width, label=f'{puz}') 
         offset += 2*width
     ax.legend()
 
@@ -202,7 +206,7 @@ if __name__=='__main__':
     newPDB = f'{puzzleDB[:-4]}-{plays}.csv'
     df = pd.read_csv(newPDB)
     # df = df.sort_values('Popularity', ascending=False)
-    # pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_columns', None)
     print(df)
 
 
@@ -235,9 +239,31 @@ if __name__=='__main__':
     """
     with open(f'../out/maiaData-{plays}.pkl', 'rb') as f:
         puzzlePerf = pickle.load(f)
-    print(puzzlePerf)
-    plotPuzzlePerformance(puzzlePerf, engineNames)
+    # print(puzzlePerf)
+    pfN = dict()
+    for k,v in puzzlePerf.items():
+        if not k == '2400-2700':
+            pfN[k] = v
+    # plotPuzzlePerformance(pfN, engineNames)
 
+    pPerfPhase = dict()
+    for e in engineNames:
+        for phase in ['opening', 'middlegame', 'endgame']:
+            filteredSolutions = list()
+            for upper in [1200, 1500, 1800, 2100, 2400]:
+                with open(f'../out/puzzleSol{e}-{upper}-{plays}.pkl', 'rb') as f:
+                    solution = pickle.load(f)
+                fil = {'Themes': phase}
+                filteredSolutions += filterSolutions(df, solution, fil)
+            score = calcPuzzleScore(solution)
+            print(e, phase, score)
+            if phase not in pPerfPhase.keys():
+                pPerfPhase[phase] = [score]
+            else:
+                pPerfPhase[phase].append(score)
+    print(pPerfPhase)
+    plotPuzzlePerformance(pPerfPhase, engineNames)
+    
     maia1100.quit()
     maia1500.quit()
     maia1900.quit()
