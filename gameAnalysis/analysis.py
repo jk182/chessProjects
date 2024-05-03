@@ -553,8 +553,8 @@ if __name__ == '__main__':
     # plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
     # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
     # plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
-    plotAccuracyDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
-    plotAccuracyDistribution('../out/Vidit-Caruana-sf.pgn')
+    # plotAccuracyDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
+    # plotAccuracyDistribution('../out/Vidit-Caruana-sf.pgn')
     # pgns = ['../resources/Ponomariov-Carlsen-2010.pgn']
     # Testing for WDL graphs post
     """
@@ -588,12 +588,12 @@ if __name__ == '__main__':
     plotWDL(outf3)
     """
     # Testing for Maia mistake analysis
-    """
     logging.basicConfig(level=logging.WARNING)
     pgn = '../resources/jkGames50.pgn'
-    fen = '8/8/6p1/2pK3p/1k5P/1P4P1/8/8 w - - 0 44'
+    fen = 'rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4'
     maiaFolder = '/Users/julian/chess/maiaNets'
-    # print(maiaMoves(fen, maiaFolder))
+    print(maiaMoves([fen], maiaFolder))
+    """
     # print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
     # makeComments(pgn, '../out/jkGames50-10000.pgn', analysisWDL, 10000, op)
     # mistakes = findMistakes('../out/jkGames50-10000.pgn')

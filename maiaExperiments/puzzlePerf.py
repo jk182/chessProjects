@@ -171,20 +171,26 @@ def calcPuzzleScore(solutions: list) -> tuple:
     return ((partialSol+fullSol)/len(solutions), fullSol/len(solutions))
 
 
-def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list):
+def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list, filename: str = None):
     """
     This function plots the performance of different engines on various datasets
     puzzlePerf: dict
         This dictionary has the name of the puzzle dataset as key (e.g. 1500-1800 puzzles) and a list of the 
         scores from the engines as values.
     engineNames: list
-        The names of the engines, sorted the same way as in the values of the puzzlePerf dictionary
+        The names of the engines, ordered the same way as in the values of the puzzlePerf dictionary
+    filename: str
+        The name of the file to which the graph should be saved.
+        If no name is specified, the graph will be shown instead of saved
     """
-    fig, ax = plt.subplots()
+    colors = [('#93BFCF', '#6096B4'), ('#b9e6d3', '#7ed3b2'), ('#FFC4E1', '#FF87CA'), ('#DFCCFB', '#BEADFA'), ('#EBCE95', '#F8A978'), ('#FF9F9F', '#E97777'), ('#6E7C7C', '#435560')] 
+
+    fig, ax = plt.subplots(figsize=(10,6))
     ax.set_facecolor('#e6f7f2')
 
     plt.xticks(ticks=range(1, len(engineNames)+1), labels=engineNames)
-    colors = [('#93BFCF', '#6096B4'), ('#b9e6d3', '#7ed3b2'), ('#FFC4E1', '#FF87CA'), ('#FF9F9F', '#E97777'), ('#6E7C7C', '#435560')] 
+    plt.ylim(0, 0.55)
+    plt.ylabel('Score')
 
     width = 2 / (4 * (len(puzzlePerf.keys())+1))
     offset = -width*(len(puzzlePerf.keys())-0.5)
@@ -194,9 +200,14 @@ def plotPuzzlePerformance(puzzlePerf: dict, engineNames: list):
         ax.bar([ i+1+offset for i in range(len(perf)) ], [ p[0] for p in perf ], color=colors[colorIndex][0], edgecolor='black', linewidth=0.5, width=width) 
         ax.bar([ i+1+offset+width for i in range(len(perf)) ], [ p[1] for p in perf ], color=colors[colorIndex][1], edgecolor='black', linewidth=0.5, width=width, label=f'{puz}') 
         offset += 2*width
-    ax.legend()
+    ax.legend(loc='upper center', ncol=5)
 
-    plt.show()
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 if __name__=='__main__':
@@ -244,7 +255,7 @@ if __name__=='__main__':
     for k,v in puzzlePerf.items():
         if not k == '2400-2700':
             pfN[k] = v
-    # plotPuzzlePerformance(pfN, engineNames)
+    plotPuzzlePerformance(pfN, engineNames, '../out/maiaPuzzlePerf.png')
 
     pPerfPhase = dict()
     for e in engineNames:
@@ -262,7 +273,7 @@ if __name__=='__main__':
             else:
                 pPerfPhase[phase].append(score)
     print(pPerfPhase)
-    plotPuzzlePerformance(pPerfPhase, engineNames)
+    plotPuzzlePerformance(pPerfPhase, engineNames, '../out/maiaGameStagePuzzle.png')
     
     maia1100.quit()
     maia1500.quit()
