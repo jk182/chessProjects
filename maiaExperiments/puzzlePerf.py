@@ -221,9 +221,9 @@ if __name__=='__main__':
     print(df)
 
 
-    maia1100 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1100.pb', 'UCI_ShowWDL': 'true'})
-    maia1500 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1500.pb', 'UCI_ShowWDL': 'true'})
-    maia1900 = functions.configureEngine('lc0', {'WeightsFile': '/home/julian/chess/maiaNets/maia-1900.pb', 'UCI_ShowWDL': 'true'})
+    maia1100 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/maiaNets/maia-1100.pb.gz', 'UCI_ShowWDL': 'true'})
+    maia1500 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/maiaNets/maia-1500.pb.gz', 'UCI_ShowWDL': 'true'})
+    maia1900 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/maiaNets/maia-1900.pb.gz', 'UCI_ShowWDL': 'true'})
 
     engineNames = ['Maia 1100', 'Maia 1500', 'Maia 1900']
     engines = [maia1100, maia1500, maia1900]
@@ -250,13 +250,18 @@ if __name__=='__main__':
     """
     with open(f'../out/maiaData-{plays}.pkl', 'rb') as f:
         puzzlePerf = pickle.load(f)
+
     # print(puzzlePerf)
     pfN = dict()
     for k,v in puzzlePerf.items():
         if not k == '2400-2700':
             pfN[k] = v
-    plotPuzzlePerformance(pfN, engineNames, '../out/maiaPuzzlePerf.png')
+    # plotPuzzlePerformance(pfN, engineNames, '../out/maiaPuzzlePerf.png')
 
+    for maia in engines:
+        print(calcPerformanceRating(maia, df))
+
+    """
     pPerfPhase = dict()
     for e in engineNames:
         for phase in ['opening', 'middlegame', 'endgame']:
@@ -274,6 +279,7 @@ if __name__=='__main__':
                 pPerfPhase[phase].append(score)
     print(pPerfPhase)
     plotPuzzlePerformance(pPerfPhase, engineNames, '../out/maiaGameStagePuzzle.png')
+    """
     
     maia1100.quit()
     maia1500.quit()
