@@ -21,6 +21,8 @@ def searchPositions(pgn: str, script: str, db: str) -> dict:
         A dict indexed by the players with the number of novelties they played.
     """
     novelties = dict()
+    # dictionary to count the book moves, values are lists with the number of moves with more than 1000, 100, 10, 1 games
+    bookMoves = dict()
     cache = list()
     with open(pgn, 'r') as tournament:
         while (game := chess.pgn.read_game(tournament)):
@@ -38,19 +40,32 @@ def searchPositions(pgn: str, script: str, db: str) -> dict:
 
                 search = str(subprocess.run(['tkscid', script, db, posAfter], stdout=subprocess.PIPE).stdout)
                 numGames = gamesFromSearchOutput(search)
+                if board.turn:
+                    player = black
+                else:
+                    player = white
                 if numGames > 1:
                     cache.append(posAfter)
+                    if player not in bookMoves.keys():
+                        bookMoves[player] = [0, 0, 0, 0]
+                    if numGames > 1000:
+                        start = 0
+                    elif numgames > 100:
+                        start = 1
+                    elif numgames > 10:
+                        start = 2
+                    else:
+                        start = 3
+                    for i in range(start, len(bookMoves[player])):
+                        bookMoves[player][i] += 1
                     continue
 
                 if not isMistake(posBefore, posAfter):
-                    if board.turn:
-                        player = black
-                    else:
-                        player = white
                     if player not in novelties.keys():
                         novelties[player] = 1
                     else:
                         novelties[player] += 1
+    print(bookMoves)
     return novelties
 
 
