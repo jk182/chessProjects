@@ -3,6 +3,10 @@ import subprocess
 import chess
 import re
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
+import evalDB
+
 
 def searchPositions(pgn: str, script: str, db: str) -> dict:
     """
@@ -75,8 +79,21 @@ def isMistake(posBefore: str, posAfter: str, mistakeThreshold: int = 70) -> bool
     return -> bool:
         True if the move was a mistake, False otherwise
     """
-    # TODO
-    return False
+    sf = functions.configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    time = 4
+    if evalDB.contains(posBefore):
+        cpBefore = int(evalDB.getEval(posBefore, False))
+    else:
+        info = sf.analyse(Board(posBefore), chess.engine.Limit(time=time))
+        cpBefore = info['Score']
+        # TODO: enter positions into eval DB
+    if evalDB.contains(posAfter):
+        cpAfter = int(evalDB.getEval(posAfter, False))
+    else:
+        info = sf.analyse(Board(posAfter), chess.engine.Limit(time=time))
+        cpAfter = info['Score']
+        # TODO: enter positions into eval DB
+    return abs(cpBefore-cpAfter) > mistakeThreshold)
 
 
 if __name__ == '__main__':
