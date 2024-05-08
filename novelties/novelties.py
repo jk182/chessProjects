@@ -1,4 +1,4 @@
-import os
+import os, sys
 import subprocess
 import chess
 import re
@@ -93,7 +93,7 @@ def isMistake(posBefore: str, posAfter: str, mistakeThreshold: int = 70) -> bool
         info = sf.analyse(Board(posAfter), chess.engine.Limit(time=time))
         cpAfter = info['Score']
         # TODO: enter positions into eval DB
-    return abs(cpBefore-cpAfter) > mistakeThreshold)
+    return abs(cpBefore-cpAfter) > mistakeThreshold
 
 
 if __name__ == '__main__':
