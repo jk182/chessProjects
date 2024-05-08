@@ -4,6 +4,7 @@ import subprocess
 import chess
 import re
 import pickle
+import matplotlib.pyplot as plt
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
@@ -126,6 +127,115 @@ def isMistake(posBefore: str, posAfter: str, mistakeThreshold: int = 70) -> bool
     return abs(cpBefore-cpAfter) > mistakeThreshold
 
 
+def sortPlayers(d: dict, index: int) -> list:
+    """
+    This function takes a dictionary with a list as values and sorts the keys by the value at the index of the list
+    """
+
+    players = list()
+    for i in range(len(d.keys())):
+        maximum = -1
+        for k, v in d.items():
+            if k in players:
+                continue
+            if isinstance(v, int):
+                curr = v
+            else:
+                curr = v[index]
+            if curr > maximum:
+                p = k
+                maximum = curr
+        players.append(p)
+    return players
+
+
+def plotNovelties(novelties: dict, short: dict = None, filename: str = None):
+    """
+    This function plots the number of novelties per player
+    novelties: dict
+        A dictionary index by the players and the number of novelties as values
+    short: dict
+        Short names for the players to replace them in the graph
+    filename: str
+        The name of the file to which the graph should be saved.
+        If no name is specified, the graph will be shown instead of saved
+    """
+    sort = sortPlayers(novelties, 0)
+    labels = list()
+    for i, player in enumerate(sort):
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
+        labels.append(p)
+
+    fig, ax = plt.subplots(figsize=(10,6))
+
+    ax.set_facecolor('#e6f7f2')
+    plt.xticks(rotation=90)
+    plt.yticks(range(0,9))
+    plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
+
+    ax.bar([i+1 for i in range(len(sort))], [ novelties[p] for p in sort], color='#689bf2', edgecolor='black', linewidth=0.5, width=0.5, label='Novelties')
+    ax.legend()
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    plt.title('Number of novelties')
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
+
+
+def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGames: int = 14):
+    """
+    This function plots the number of book moves per player
+    bookMoves: dict
+        A dictionary index by the players and the number of book moves as values
+    short: dict
+        Short names for the players to replace them in the graph
+    filename: str
+        The name of the file to which the graph should be saved.
+        If no name is specified, the graph will be shown instead of saved
+    nGames: int
+        The number of games per player
+    """
+    sort = sortPlayers(bookMoves, 0)
+    labels = list()
+    for i, player in enumerate(sort):
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
+        labels.append(p)
+
+    fig, ax = plt.subplots(figsize=(10,6))
+
+    ax.set_facecolor('#e6f7f2')
+    plt.xticks(rotation=90)
+    plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
+    plt.ylim(0, 11.5)
+    
+    values = list(bookMoves.values())
+    width = 1 / (2*len(values[0]))
+    offset = -width*(len(values[0])-0.5)/2
+
+    legendNames = ['>10,000 games', '>1,000 games', '>100 games', '>10 games', '>1 game']
+    colors = ['#689bf2', '#7ed3b2', '#ff87ca', '#beadfa', '#f8a978']
+
+    for i in range(len(values[0])):
+        ax.bar([j+1+offset for j in range(len(sort))], [bookMoves[p][i]/nGames for p in sort], width=width, label=legendNames[i], color=colors[i], edgecolor='black', linewidth=0.5)
+        offset += width
+
+    ax.legend(loc='upper center', ncol=5)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    plt.title('Number of book moves')
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
+
+
+
 if __name__ == '__main__':
     db = '/home/julian/chess/database/gameDB/novelties'
     player = 'Carlsen, M.'
@@ -133,12 +243,21 @@ if __name__ == '__main__':
     pgn = '../out/candidates2024-WDL+CP.pgn'
     fen = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
 
-    o = subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout
-    print(o)
-    print(gamesFromSearchOutput(str(o)))
+    # o = subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout
+    # print(o)
+    # print(gamesFromSearchOutput(str(o)))
+    """
     nov, book = searchPositions(pgn, script, db)
     print(nov, book)
     with open(f'../out/candidates-novelties.pkl', 'wb+') as f:
         pickle.dump(nov, f)
     with open(f'../out/candidates-bookMoves.pkl', 'wb+') as f:
         pickle.dump(book, f)
+    """
+    with open(f'../out/candidates-novelties.pkl', 'rb+') as f:
+        novelties = pickle.load(f)
+    nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
+    with open(f'../out/candidates-bookMoves.pkl', 'rb+') as f:
+        bookMoves = pickle.load(f)
+    # plotNovelties(novelties, short=nicknames)
+    plotBookMoves(bookMoves, short=nicknames)
