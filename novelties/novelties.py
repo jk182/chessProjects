@@ -1,3 +1,4 @@
+# Future Idea: calculate how much a player narrows the known moves
 import os, sys
 import subprocess
 import chess
@@ -23,7 +24,7 @@ def searchPositions(pgn: str, script: str, db: str) -> dict:
     novelties = dict()
     # dictionary to count the book moves, values are lists with the number of moves with more than 1000, 100, 10, 1 games
     bookMoves = dict()
-    cache = list()
+    cache = dict()
     with open(pgn, 'r') as tournament:
         while (game := chess.pgn.read_game(tournament)):
             white = game.headers["White"]
@@ -35,11 +36,13 @@ def searchPositions(pgn: str, script: str, db: str) -> dict:
                 board.push(move)
                 posAfter = board.fen()
                 
-                if posAfter in cache:
-                    break
+                if posAfter in cache.keys():
+                    numGames = cache[posAfter]
+                else:
+                    search = str(subprocess.run(['tkscid', script, db, posAfter], stdout=subprocess.PIPE).stdout)
+                    numGames = gamesFromSearchOutput(search)
+                    cache[posAfter] = numGames
 
-                search = str(subprocess.run(['tkscid', script, db, posAfter], stdout=subprocess.PIPE).stdout)
-                numGames = gamesFromSearchOutput(search)
                 if board.turn:
                     player = black
                 else:
@@ -65,6 +68,7 @@ def searchPositions(pgn: str, script: str, db: str) -> dict:
                         novelties[player] = 1
                     else:
                         novelties[player] += 1
+                break
     print(bookMoves)
     return novelties
 
