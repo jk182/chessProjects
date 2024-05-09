@@ -78,6 +78,8 @@ def searchPositions(pgn: str, script: str, db: str) -> tuple:
                     else:
                         novelties[player] += 1
                     print(f'Novelty: {move}')
+                else:
+                    print(f'No Novelty: {move}')
                 break
     return (novelties, bookMoves)
 
@@ -199,7 +201,7 @@ def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGa
     nGames: int
         The number of games per player
     """
-    sort = sortPlayers(bookMoves, 0)
+    sort = sortPlayers(bookMoves, 4)
     labels = list()
     for i, player in enumerate(sort):
         p = player.split(',')[0]
@@ -259,5 +261,5 @@ if __name__ == '__main__':
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     with open(f'../out/candidates-bookMoves.pkl', 'rb+') as f:
         bookMoves = pickle.load(f)
-    # plotNovelties(novelties, short=nicknames)
-    plotBookMoves(bookMoves, short=nicknames)
+    # plotNovelties(novelties, short=nicknames, filename='../out/novelties.png')
+    # plotBookMoves(bookMoves, short=nicknames, filename='../out/bookMoves.png')
