@@ -99,3 +99,28 @@ def winP(centipawns: int) -> float:
     """
     return 50 + 50*(2/(1+np.exp(-0.00368208 * centipawns)) - 1)
 
+
+def readComment(node, wdl: bool, cp: bool) -> tuple:
+    """
+    This function takes a game node from a PGN with evaluation comments and returns the evaluation.
+    Comment structure: [w, d, l]; cp
+    node:
+        The game node
+    wdl: bool
+        If the comment contains a WDL evaluation
+    cp: bool
+        If the comment contains a centipawn evaluation
+    return -> tuple
+        A tuple containing the WDL and/or CP evaluations
+    """
+    if not (wdl or cp):
+        return None
+
+    if wdl and not cp:
+        wdlList = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+        return (wdlList)
+    if cp and not wdl:
+        return (int(node.comment))
+    sp = node.comment.split(';')
+    wdlList = [ int(w) for w in sp[0].replace('[', '').replace(']', '').strip().split(',') ]
+    return (wdlList, int(sp[1]))
