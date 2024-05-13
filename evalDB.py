@@ -1,4 +1,6 @@
 import sqlite3
+import functions
+import chess
 
 def createTable(name: str):
     """
@@ -55,6 +57,15 @@ def contains(position: str) -> bool:
     if cur.execute(f'SELECT 1 FROM eval WHERE position="{position}"').fetchall():
         return True
     return False
+
+
+def importFromPGN(pgnPath: str, nodes: int = None, depth: int = None):
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            if nodes and depth:
+                wdl, cp = functions.readComment(node, True, True)
+                # TODO
 
 
 if __name__ == '__main__':

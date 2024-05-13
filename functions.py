@@ -116,6 +116,9 @@ def readComment(node, wdl: bool, cp: bool) -> tuple:
     if not (wdl or cp):
         return None
 
+    if not node.comment:
+        return None
+
     if wdl and not cp:
         wdlList = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
         return (wdlList)
