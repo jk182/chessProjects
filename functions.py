@@ -123,7 +123,7 @@ def readComment(node, wdl: bool, cp: bool) -> tuple:
         wdlList = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
         return (wdlList)
     if cp and not wdl:
-        return (int(node.comment))
+        return (int(float(node.comment)))
     sp = node.comment.split(';')
     wdlList = [ int(w) for w in sp[0].replace('[', '').replace(']', '').strip().split(',') ]
-    return (wdlList, int(sp[1]))
+    return (wdlList, int(float(sp[1])))

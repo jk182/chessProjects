@@ -24,7 +24,7 @@ def createTable(name: str):
             )""")
 
 
-def insert(position: str, nodes: int = -1, w: int = None, d: int = -1, l: int = None, depth: int = None, cp: float = None, mate: int = None, pv: str = None):
+def insert(position: str, nodes: int = -1, w: int = None, d: int = None, l: int = None, depth: int = -1, cp: float = None, mate: int = None, pv: str = None):
     """
     Inserting data into the table.
     Default values of nodes and depth are -1, if there is only an evaluation by LC0 or SF and not by both.
@@ -35,12 +35,13 @@ def insert(position: str, nodes: int = -1, w: int = None, d: int = -1, l: int = 
     con.commit()
 
 
-def update(position: str, nodes: int = -1, w: int = None, d: int = -1, l: int = None, depth: int = None, cp: float = None, mate: int = None, pv: str = None):
+def update(position: str, nodes: int = -1, w: int = None, d: int = None, l: int = None, depth: int = -1, cp: float = None, mate: int = None, pv: str = None):
     con = sqlite3.connect('out/evaluation.db')
     cur = con.cursor()
     nd = cur.execute(f'SELECT nodes, depth FROM eval WHERE position="{position}"')
+    if not contains(position):
+        insert(position, nodes, w, d, l, depth, cp, mate, pv)
     # TODO: check if position is in DB and nodes or depth are higher than before, then update
-    print(nd.fetchall())
 
 
 def getEval(position: str, wdl: bool):
@@ -62,19 +63,34 @@ def contains(position: str) -> bool:
 def importFromPGN(pgnPath: str, nodes: int = None, depth: int = None):
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
+            print('Test')
             node = game
-            if nodes and depth:
-                wdl, cp = functions.readComment(node, True, True)
-                # TODO
+            while not node.is_end():
+                node = node.variations[0]
+                fen = node.board().fen()
+                if nodes and depth:
+                    if functions.readComment(node, True, True):
+                        wdl, cp = functions.readComment(node, True, True)
+                        update(fen, nodes, wdl[0], wdl[1], wdl[2], depth, cp)
+                elif nodes:
+                    wdl = functions.readComment(node, True, False)
+                    update(fen, nodes, wdl[0], wdl[1], wdl[2])
+                elif depth:
+                    cp = functions.readComment(node, False, True)
+                    update(fen, depth=depth, cp=cp)
 
 
 if __name__ == '__main__':
     DBname = 'out/evaluation.db'
     con = sqlite3.connect(DBname)
     cur = con.cursor()
-    # cur.execute("DROP TABLE IF EXISTS eval")
-    # createTable(DBname)
-    print(cur.execute("SELECT name FROM sqlite_master").fetchone())
+    cur.execute("DROP TABLE IF EXISTS eval")
+    createTable(DBname)
+    # print(cur.execute("SELECT name FROM sqlite_master").fetchone())
+    con.close()
+    importFromPGN('out/candidates2024-WDL+CP.pgn', 5000, 35)
+    con = sqlite3.connect(DBname)
+    cur = con.cursor()
     print(cur.execute("SELECT * FROM eval").fetchall())
     """
     insert('test2', depth=5, cp=0.4, w=2, d=1, l=3)
