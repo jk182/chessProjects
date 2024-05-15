@@ -1,6 +1,8 @@
 # This file should contain different functions to analyse a chess game
 # TODO: analysis with WDL+CP is very janky
+import os, sys
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from chess import engine, pgn, Board
 import chess
 import numpy as np
@@ -61,12 +63,14 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                         print('Cache hit!')
                         node.comment = f'{wdl};{cp}'
                     else:
-                        ana = analysis(board, engine, limit)
+                        # TODO: remove hard coded depth limit
+                        depth = 30
+                        ana = analysis(board, engine, limit, depth)
                         if ana:
                             node.comment = ana
                             cp = int(ana.split(';')[1])
                             wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
-                            evalDB.insert(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2])
+                            evalDB.update(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=depth)
                 else:
                     node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
@@ -123,18 +127,17 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
     return str(info['score'].white())
 
 
-def analysisCPnWDL(position: Board, lc0: engine, nodes: int) -> str:
+def analysisCPnWDL(position: Board, lc0: engine, nodes: int, depth: int) -> str:
     """
     This function analyses a position both with LC0 and Stockfish. It returns the WDL and CP score.
     """
     if position.is_game_over():
         return ""
 
-    time = 4
     # Defining Stockfish here is not ideal, but it's the easiest way right now
     sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     iLC0 = lc0.analyse(position, chess.engine.Limit(nodes=nodes))
-    iSF = sf.analyse(position, chess.engine.Limit(time=time))
+    iSF = sf.analyse(position, chess.engine.Limit(depth=depth))
     wdl = []
     wdl_w = engine.PovWdl.white(iLC0['wdl'])
     for w in wdl_w:
@@ -145,6 +148,7 @@ def analysisCPnWDL(position: Board, lc0: engine, nodes: int) -> str:
             cp = 10000
         else:
             cp = -10000
+    sf.quit()
     return f'{str(wdl)};{cp}'
 
 
@@ -505,7 +509,7 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    # leela = configureEngine('lc0', op)
+    leela = configureEngine('lc0', op)
     """
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
@@ -514,9 +518,10 @@ if __name__ == '__main__':
         wdl.append(w)
     startSharp = sharpnessLC0(wdl)
     """
-    candidates = '../resources/candidatesR14.pgn'
-    outCan = '../out/candidates2024-WDL+CP.pgn'
-    # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
+    candidates = '../resources/wijkMasters2024.pgn'
+    outCan = '../out/wijk2024.pgn'
+    makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
+    print('Done')
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
     for k,v in playerSharp.items():
@@ -592,7 +597,7 @@ if __name__ == '__main__':
     pgn = '../resources/jkGames50.pgn'
     fen = 'rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4'
     maiaFolder = '/Users/julian/chess/maiaNets'
-    print(maiaMoves([fen], maiaFolder))
+    # print(maiaMoves([fen], maiaFolder))
     """
     # print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
     # makeComments(pgn, '../out/jkGames50-10000.pgn', analysisWDL, 10000, op)

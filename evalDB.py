@@ -29,14 +29,14 @@ def insert(position: str, nodes: int = -1, w: int = None, d: int = None, l: int 
     Inserting data into the table.
     Default values of nodes and depth are -1, if there is only an evaluation by LC0 or SF and not by both.
     """
-    con = sqlite3.connect('out/evaluation.db')
+    con = sqlite3.connect('../out/evaluation.db')
     cursor = con.cursor()
     cursor.execute(f'INSERT INTO eval VALUES ("{position}", "{nodes}", "{w}", "{d}", "{l}", "{depth}", "{cp}", "{mate}", "{pv}")')
     con.commit()
 
 
 def update(position: str, nodes: int = -1, w: int = None, d: int = None, l: int = None, depth: int = -1, cp: float = None, mate: int = None, pv: str = None):
-    con = sqlite3.connect('out/evaluation.db')
+    con = sqlite3.connect('../out/evaluation.db')
     cur = con.cursor()
     nd = cur.execute(f'SELECT nodes, depth FROM eval WHERE position="{position}"')
     if not contains(position):
@@ -45,7 +45,7 @@ def update(position: str, nodes: int = -1, w: int = None, d: int = None, l: int 
 
 
 def getEval(position: str, wdl: bool):
-    con = sqlite3.connect('out/evaluation.db')
+    con = sqlite3.connect('../out/evaluation.db')
     cur = con.cursor()
     if wdl:
         return list(cur.execute(f'SELECT w,d,l FROM eval WHERE position="{position}"').fetchall()[0])
@@ -53,7 +53,7 @@ def getEval(position: str, wdl: bool):
 
 
 def contains(position: str) -> bool:
-    con = sqlite3.connect('out/evaluation.db')
+    con = sqlite3.connect('../out/evaluation.db')
     cur = con.cursor()
     if cur.execute(f'SELECT 1 FROM eval WHERE position="{position}"').fetchall():
         return True
