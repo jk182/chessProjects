@@ -7,11 +7,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def getPlayers(pgnPath: str) -> list:
+def getPlayers(pgnPath: str, whiteList: list = None) -> list:
     """
     This function gets the names of the players in a tournament.
     pgnPath: str
         The path to the PGN file of the tournament
+    whiteList: list
+        A list of player names that should be included. The name has to be the same as in the PGN
+        If no whiteList is specified, all players will be included
     return -> list
         A list of the players' names
     """
@@ -19,9 +22,17 @@ def getPlayers(pgnPath: str) -> list:
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
             if (w := game.headers["White"]) not in players:
-                players.append(w)
+                if not whiteList:
+                    players.append(w)
+                else:
+                    if w in whiteList:
+                        players.append(w)
             if (b := game.headers["Black"]) not in players:
-                players.append(b)
+                if not whiteList:
+                    players.append(b)
+                else:
+                    if b in whiteList:
+                        players.append(b)
     return players
 
 
@@ -310,12 +321,13 @@ if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
+    print(players)
     # generateAccDistributionGraphs(t, players)
-    scores = getPlayerScores(t)
-    createMovePlot(getMoveSituation(t), nicknames)
-    sharpChange = analysis.sharpnessChangePerPlayer(t)
-    analysis.plotSharpChange(sharpChange, short=nicknames)
-    plotScores(scores, nicknames)
+    # scores = getPlayerScores(t)
+    # createMovePlot(getMoveSituation(t), nicknames)
+    # sharpChange = analysis.sharpnessChangePerPlayer(t)
+    # analysis.plotSharpChange(sharpChange, short=nicknames)
+    # plotScores(scores, nicknames)
     worse = worseGames(t)
-    plotWorseGames(worse, nicknames)
+    # plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
