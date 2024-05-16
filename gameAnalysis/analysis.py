@@ -74,7 +74,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                 else:
                     node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
-    engine.quit()
+    # engine.quit()
     return []
 
 
@@ -520,8 +520,14 @@ if __name__ == '__main__':
     """
     candidates = '../resources/wijkMasters2024.pgn'
     outCan = '../out/wijk2024.pgn'
-    makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
-    print('Done')
+    # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
+
+    tournaments = ['shenzhen.pgn', 'tepe-sigeman.pgn', 'arjun_open.pgn', 'arjun_chennai.pgn', 'carlsen_open.pgn']
+    for t in tournaments:
+        print(t)
+        makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
+
+    leela.quit()
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
     for k,v in playerSharp.items():
