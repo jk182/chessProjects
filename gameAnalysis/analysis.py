@@ -63,14 +63,15 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                         print('Cache hit!')
                         node.comment = f'{wdl};{cp}'
                     else:
-                        # TODO: remove hard coded depth limit
-                        depth = 27
-                        ana = analysis(board, engine, limit, depth)
-                        if ana:
+                        infos = analysis(board, engine, limit)
+                        if infos:
+                            iLC0, iSF = infos
+                            ana = formatInfo(iLC0, iSF)
+                            print(ana)
                             node.comment = ana
                             cp = int(ana.split(';')[1])
                             wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
-                            evalDB.update(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=depth)
+                            evalDB.update(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
                 else:
                     node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
@@ -79,6 +80,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
 
 
 def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) -> str:
+    # TODO: change like analysisCPnWDL
     """
     This function analyses a given chess position with LC0 to get the WDL from whtie's perspective.
     position:Board
@@ -109,6 +111,7 @@ def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) ->
 
 
 def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
+    # TODO: change like analysisCPnWDL
     """
     This function analyses a given position with Stockfish and returns the centipawn score.
     position: Board:
@@ -127,30 +130,42 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
     return str(info['score'].white())
 
 
-def analysisCPnWDL(position: Board, lc0: engine, nodes: int, depth: int) -> str:
+def analysisCPnWDL(position: Board, lc0: engine, nodes: int) -> tuple:
     """
-    This function analyses a position both with LC0 and Stockfish. It returns the WDL and CP score.
+    This function analyses a position both with LC0 and Stockfish. It returns the WDL and CP infos as tuple.
     """
     if position.is_game_over():
-        return ""
+        return None
 
     # Defining Stockfish here is not ideal, but it's the easiest way right now
     sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     iLC0 = lc0.analyse(position, chess.engine.Limit(nodes=nodes))
     iSF = sf.analyse(position, chess.engine.Limit(time=4))
-    print(iSF["depth"])
-    wdl = []
-    wdl_w = engine.PovWdl.white(iLC0['wdl'])
-    for w in wdl_w:
-        wdl.append(w)
-    cp = str(iSF["score"].white())
-    if '#' in cp:
-        if '+' in cp:
-            cp = 10000
-        else:
-            cp = -10000
-    sf.quit()
-    return f'{str(wdl)};{cp}'
+    return (iLC0, iSF)
+
+
+def formatInfo(infoLC0 = None, infoSF = None) -> str:
+    """
+    This function takes the info from an engine analysis by LC0 or stockfish and returns the WDL/CP as string
+    """
+    evaluation = ""
+    if infoLC0:
+        wdl = []
+        wdl_w = engine.PovWdl.white(iLC0['wdl'])
+        for w in wdl_w:
+            wdl.append(w)
+        evaluation = str(wdl)
+    if infoSF:
+        if infoLC0:
+            evaluation += ';'
+        cp = str(infoSF['score'].white())
+        if '#' in cp:
+            if '+' in cp:
+                cp = 10000
+            else:
+                cp = -10000
+        evaluation += cp
+    return evaluation
 
 
 def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
