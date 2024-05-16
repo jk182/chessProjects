@@ -317,6 +317,47 @@ def plotWorseGames(worse: dict, short: dict = None, filename: str = None):
         plt.show()
 
 
+def normaliseAccDistribution(accDis: dict) -> dict:
+    """
+    This takes an accuracy distribution and normalises the values.
+    """
+    norm = dict()
+    total = sum(accDis.values())
+    for k,v in accDis.items():
+        norm[k] = v/total
+    return norm
+
+
+def plotMultAccDistributions(pgnPaths: list, filename: str = None):
+    """
+    This function plots multiple accuracy distribution graphs in one graph
+    pgnPaths: list
+        The path to the PGN files
+    filename: str
+        The name of the file to which the graph should be saved.
+        If no name is specified, the graph will be shown instead of saved.
+    """
+    colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa']
+
+    fig, ax = plt.subplots()
+    ax.set_facecolor('#e6f7f2')
+    ax.set_yscale('log')
+    plt.xlim(0, 100)
+    ax.invert_xaxis()
+    for i, pgn in enumerate(pgnPaths):
+        # TODO: handle the players
+        accDis = analysis.getAccuracyDistributionPlayer(pgn, 'Erigaisi, Arjun')
+        accDis = normaliseAccDistribution(accDis)
+        ax.bar(accDis.keys(), accDis.values(), width=1, color=colors[i], edgecolor='black', linewidth='0.5', label=i, alpha=0.5)
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.legend()
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
+
+
 if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
@@ -335,8 +376,8 @@ if __name__ == '__main__':
     arjunO = '../out/arjun_open-5000-30.pgn'
     WL = ['Erigaisi, Arjun']
     p2 = getPlayers(arjunC, WL)
-    generateAccDistributionGraphs(arjunC, p2)
-    generateAccDistributionGraphs(arjunO, p2)
-    plt.show()
+    plotMultAccDistributions([arjunC, arjunO])
+    # generateAccDistributionGraphs(arjunC, p2)
+    # generateAccDistributionGraphs(arjunO, p2)
     # analysis.plotSharpChange(analysis.sharpnessChangePerPlayer(arjunC))
 

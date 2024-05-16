@@ -331,14 +331,15 @@ def plotCPLDistribution(pgnPath: str):
             plt.show()
 
 
-def plotCPLDistributionPlayer(pgnPath: str, player: str):
+def getCPLDistributionPlayer(pgnPath: str, player: str) -> dict:
     """
-    This method plots a centipawn distribution from the comments of a PGN file for a specific player.
-    It plots all games in the file in one graph
+    This method calculated the CPL for a player on each moves.
     pgnPath: str
         The path to the PGN file
     player: str
         The name of the player
+    return -> dict
+        A dictionary with the CPL as keys and the number of moves with this CPL as values
     """
     with open(pgnPath, 'r') as pgn:
         cpl = dict()
@@ -374,6 +375,19 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
                             else:
                                 cpl[curCPL] = 1
                     lastCP = cp
+    return cpl
+
+
+def plotCPLDistributionPlayer(pgnPath: str, player: str):
+    """
+    This method plots a centipawn distribution from the comments of a PGN file for a specific player.
+    It plots all games in the file in one graph
+    pgnPath: str
+        The path to the PGN file
+    player: str
+        The name of the player
+    """
+    cpl = getCPLDistributionPlayer(pgnPath, player)
 
     fig, ax = plt.subplots()
     # ax.set_yscale("log")
@@ -384,16 +398,15 @@ def plotCPLDistributionPlayer(pgnPath: str, player: str):
     plt.show()
 
 
-def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = None):
+def getAccuracyDistributionPlayer(pgnPath: str, player: str) -> dict:
     """
-    This method plots an accuracy distribution from the comments of a PGN file for a specific player.
-    It plots all games in the file in one graph
+    This method calculated the accuracy for a player on each moves.
     pgnPath: str
         The path to the PGN file
     player: str
         The name of the player
-    outFile: str
-        Filename of the plot if it should be saved instead of shown
+    return -> dict
+        A dictionary with the accuracy as keys and the number of moves with this accuracy as values
     """
     with open(pgnPath, 'r') as pgn:
         accDis = dict()
@@ -435,6 +448,21 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
                             else:
                                 accDis[acc] = 1
                     lastWp = wp
+    return accDis
+
+
+def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = None):
+    """
+    This method plots an accuracy distribution from the comments of a PGN file for a specific player.
+    It plots all games in the file in one graph
+    pgnPath: str
+        The path to the PGN file
+    player: str
+        The name of the player
+    outFile: str
+        Filename of the plot if it should be saved instead of shown
+    """
+    accDis = getAccuracyDistributionPlayer(pgnPath, player)
     p = player.split(',')[0]
 
     fig, ax = plt.subplots()
@@ -538,7 +566,7 @@ if __name__ == '__main__':
     outCan = '../out/wijk2024.pgn'
     # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
 
-    tournaments = ['arjun_chennai.pgn', 'carlsen_open.pgn']
+    tournaments = ['arjun_biel.pgn', 'carlsen_open.pgn']
     for t in tournaments:
         print(t)
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)

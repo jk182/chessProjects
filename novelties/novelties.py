@@ -204,7 +204,8 @@ def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGa
     sort = sortPlayers(bookMoves, 4)
     labels = list()
     for i, player in enumerate(sort):
-        p = player.split(',')[0]
+        # p = player.split(',')[0]
+        p = player
         if short:
             if p in short.keys():
                 p = short[p]
@@ -213,7 +214,7 @@ def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGa
     fig, ax = plt.subplots(figsize=(10,6))
 
     ax.set_facecolor('#e6f7f2')
-    plt.xticks(rotation=90)
+    # plt.xticks(rotation=90)
     plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
     plt.ylim(0, 11.5)
     
@@ -245,19 +246,40 @@ if __name__ == '__main__':
     pgn = '../out/candidates2024-WDL+CP.pgn'
     fen = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
 
-    arjunC = '../out/arjun_closed.pgn'
-    arjunO = '../out/arjun_open-5000.pgn'
-
     # o = subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout
     # print(o)
     # print(gamesFromSearchOutput(str(o)))
+
+    arjunC = '../out/arjun_closed.pgn'
+    arjunO = '../out/arjun_open-5000-30.pgn'
+
+    """
     novC, bookC = searchPositions(arjunC, script, db)
     plotNovelties(novC)
     plotBookMoves(bookC)
 
+    with open(f'../out/arjun_closed-novelties.pkl', 'wb+') as f:
+        pickle.dump(novC, f)
+    with open(f'../out/arjun_closed-bookMoves.pkl', 'wb+') as f:
+        pickle.dump(bookC, f)
+
     novO, bookO = searchPositions(arjunO, script, db)
     plotNovelties(novO)
     plotBookMoves(bookO)
+    with open(f'../out/arjun_open-novelties.pkl', 'wb+') as f:
+        pickle.dump(novO, f)
+    with open(f'../out/arjun_open-bookMoves.pkl', 'wb+') as f:
+        pickle.dump(bookO, f)
+    """
+    with open(f'../out/arjun_closed-bookMoves.pkl', 'rb') as f:
+        arjun_closed = pickle.load(f)
+    with open(f'../out/arjun_open-bookMoves.pkl', 'rb') as f:
+        arjun_open = pickle.load(f)
+
+    name = 'Erigaisi, Arjun'
+    moves = {f'{name}\nClosed': arjun_closed[name], f'{name}\nOpen': [x*25 / 37 for x in arjun_open[name]]}
+    plotBookMoves(moves, nGames=25)
+    
     """
     nov, book = searchPositions(pgn, script, db)
     print(nov, book)
