@@ -151,7 +151,7 @@ def formatInfo(infoLC0 = None, infoSF = None) -> str:
     evaluation = ""
     if infoLC0:
         wdl = []
-        wdl_w = engine.PovWdl.white(iLC0['wdl'])
+        wdl_w = engine.PovWdl.white(infoLC0['wdl'])
         for w in wdl_w:
             wdl.append(w)
         evaluation = str(wdl)
@@ -164,7 +164,7 @@ def formatInfo(infoLC0 = None, infoSF = None) -> str:
                 cp = 10000
             else:
                 cp = -10000
-        evaluation += cp
+        evaluation += str(cp)
     return evaluation
 
 
@@ -538,7 +538,7 @@ if __name__ == '__main__':
     outCan = '../out/wijk2024.pgn'
     # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
 
-    tournaments = ['shenzhen.pgn', 'tepe-sigeman.pgn', 'arjun_open.pgn', 'arjun_chennai.pgn', 'carlsen_open.pgn']
+    tournaments = ['arjun_chennai.pgn', 'carlsen_open.pgn']
     for t in tournaments:
         print(t)
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
