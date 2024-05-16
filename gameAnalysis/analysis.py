@@ -64,7 +64,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                         node.comment = f'{wdl};{cp}'
                     else:
                         # TODO: remove hard coded depth limit
-                        depth = 30
+                        depth = 27
                         ana = analysis(board, engine, limit, depth)
                         if ana:
                             node.comment = ana
@@ -137,7 +137,8 @@ def analysisCPnWDL(position: Board, lc0: engine, nodes: int, depth: int) -> str:
     # Defining Stockfish here is not ideal, but it's the easiest way right now
     sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     iLC0 = lc0.analyse(position, chess.engine.Limit(nodes=nodes))
-    iSF = sf.analyse(position, chess.engine.Limit(depth=depth))
+    iSF = sf.analyse(position, chess.engine.Limit(time=4))
+    print(iSF["depth"])
     wdl = []
     wdl_w = engine.PovWdl.white(iLC0['wdl'])
     for w in wdl_w:
