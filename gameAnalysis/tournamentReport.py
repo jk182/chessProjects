@@ -321,7 +321,6 @@ if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
-    print(players)
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
     # createMovePlot(getMoveSituation(t), nicknames)
@@ -331,3 +330,13 @@ if __name__ == '__main__':
     worse = worseGames(t)
     # plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
+
+    arjunC = '../out/arjun_closed.pgn'
+    arjunO = '../out/arjun_open-5000-30.pgn'
+    WL = ['Erigaisi, Arjun']
+    p2 = getPlayers(arjunC, WL)
+    generateAccDistributionGraphs(arjunC, p2)
+    generateAccDistributionGraphs(arjunO, p2)
+    plt.show()
+    # analysis.plotSharpChange(analysis.sharpnessChangePerPlayer(arjunC))
+

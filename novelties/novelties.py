@@ -245,9 +245,19 @@ if __name__ == '__main__':
     pgn = '../out/candidates2024-WDL+CP.pgn'
     fen = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
 
+    arjunC = '../out/arjun_closed.pgn'
+    arjunO = '../out/arjun_open-5000.pgn'
+
     # o = subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout
     # print(o)
     # print(gamesFromSearchOutput(str(o)))
+    novC, bookC = searchPositions(arjunC, script, db)
+    plotNovelties(novC)
+    plotBookMoves(bookC)
+
+    novO, bookO = searchPositions(arjunO, script, db)
+    plotNovelties(novO)
+    plotBookMoves(bookO)
     """
     nov, book = searchPositions(pgn, script, db)
     print(nov, book)
@@ -256,10 +266,12 @@ if __name__ == '__main__':
     with open(f'../out/candidates-bookMoves.pkl', 'wb+') as f:
         pickle.dump(book, f)
     """
+    """
     with open(f'../out/candidates-novelties.pkl', 'rb+') as f:
         novelties = pickle.load(f)
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     with open(f'../out/candidates-bookMoves.pkl', 'rb+') as f:
         bookMoves = pickle.load(f)
+    """
     # plotNovelties(novelties, short=nicknames, filename='../out/novelties.png')
     # plotBookMoves(bookMoves, short=nicknames, filename='../out/bookMoves.png')
