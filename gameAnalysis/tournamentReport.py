@@ -338,6 +338,7 @@ def plotMultAccDistributions(pgnPaths: list, filename: str = None):
         If no name is specified, the graph will be shown instead of saved.
     """
     colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa']
+    labels = ['Arjun\nClosed', 'Arjun\nOpen']
 
     fig, ax = plt.subplots()
     ax.set_facecolor('#e6f7f2')
@@ -348,8 +349,9 @@ def plotMultAccDistributions(pgnPaths: list, filename: str = None):
         # TODO: handle the players
         accDis = analysis.getAccuracyDistributionPlayer(pgn, 'Erigaisi, Arjun')
         accDis = normaliseAccDistribution(accDis)
-        ax.bar(accDis.keys(), accDis.values(), width=1, color=colors[i], edgecolor='black', linewidth='0.5', label=i, alpha=0.5)
+        ax.bar(accDis.keys(), accDis.values(), width=1, color=colors[i], edgecolor='black', linewidth='0.5', label=labels[i], alpha=0.5)
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title('Accuracy Distribution')
     ax.legend()
 
     if filename:
@@ -382,7 +384,7 @@ if __name__ == '__main__':
 
     sharpChange = {f'{name}\nClosed': sharpC[name], f'{name}\nOpen': sharpO[name]}
     # analysis.plotSharpChange(sharpChange, filename='../out/sharpArjun.png')
-    plotMultAccDistributions([arjunC, arjunO])
+    plotMultAccDistributions([arjunC, arjunO], filename='../out/arjunAccDis.png')
     # generateAccDistributionGraphs(arjunC, p2)
     # generateAccDistributionGraphs(arjunO, p2)
     # analysis.plotSharpChange(analysis.sharpnessChangePerPlayer(arjunC))
