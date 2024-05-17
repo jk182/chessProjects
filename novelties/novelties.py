@@ -253,7 +253,6 @@ if __name__ == '__main__':
     arjunC = '../out/arjun_closed.pgn'
     arjunO = '../out/arjun_open-5000-30.pgn'
 
-    """
     novC, bookC = searchPositions(arjunC, script, db)
     plotNovelties(novC)
     plotBookMoves(bookC)
@@ -262,7 +261,7 @@ if __name__ == '__main__':
         pickle.dump(novC, f)
     with open(f'../out/arjun_closed-bookMoves.pkl', 'wb+') as f:
         pickle.dump(bookC, f)
-
+    """
     novO, bookO = searchPositions(arjunO, script, db)
     plotNovelties(novO)
     plotBookMoves(bookO)
@@ -277,8 +276,8 @@ if __name__ == '__main__':
         arjun_open = pickle.load(f)
 
     name = 'Erigaisi, Arjun'
-    moves = {f'{name}\nClosed': arjun_closed[name], f'{name}\nOpen': [x*25 / 37 for x in arjun_open[name]]}
-    plotBookMoves(moves, nGames=25)
+    moves = {f'{name}\nClosed': arjun_closed[name], f'{name}\nOpen': [x*32 / 37 for x in arjun_open[name]]}
+    plotBookMoves(moves, nGames=32)
     
     """
     nov, book = searchPositions(pgn, script, db)
