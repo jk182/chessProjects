@@ -500,6 +500,7 @@ def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, fil
             # one sharp change was infinite, so I exclude them (TODO: investigate this)
             finSharp = [ s for s in sharp if not np.isinf(s) ]
             pl = p.split(',')[0]
+            pl = p
             if short:
                 if pl in short.keys():
                     pl = short[pl]
@@ -507,12 +508,12 @@ def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, fil
             y.append(sum(finSharp)/len(finSharp))
 
     fig, ax = plt.subplots()
-    plt.xticks(rotation=90)
+    # plt.xticks(rotation=90)
     ax.set_facecolor('#e6f7f2')
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
-    plt.xlim(-1, len(x))
-    ax.bar(x,y, edgecolor='black', linewidth=0.5, color='#fa5a5a')
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.xlim(-0.5, len(x)-0.5)
+    ax.bar(x,y, edgecolor='black', linewidth=0.5, color='#fa5a5a', width=0.7)
     # ax.legend(['Avg. sharp change per move'])
     plt.title('Average sharpness change per move')
     if filename:

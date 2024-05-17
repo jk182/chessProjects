@@ -214,10 +214,13 @@ def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGa
     fig, ax = plt.subplots(figsize=(10,6))
 
     ax.set_facecolor('#e6f7f2')
-    # plt.xticks(rotation=90)
+    plt.xticks(rotation=90)
     plt.xticks(ticks=range(1, len(sort)+1), labels=labels)
+    plt.yticks(range(12))
     plt.ylim(0, 11.5)
-    
+
+    plt.grid(axis='y')
+
     values = list(bookMoves.values())
     width = 1 / (2*len(values[0]))
     offset = -width*(len(values[0])-0.5)/2
@@ -226,11 +229,12 @@ def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGa
     colors = ['#689bf2', '#7ed3b2', '#ff87ca', '#beadfa', '#f8a978']
 
     for i in range(len(values[0])):
-        ax.bar([j+1+offset for j in range(len(sort))], [bookMoves[p][i]/nGames for p in sort], width=width, label=legendNames[i], color=colors[i], edgecolor='black', linewidth=0.5)
+        # zorder=3 to have the bars in front of the grid lines
+        ax.bar([j+1+offset for j in range(len(sort))], [bookMoves[p][i]/nGames for p in sort], width=width, label=legendNames[i], color=colors[i], edgecolor='black', linewidth=0.5, zorder=3)
         offset += width
 
     ax.legend(loc='upper center', ncol=5)
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.05, right=0.95)
     plt.title('Number of book moves')
     if filename:
         plt.savefig(filename, dpi=500)
@@ -253,6 +257,7 @@ if __name__ == '__main__':
     arjunC = '../out/arjun_closed.pgn'
     arjunO = '../out/arjun_open-5000-30.pgn'
 
+    """
     novC, bookC = searchPositions(arjunC, script, db)
     plotNovelties(novC)
     plotBookMoves(bookC)
@@ -261,7 +266,6 @@ if __name__ == '__main__':
         pickle.dump(novC, f)
     with open(f'../out/arjun_closed-bookMoves.pkl', 'wb+') as f:
         pickle.dump(bookC, f)
-    """
     novO, bookO = searchPositions(arjunO, script, db)
     plotNovelties(novO)
     plotBookMoves(bookO)
@@ -277,7 +281,7 @@ if __name__ == '__main__':
 
     name = 'Erigaisi, Arjun'
     moves = {f'{name}\nClosed': arjun_closed[name], f'{name}\nOpen': [x*32 / 37 for x in arjun_open[name]]}
-    plotBookMoves(moves, nGames=32)
+    plotBookMoves(moves, filename='../out/arjunBookMoves.png', nGames=32)
     
     """
     nov, book = searchPositions(pgn, script, db)

@@ -374,8 +374,14 @@ if __name__ == '__main__':
 
     arjunC = '../out/arjun_closed.pgn'
     arjunO = '../out/arjun_open-5000-30.pgn'
-    WL = ['Erigaisi, Arjun']
+    name = 'Erigaisi, Arjun'
+    WL = [name]
     p2 = getPlayers(arjunC, WL)
+    sharpC = analysis.sharpnessChangePerPlayer(arjunC)
+    sharpO = analysis.sharpnessChangePerPlayer(arjunO)
+
+    sharpChange = {f'{name}\nClosed': sharpC[name], f'{name}\nOpen': sharpO[name]}
+    # analysis.plotSharpChange(sharpChange, filename='../out/sharpArjun.png')
     plotMultAccDistributions([arjunC, arjunO])
     # generateAccDistributionGraphs(arjunC, p2)
     # generateAccDistributionGraphs(arjunO, p2)
