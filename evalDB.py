@@ -46,12 +46,13 @@ def update(position: str, nodes: int = -1, w: int = None, d: int = None, l: int 
     # TODO: check if position is in DB and nodes or depth are higher than before, then update
 
 
-def getEval(position: str, wdl: bool):
+def getEval(position: str):
     con = sqlite3.connect('../out/evaluation.db')
     cur = con.cursor()
-    if wdl:
-        return list(cur.execute(f'SELECT w,d,l FROM eval WHERE position="{position}"').fetchall()[0])
-    return cur.execute(f'SELECT cp FROM eval WHERE position="{position}"').fetchall()[0][0]
+    if not contains(position):
+        return None
+    query = cur.execute(f'SELECT w,d,l,nodes,cp,depth FROM eval WHERE position="{position}"').fetchall()[0]
+    return {'cp': query[4], 'depth': query[5], 'wdl': [query[0], query[1], query[2]], 'nodes': query[3]}
 
 
 def contains(position: str) -> bool:
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     # con = sqlite3.connect(DBname)
     # cur = con.cursor()
     # print(cur.execute("SELECT * FROM eval").fetchall())
-    importFromLichessDB('../resources/lichess_db_eval_1000000.json')
+    # importFromLichessDB('../resources/lichess_db_eval_1000000.json')
     """
     insert('test2', depth=5, cp=0.4, w=2, d=1, l=3)
     print(contains('test2'))

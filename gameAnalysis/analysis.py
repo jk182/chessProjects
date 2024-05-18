@@ -58,10 +58,18 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                     pos = board.fen()
                     if evalDB.contains(pos):
                         # TODO: not general enough
-                        wdl = str(evalDB.getEval(pos, True))
-                        cp = str(evalDB.getEval(pos, False))
+                        evalDict = evalDB.getEval(pos)
+                        wdl = evalDict['wdl']
+                        cp = evalDict['cp']
+                        if evalDict['depth'] <= 0:
+                            info = analysisCP(pos, None, 4)
+                            cp = info['score']
+                        if evalDict['nodes'] <= 0:
+                            wdl = analysisWDL(position, engine, limit)
+                            print(f'WDL calculated: {wdl}')
                         print('Cache hit!')
-                        node.comment = f'{wdl};{cp}'
+                        print(wdl, cp)
+                        node.comment = f'{str(wdl)};{cp}'
                     else:
                         infos = analysis(board, engine, limit)
                         if infos:
@@ -71,7 +79,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                             node.comment = ana
                             cp = int(ana.split(';')[1])
                             wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
-                            evalDB.update(pos, nodes=5000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
+                            evalDB.update(pos, nodes=limit, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
                 else:
                     node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
@@ -110,8 +118,7 @@ def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) ->
     return str(wdl)
 
 
-def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
-    # TODO: change like analysisCPnWDL
+def analysisCP(position: Board, sf: engine, timeLimit: int):
     """
     This function analyses a given position with Stockfish and returns the centipawn score.
     position: Board:
@@ -123,11 +130,14 @@ def analysisCP(position: Board, sf: engine, timeLimit: int) -> str:
     return -> str
         The centipawn score
     """
+    # TODO: fix this somehow
+    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     if position.is_game_over():
         return ""
 
     info = sf.analyse(position, chess.engine.Limit(time=timeLimit))
-    return str(info['score'].white())
+    sf.quit()
+    return info
 
 
 def analysisCPnWDL(position: Board, lc0: engine, nodes: int) -> tuple:
@@ -141,6 +151,7 @@ def analysisCPnWDL(position: Board, lc0: engine, nodes: int) -> tuple:
     sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     iLC0 = lc0.analyse(position, chess.engine.Limit(nodes=nodes))
     iSF = sf.analyse(position, chess.engine.Limit(time=4))
+    sf.quit()
     return (iLC0, iSF)
 
 
@@ -567,11 +578,14 @@ if __name__ == '__main__':
     outCan = '../out/wijk2024.pgn'
     # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
 
+    """
     tournaments = ['arjun_biel.pgn', 'carlsen_open.pgn']
     for t in tournaments:
         print(t)
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
+    """
 
+    makeComments('../resources/womenCanR14.pgn', '../out/womenCanR14.pgn', analysisCPnWDL, 5000, leela, True)
     leela.quit()
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
