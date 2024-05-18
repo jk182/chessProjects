@@ -85,14 +85,15 @@ def importFromPGN(pgnPath: str, nodes: int = None, depth: int = None):
 def importFromLichessDB(lichessDB: str):
     evalDB = pd.read_json(lichessDB, lines=True)
     for i, row in evalDB.iterrows():
-        evals = row['evals']
-        print(evals)
-        cps = list()
-        for pv in evals[0]['pvs']:
-            if 'cp' in pv.keys():
-                cps.append(pv['cp'])
-        if cps:
-            print(max(cps)-min(cps), len(cps))
+        print(i)
+        if not contains(row['fen']):
+            evals = row['evals']
+            if 'cp' in evals[0]['pvs'][0].keys():
+                cp = evals[0]['pvs'][0]['cp']
+                pv = evals[0]['pvs'][0]['line']
+                # print(evals)
+                # print(row['fen'], cp, evals[0]['depth'], pv)
+                insert(position=row['fen'], cp=cp, depth=evals[0]['depth'], pv=pv)
 
 
 if __name__ == '__main__':
@@ -107,7 +108,7 @@ if __name__ == '__main__':
     # con = sqlite3.connect(DBname)
     # cur = con.cursor()
     # print(cur.execute("SELECT * FROM eval").fetchall())
-    importFromLichessDB('resources/lichess_db_eval_100.json')
+    importFromLichessDB('../resources/lichess_db_eval_1000000.json')
     """
     insert('test2', depth=5, cp=0.4, w=2, d=1, l=3)
     print(contains('test2'))
