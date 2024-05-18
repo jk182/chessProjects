@@ -1,6 +1,8 @@
 import sqlite3
 import functions
 import chess
+import json
+import pandas as pd
 
 def createTable(name: str):
     """
@@ -80,18 +82,32 @@ def importFromPGN(pgnPath: str, nodes: int = None, depth: int = None):
                     update(fen, depth=depth, cp=cp)
 
 
+def importFromLichessDB(lichessDB: str):
+    evalDB = pd.read_json(lichessDB, lines=True)
+    for i, row in evalDB.iterrows():
+        evals = row['evals']
+        print(evals)
+        cps = list()
+        for pv in evals[0]['pvs']:
+            if 'cp' in pv.keys():
+                cps.append(pv['cp'])
+        if cps:
+            print(max(cps)-min(cps), len(cps))
+
+
 if __name__ == '__main__':
-    DBname = 'out/evaluation.db'
-    con = sqlite3.connect(DBname)
-    cur = con.cursor()
-    cur.execute("DROP TABLE IF EXISTS eval")
-    createTable(DBname)
+    # DBname = 'out/evaluation.db'
+    # con = sqlite3.connect(DBname)
+    # cur = con.cursor()
+    # cur.execute("DROP TABLE IF EXISTS eval")
+    # createTable(DBname)
     # print(cur.execute("SELECT name FROM sqlite_master").fetchone())
-    con.close()
-    importFromPGN('out/candidates2024-WDL+CP.pgn', 5000, 35)
-    con = sqlite3.connect(DBname)
-    cur = con.cursor()
-    print(cur.execute("SELECT * FROM eval").fetchall())
+    # con.close()
+    # importFromPGN('out/candidates2024-WDL+CP.pgn', 5000, 35)
+    # con = sqlite3.connect(DBname)
+    # cur = con.cursor()
+    # print(cur.execute("SELECT * FROM eval").fetchall())
+    importFromLichessDB('resources/lichess_db_eval_100.json')
     """
     insert('test2', depth=5, cp=0.4, w=2, d=1, l=3)
     print(contains('test2'))
