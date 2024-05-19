@@ -127,3 +127,15 @@ def readComment(node, wdl: bool, cp: bool) -> tuple:
     sp = node.comment.split(';')
     wdlList = [ int(w) for w in sp[0].replace('[', '').replace(']', '').strip().split(',') ]
     return (wdlList, int(float(sp[1])))
+
+def modifyFEN(fen: str) -> str:
+    """
+    This function takes a standard FEN string and removes the halfmove clock and the fullmove number
+    """
+    fenS = fen.split(' ')
+    if not fenS[-2].isnumeric():
+        return fen
+    modFen = fenS[0]
+    for s in fenS[1:-2]:
+        modFen = f'{modFen} {s}'
+    return modFen
