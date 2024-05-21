@@ -118,7 +118,7 @@ if __name__ == '__main__':
     # con = sqlite3.connect(DBname)
     # cur = con.cursor()
     # print(cur.execute("SELECT * FROM eval").fetchall()[-100:])
-    for i in range(1, 10):
+    for i in range(5, 10):
         print(i)
         importFromLichessDB(f'../resources/lichess_db_eval_1000000_{i}.json')
     """
