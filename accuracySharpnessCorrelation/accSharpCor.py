@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import chess
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def accSharpPerPlayer(pgnPath: str) -> dict:
@@ -34,22 +35,59 @@ def accSharpPerPlayer(pgnPath: str) -> dict:
                     break
                 cpAfter = comment[1]
                 sharpness = functions.sharpnessLC0(wdl)
+                sharpness = min(3, sharpness)
+                if sharpness > 0:
+                    sharpness = 200 * sharpness/(max(wdl)+1)
 
                 if white:
                     winPBefore = functions.winP(cpBefore)
                     winPAfter = functions.winP(cpAfter)
                     accuracy = functions.accuracy(winPBefore, winPAfter)
+                    accuracy = min(100, accuracy)
                     accSharp[w].append((accuracy, sharpness))
                 else:
                     winPBefore = functions.winP(-1 * cpBefore)
                     winPAfter = functions.winP(-1 * cpAfter)
                     accuracy = functions.accuracy(winPBefore, winPAfter)
+                    accuracy = min(100, accuracy)
                     accSharp[b].append((accuracy, sharpness))
     return accSharp
 
 
+def plotAccSharp(pgnPath: str, filename: str = None):
+    """
+    This function plots the accuracy and sharpness of all games in the given PGN file.
+    pgnPath: str
+        Path to the PGN file
+    filename: str
+        The name of the file to which the graph should be saved.
+        If no name is specified, the graph will be shown instead of saved.
+    """
+    accSharp = accSharpPerPlayer(pgnPath)
+
+    colors = ['#689bf2', '#7ed3b2', '#ff87ca', '#beadfa', '#f8a978']
+
+    fig, ax = plt.subplots(figsize=(10,6))
+    ax.set_facecolor('#e6f7f2')
+    ax.set_xlabel('Sharpness of position')
+    ax.set_ylabel('Accuracy')
+    ax.set_xlim(0, max([x[1] for acs in accSharp.values() for x in acs]))
+    ax.set_ylim(0, 101)
+
+    for player, acs in accSharp.items():
+        ax.scatter([a[1] for a in acs], [a[0] for a in acs], color=colors[0], alpha=0.5)
+
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title('Sharpness/Accuracy')
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
+
+
+
 if __name__ == '__main__':
-    pgn = '../out/wijkMasters2024-5000-30.pgn'
+    pgn = '../out/candidates+wijk.pgn'
     ASP = accSharpPerPlayer(pgn)
     totalAcc = list()
     totalSharp = list()
@@ -61,3 +99,4 @@ if __name__ == '__main__':
         print(p, sum(acc)/len(acc), sum(sharp)/len(sharp))
         print(np.corrcoef(acc, sharp))
     print(np.corrcoef(totalAcc, totalSharp))
+    plotAccSharp(pgn)
