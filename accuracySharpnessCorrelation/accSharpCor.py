@@ -3,6 +3,7 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import chess
+import numpy as np
 
 
 def accSharpPerPlayer(pgnPath: str) -> dict:
@@ -49,4 +50,14 @@ def accSharpPerPlayer(pgnPath: str) -> dict:
 
 if __name__ == '__main__':
     pgn = '../out/wijkMasters2024-5000-30.pgn'
-    print(accSharpPerPlayer(pgn))
+    ASP = accSharpPerPlayer(pgn)
+    totalAcc = list()
+    totalSharp = list()
+    for p in ASP.keys():
+        acc = [acs[0] for acs in ASP[p]]
+        sharp = [acs[1] for acs in ASP[p]]
+        totalAcc += acc
+        totalSharp += sharp
+        print(p, sum(acc)/len(acc), sum(sharp)/len(sharp))
+        print(np.corrcoef(acc, sharp))
+    print(np.corrcoef(totalAcc, totalSharp))
