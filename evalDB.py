@@ -40,9 +40,11 @@ def insert(position: str, nodes: int = -1, w: int = None, d: int = None, l: int 
 def update(position: str, nodes: int = -1, w: int = None, d: int = None, l: int = None, depth: int = -1, cp: float = None, mate: int = None, pv: str = None):
     con = sqlite3.connect('../out/evaluation.db')
     cur = con.cursor()
-    nd = cur.execute(f'SELECT nodes, depth FROM eval WHERE position="{position}"')
-    if not contains(position):
-        insert(position, nodes, w, d, l, depth, cp, mate, pv)
+    # TODO: update for CP
+    cur.execute(f'UPDATE eval SET nodes={nodes}, w={w}, d={d}, l={l} WHERE position="{position}"')
+    # nd = cur.execute(f'SELECT nodes, depth FROM eval WHERE position="{position}"')
+    # if not contains(position):
+    #     insert(position, nodes, w, d, l, depth, cp, mate, pv)
     # TODO: check if position is in DB and nodes or depth are higher than before, then update
 
 

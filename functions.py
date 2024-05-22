@@ -1,6 +1,8 @@
 from chess import engine, pgn
 import chess
 import numpy as np
+import subprocess
+import re
 
 
 def configureEngine(engineName: str, uci_options: dict) -> engine:
@@ -139,3 +141,15 @@ def modifyFEN(fen: str) -> str:
     for s in fenS[1:-2]:
         modFen = f'{modFen} {s}'
     return modFen
+
+
+def getNumberOfGames(fen: str) -> int:
+    """
+    This function returns the number of games in the database with the given position.
+    """
+    script = '~/coding/chessProjects/novelties/searchPosition.tcl'
+    db = '/home/julian/chess/database/gameDB/novelties'
+    output = str(subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout)
+    print(output)
+    games = re.findall('\d+', output)[0]
+    return int(games)

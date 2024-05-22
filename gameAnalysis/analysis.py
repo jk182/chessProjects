@@ -56,16 +56,20 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                 # Adds a comment after every move with the wdl
                 if cache:
                     pos = board.fen()
-                    if evalDB.contains(pos):
+                    posDB = functions.modifyFEN(pos)
+                    if evalDB.contains(posDB):
                         # TODO: not general enough
-                        evalDict = evalDB.getEval(pos)
+                        evalDict = evalDB.getEval(posDB)
                         wdl = evalDict['wdl']
                         cp = evalDict['cp']
                         if evalDict['depth'] <= 0:
-                            info = analysisCP(pos, None, 4)
+                            info = analysisCP(board, None, 4)
                             cp = info['score']
                         if evalDict['nodes'] <= 0:
-                            wdl = analysisWDL(position, engine, limit)
+                            wdl = analysisWDL(board, engine, limit)
+                            wdlList = [int(x) for x in wdl[1:-1].split(',')]
+                            print(wdlList)
+                            evalDB.update(position=posDB, nodes=limit, w=wdlList[0], d=wdlList[1], l=wdlList[2])
                             print(f'WDL calculated: {wdl}')
                         print('Cache hit!')
                         print(wdl, cp)
@@ -79,7 +83,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
                             node.comment = ana
                             cp = int(ana.split(';')[1])
                             wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
-                            evalDB.update(pos, nodes=limit, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
+                            evalDB.insert(posDB, nodes=limit, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
                 else:
                     node.comment = analysis(board, engine, limit)
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
@@ -585,7 +589,8 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    makeComments('../resources/womenCanR14.pgn', '../out/womenCanR14.pgn', analysisCPnWDL, 5000, leela, True)
+    makeComments('../resources/chennai2023.pgn', '../out/chennai2023-out.pgn', analysisCPnWDL, 5000, leela, True)
+    makeComments('../resources/jkClassical.pgn', '../out/jkClassical-out.pgn', analysisCPnWDL, 5000, leela, True)
     leela.quit()
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)

@@ -7,17 +7,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def accSharpPerPlayer(pgnPath: str) -> dict:
+def accSharpPerPlayer(pgnPath: str, dbGames: int = None) -> dict:
     """
     This function calculates the accuracy and sharpness on each move.
     pgnPath: str
         Path to the PGN file
+    dbGames: int
+        The cutoff for book moves.
     return -> dict
         Dictionary indexed by players containing a list of tuples (acc, sharp)
     """
     accSharp = dict()
     with open (pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
+            nGames = 1000000
             if (w := game.headers['White']) not in accSharp.keys():
                 accSharp[w] = list()
             if (b := game.headers['Black']) not in accSharp.keys():
@@ -30,7 +33,16 @@ def accSharpPerPlayer(pgnPath: str) -> dict:
                     break
                 wdl, cpBefore = functions.readComment(node, True, True)
                 white = node.turn()
+                oldNode = node
                 node = node.variations[0]
+                if dbGames:
+                    if nGames < dbGames:
+                        continue
+                    else: 
+                        currNGames = functions.getNumberOfGames(node.board().fen())
+                        nGames = currNGames
+                        if currNGames > dbGames:
+                            continue
                 if not (comment := functions.readComment(node, True, True)):
                     break
                 cpAfter = comment[1]
@@ -43,6 +55,7 @@ def accSharpPerPlayer(pgnPath: str) -> dict:
                     winPBefore = functions.winP(cpBefore)
                     winPAfter = functions.winP(cpAfter)
                     accuracy = functions.accuracy(winPBefore, winPAfter)
+                    # The accuracy is sometimes over 100 but it seems like this only happens when the position gets more winning due to a strong move
                     accuracy = min(100, accuracy)
                     accSharp[w].append((accuracy, sharpness))
                 else:
@@ -88,7 +101,7 @@ def plotAccSharp(pgnPath: str, filename: str = None):
 
 if __name__ == '__main__':
     pgn = '../out/candidates+wijk.pgn'
-    ASP = accSharpPerPlayer(pgn)
+    ASP = accSharpPerPlayer(pgn, 10)
     totalAcc = list()
     totalSharp = list()
     for p in ASP.keys():
