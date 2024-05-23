@@ -589,8 +589,8 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    makeComments('../resources/chennai2023.pgn', '../out/chennai2023-out.pgn', analysisCPnWDL, 5000, leela, True)
     makeComments('../resources/jkClassical.pgn', '../out/jkClassical-out.pgn', analysisCPnWDL, 5000, leela, True)
+    makeComments('../resources/sharjah.pgn', '../out/sharjah-out.pgn', analysisCPnWDL, 5000, leela, True)
     leela.quit()
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)

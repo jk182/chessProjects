@@ -5,6 +5,7 @@ import functions
 import chess
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
 
 
 def accSharpPerPlayer(pgnPath: str, dbGames: int = None) -> dict:
@@ -27,6 +28,8 @@ def accSharpPerPlayer(pgnPath: str, dbGames: int = None) -> dict:
                 accSharp[b] = list()
 
             node = game
+            if not node.variations:
+                continue
             node = node.variations[0]
             while not node.is_end():
                 if not functions.readComment(node, True, True):
@@ -35,6 +38,8 @@ def accSharpPerPlayer(pgnPath: str, dbGames: int = None) -> dict:
                 white = node.turn()
                 oldNode = node
                 node = node.variations[0]
+                if abs(cpBefore) > 300:
+                    continue
                 if dbGames:
                     if nGames < dbGames:
                         continue
@@ -47,10 +52,11 @@ def accSharpPerPlayer(pgnPath: str, dbGames: int = None) -> dict:
                     break
                 cpAfter = comment[1]
                 sharpness = functions.sharpnessLC0(wdl)
+                """
                 sharpness = min(3, sharpness)
                 if sharpness > 0:
                     sharpness = 200 * sharpness/(max(wdl)+1)
-
+                """
                 if white:
                     winPBefore = functions.winP(cpBefore)
                     winPAfter = functions.winP(cpAfter)
@@ -98,18 +104,45 @@ def plotAccSharp(pgnPath: str, filename: str = None):
         plt.show()
 
 
+def accuracyPerSharpness(pgnPath: str, maxSharpness: float, intervalls: int):
+    acc = list()
+    sharp = list()
+    ASP = accSharpPerPlayer(pgnPath)
+    for p in ASP.keys():
+        acc += [acs[0] for acs in ASP[p]]
+        sharp += [acs[1] for acs in ASP[p]]
+    
+    accPerSharp = list()
+    for i in range(intervalls + 1):
+        accPerSharp.append(list())
+    for i, s in enumerate(sharp):
+        if s >= maxSharpness:
+            accPerSharp[intervalls].append(acc[i])
+        else:
+            accPerSharp[int((s*intervalls)/maxSharpness)].append(acc[i])
+    averages = [ sum(aps)/len(aps) for aps in accPerSharp ]
+    print(averages)
+    x = [ i * maxSharpness / intervalls for i in range(len(averages)) ]
+    plt.plot(x, averages)
+    plt.show()
+
 
 if __name__ == '__main__':
-    pgn = '../out/candidates+wijk.pgn'
-    ASP = accSharpPerPlayer(pgn, 10)
+    pgn = '../out/gmGames.pgn'
+    # pgn = '../out/jkClassical-out.pgn'
+    accuracyPerSharpness(pgn, 2, 10)
+    ASP = accSharpPerPlayer(pgn)
     totalAcc = list()
     totalSharp = list()
     for p in ASP.keys():
         acc = [acs[0] for acs in ASP[p]]
         sharp = [acs[1] for acs in ASP[p]]
+        if not acc or not sharp:
+            continue
         totalAcc += acc
         totalSharp += sharp
         print(p, sum(acc)/len(acc), sum(sharp)/len(sharp))
         print(np.corrcoef(acc, sharp))
     print(np.corrcoef(totalAcc, totalSharp))
+    print(stats.spearmanr(totalAcc, totalSharp))
     plotAccSharp(pgn)
