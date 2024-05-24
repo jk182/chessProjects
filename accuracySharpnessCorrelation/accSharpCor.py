@@ -94,43 +94,61 @@ def plotAccSharp(pgnPath: str, filename: str = None):
     ax.set_ylim(0, 101)
 
     for player, acs in accSharp.items():
-        ax.scatter([a[1] for a in acs], [a[0] for a in acs], color=colors[0], alpha=0.5)
+        ax.scatter([a[1] for a in acs], [a[0] for a in acs], color=colors[2], alpha=0.3)
 
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
-    plt.title('Sharpness/Accuracy')
+    plt.title('Sharpness/Accuracy My Games')
     if filename:
         plt.savefig(filename, dpi=500)
     else:
         plt.show()
 
 
-def accuracyPerSharpness(pgnPath: str, maxSharpness: float, intervalls: int):
-    acc = list()
-    sharp = list()
-    ASP = accSharpPerPlayer(pgnPath)
-    for p in ASP.keys():
-        acc += [acs[0] for acs in ASP[p]]
-        sharp += [acs[1] for acs in ASP[p]]
-    
-    accPerSharp = list()
-    for i in range(intervalls + 1):
-        accPerSharp.append(list())
-    for i, s in enumerate(sharp):
-        if s >= maxSharpness:
-            accPerSharp[intervalls].append(acc[i])
-        else:
-            accPerSharp[int((s*intervalls)/maxSharpness)].append(acc[i])
-    averages = [ sum(aps)/len(aps) for aps in accPerSharp ]
-    print(averages)
-    x = [ i * maxSharpness / intervalls for i in range(len(averages)) ]
-    plt.plot(x, averages)
-    plt.show()
+def accuracyPerSharpness(pgns: list, labels: list, maxSharpness: float, intervalls: int, filename: str = None) -> None:
+    colors = ['#689bf2', '#ff87ca', '#beadfa', '#7ed3b2', '#f8a978']
+
+    fig, ax = plt.subplots(figsize=(10,6))
+    ax.set_facecolor('#e6f7f2')
+    ax.set_xlabel('Sharpness of position')
+    ax.set_ylabel('Accuracy')
+    ax.set_xticks([i*maxSharpness/intervalls for i in range(intervalls+1)])
+    ax.set_xlim(0, maxSharpness)
+    for k, pgn in enumerate(pgns):
+        acc = list()
+        sharp = list()
+        ASP = accSharpPerPlayer(pgn)
+        for p in ASP.keys():
+            acc += [acs[0] for acs in ASP[p]]
+            sharp += [acs[1] for acs in ASP[p]]
+
+        accPerSharp = list()
+        for i in range(intervalls + 1):
+            accPerSharp.append(list())
+        for i, s in enumerate(sharp):
+            if s >= maxSharpness:
+                accPerSharp[intervalls].append(acc[i])
+            else:
+                accPerSharp[int((s*intervalls)/maxSharpness)].append(acc[i])
+        averages = [ sum(aps)/len(aps) for aps in accPerSharp ]
+        lengths = [ len(aps) for aps in accPerSharp ]
+        print(averages)
+        print(lengths)
+        x = [ i * maxSharpness / intervalls for i in range(len(averages)) ]
+
+        ax.plot(x, averages, color=colors[k], label=labels[k])
+
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.legend()
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
     pgn = '../out/gmGames.pgn'
-    # pgn = '../out/jkClassical-out.pgn'
-    accuracyPerSharpness(pgn, 2, 10)
+    pgn2 = '../out/jkClassical-out.pgn'
+    accuracyPerSharpness([pgn, pgn2], ['GM games', 'My games'], 2, 10, '../out/accPerS.png')
     ASP = accSharpPerPlayer(pgn)
     totalAcc = list()
     totalSharp = list()
@@ -145,4 +163,5 @@ if __name__ == '__main__':
         print(np.corrcoef(acc, sharp))
     print(np.corrcoef(totalAcc, totalSharp))
     print(stats.spearmanr(totalAcc, totalSharp))
-    plotAccSharp(pgn)
+    # plotAccSharp(pgn, '../out/gmSharp.png')
+    plotAccSharp(pgn2, '../out/jkSharp.png')
