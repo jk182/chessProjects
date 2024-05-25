@@ -25,10 +25,15 @@ class Bitboard:
         self.board = board
 
 
-    def printBoard(self):
+    def getBoard(self):
         b = 0x0
         for piece in self.board:
             b = b | piece
+        return b
+
+
+    def printBoard(self):
+        b = self.getBoard()
         for i in range(8):
             print(bin(b)[2:][i*8:(i+1)*8])
 
@@ -56,8 +61,63 @@ class Bitboard:
                 break
 
 
+    def toFEN(self) -> str:
+        """
+        This function returns the FEN string of the position without the castling rights, en-passant square or move counters
+        """
+        pieces = 'pnbrqkPNBRQK'
+        counter = 0
+        fen = ''
+        for i,sq in enumerate(bin(self.getBoard())[2:]):
+            if sq == '0':
+                counter += 1
+            else:
+                if counter > 0:
+                    fen = f'{fen}{counter}'
+                    counter = 0
+                for k,b in enumerate(self.board):
+                    if b & 2**(63-i):
+                        fen = f'{fen}{pieces[k]}'
+                        break
+            if i % 8 == 7:
+                if counter > 0:
+                    fen = f'{fen}{counter}'
+                    counter = 0
+                fen = f'{fen}/'
+        return fen[:-1]
+
+        
+    def squareToNumber(square: str) -> int:
+        file = ord(square[0])-97
+        rank = int(square[1])
+        return 2**(63-8*(8-rank)-file)
+
+
+    def squareIsEmpty(self, square: str) -> bool:
+        b = self.getBoard()
+        sqBin = Bitboard.squareToNumber(square)
+        return not bool(b & sqBin)
+
+
+    def moveToNewSquare(self, oldSquare: str, newSquare: str):
+        if not self.squareIsEmpty(newSquare) or self.squareIsEmpty(oldSquare):
+            return None
+        osBin = Bitboard.squareToNumber(oldSquare)
+        nsBin = Bitboard.squareToNumber(newSquare)
+        for i,b in enumerate(self.board):
+            if b & osBin:
+                self.board[i] ^= osBin
+                self.board[i] |= nsBin
+                break
+        return self
+
+
 if __name__ == '__main__':
     board = Bitboard()
     board.printBoard()
     board.setBoardFEN('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2')
     board.printBoard()
+    print(board.squareIsEmpty('f3'))
+    board = board.moveToNewSquare('f3', 'f4')
+    board.printBoard()
+    print(board.toFEN())
