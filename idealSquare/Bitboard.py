@@ -33,9 +33,10 @@ class Bitboard:
 
 
     def printBoard(self):
-        b = self.getBoard()
+        b = bin(self.getBoard())[2:]
+        b = f'{"0"*(64-len(b))}{b}'
         for i in range(8):
-            print(bin(b)[2:][i*8:(i+1)*8])
+            print(b[i*8:(i+1)*8])
 
 
     def setBoardFEN(self, fen):
@@ -68,7 +69,9 @@ class Bitboard:
         pieces = 'pnbrqkPNBRQK'
         counter = 0
         fen = ''
-        for i,sq in enumerate(bin(self.getBoard())[2:]):
+        boardString = bin(self.getBoard())[2:]
+        boardString = f'{"0"*(64-len(boardString))}{boardString}'
+        for i,sq in enumerate(boardString):
             if sq == '0':
                 counter += 1
             else:
@@ -114,10 +117,8 @@ class Bitboard:
 
 if __name__ == '__main__':
     board = Bitboard()
+    board.setBoardFEN('3rnrk1/2qn1pbp/1p4p1/2p1p3/4P3/4B1PP/1PPNQPB1/R4RK1 w - - 0 18')
     board.printBoard()
-    board.setBoardFEN('rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2')
-    board.printBoard()
-    print(board.squareIsEmpty('f3'))
-    board = board.moveToNewSquare('f3', 'f4')
+    board = board.moveToNewSquare('d2', 'b5')
     board.printBoard()
     print(board.toFEN())
