@@ -115,6 +115,28 @@ class Bitboard:
         return self
 
 
+    def materialDiff(self):
+        """
+        This function calculates the material difference between White and Black.
+        Positive numbers mean that White is up in material, negative that Black is up in material.
+        """
+        # P, N, B, R, Q, K
+        materialValues = [1, 3, 3, 5, 9, 1000]
+        whiteMaterial = 0
+        blackMaterial = 0
+        for i, b in enumerate(self.board):
+            count = 0
+            n = b
+            while n > 0:
+                n &= (n-1)
+                count += 1
+            if i < 6:
+                whiteMaterial += materialValues[i]*count
+            else:
+                blackMaterial += materialValues[i%6]*count
+        return whiteMaterial-blackMaterial
+
+
 if __name__ == '__main__':
     board = Bitboard()
     board.setBoardFEN('3rnrk1/2qn1pbp/1p4p1/2p1p3/4P3/4B1PP/1PPNQPB1/R4RK1 w - - 0 18')
@@ -122,3 +144,5 @@ if __name__ == '__main__':
     board = board.moveToNewSquare('d2', 'b5')
     board.printBoard()
     print(board.toFEN())
+    board2 = Bitboard()
+    board2.materialDiff()
