@@ -131,9 +131,9 @@ class Bitboard:
                 n &= (n-1)
                 count += 1
             if i < 6:
-                whiteMaterial += materialValues[i]*count
+                blackMaterial += materialValues[i]*count
             else:
-                blackMaterial += materialValues[i%6]*count
+                whiteMaterial += materialValues[i%6]*count
         return whiteMaterial-blackMaterial
 
 

@@ -58,7 +58,10 @@ def findIdealSquare(fen: str, startSquare: str, sf: chess.engine, changeMove: bo
 
     bitboard = Bitboard.Bitboard()
     bitboard.setBoardFEN(fen)
+    initialMaterialDiff = bitboard.materialDiff()
     evalChanges = dict()
+    print(initialMaterialDiff)
+
     if bitboard.squareIsEmpty(startSquare):
         return None
     for f in 'abcdefgh':
@@ -67,17 +70,40 @@ def findIdealSquare(fen: str, startSquare: str, sf: chess.engine, changeMove: bo
             if bitboard.squareIsEmpty(newSquare) and newSquare != startSquare:
                 newPos = movePieceToSquare(fen, startSquare, newSquare, changeMove)
                 board = chess.Board(newPos)
-                newCP = int(str(sf.analyse(board, chess.engine.Limit(time=time))['score'].white()))
+                info = sf.analyse(board, chess.engine.Limit(time=time))
+                matDiffAfter = materialDiffAfterPV(board, info['pv'])
+                newCP = int(str(info['score'].white()))
                 if white:
-                    gap = newCP - startCP
+                    factor = 1
                 else:
-                    gap = startCP - newCP
-                evalChanges[newSquare] = gap
+                    factor = -1
+                gap = factor * (newCP - startCP)
+                if factor*(matDiffAfter - initialMaterialDiff) <= 2:
+                    print(newSquare, gap, matDiffAfter)
+                    evalChanges[newSquare] = gap
     for sq, ev in evalChanges.items():
         if ev > improvement:
             bestSquare = sq
             improvement = ev
     return bestSquare
+
+
+def materialDiffAfterPV(board: chess.Board, pv: list) -> int:
+    """
+    This function calculates the material difference at the end of the PV
+    board: chess.Board
+        The board in the starting position
+    pv: list
+        A list of the PV moves, attained from an engine analysis
+    return -> int
+        The material difference at the end of the PV
+    """
+    board2 = board
+    for move in pv:
+        board2.push(move)
+    bb = Bitboard.Bitboard()
+    bb.setBoardFEN(board2.fen())
+    return bb.materialDiff()
 
 
 if __name__ == '__main__':
