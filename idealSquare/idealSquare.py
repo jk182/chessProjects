@@ -113,5 +113,10 @@ if __name__ == '__main__':
     # print(movePieceToSquare(fen, 'd2', 'b5'))
     # print(findIdealSquare(fen, 'd2', sf, True))
     fen2 = '2bqr1k1/r4pnp/1p3bp1/pPp1p3/2P1P3/3P1NP1/PBQ3BP/4RRK1 w - - 1 20'
-    print(findIdealSquare(fen2, 'f3', sf, True))
+    fens = ['r2q1rk1/ppb2ppp/2p1bn2/5p2/2NP4/4P1P1/PPQ1NPBP/R4RK1 w - - 3 13',
+            'r2qrnk1/pp3pb1/3p4/2pPp1p1/2P1P3/2N2PBR/PPQ2P2/2KR4 w - - 1 19',
+            'r3r1k1/pb2qppp/1n6/2b3PN/4p1QP/2N1P3/1P1B1P2/R3K2R b K - 1 21']
+    squares = ['c4', 'c3', 'b6']
+    for fen, square in zip(fens, squares):
+        print(findIdealSquare(fen, square, sf, True))
     sf.quit()
