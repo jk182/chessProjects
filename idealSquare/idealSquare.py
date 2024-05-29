@@ -60,7 +60,6 @@ def findIdealSquare(fen: str, startSquare: str, sf: chess.engine, changeMove: bo
     bitboard.setBoardFEN(fen)
     initialMaterialDiff = bitboard.materialDiff()
     evalChanges = dict()
-    print(initialMaterialDiff)
 
     if bitboard.squareIsEmpty(startSquare):
         return None
@@ -117,6 +116,8 @@ if __name__ == '__main__':
             'r2qrnk1/pp3pb1/3p4/2pPp1p1/2P1P3/2N2PBR/PPQ2P2/2KR4 w - - 1 19',
             'r3r1k1/pb2qppp/1n6/2b3PN/4p1QP/2N1P3/1P1B1P2/R3K2R b K - 1 21']
     squares = ['c4', 'c3', 'b6']
-    for fen, square in zip(fens, squares):
-        print(findIdealSquare(fen, square, sf, True))
+    # print(findIdealSquare('r1bq1rk1/1p3ppp/p3pb2/4N3/PnBP4/8/1P2QPPP/R1BR2K1 w - - 0 15', 'a1', sf, True))
+    print(findIdealSquare('r1b1k2r/pp1nqpp1/3p1n1p/2pPp3/P1P1P2P/2P2N2/2Q1BPP1/R1B1K2R b KQkq - 1 11', 'e8', sf, True))
+    # for fen, square in zip(fens, squares):
+    #     print(findIdealSquare(fen, square, sf, True))
     sf.quit()
