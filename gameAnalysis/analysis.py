@@ -13,6 +13,75 @@ import logging
 import evalDB
 
 
+def analyseGame(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit: int, nodeLimit: int) -> None:
+    """
+    This function analyses a PGN and generates a new PGN with the analysis in the comments.
+    It replaces the makeComments function
+    pgnPath: str
+        Path to the PGN file with the games to analyse
+    outfile: str
+        The path to the output PGN file
+    sf: engine
+        Configured Stockfish
+    lc0: engine
+        Configured LC0
+    timeLimit: int
+        Time limit for the Stockfish analysis
+    nodeLimit: int
+        Node limit for the LC0 analysis
+    """
+    gameNr = 1
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            print(f'Starting to analyse game {gameNr}')
+            gameNr += 1
+
+            board = game.board()
+
+            newGame = chess.pgn.Game()
+            newGame.headers = game.headers
+            node = newGame
+
+            for move in game.mainline_moves():
+                print(move)
+                node = node.add_variation(move)
+                board.push(move)
+
+
+                pos = board.fen()
+                posDB = functions.modifyFEN(pos)
+                if evalDB.contains(posDB):
+                    evalDict = evalDB.getEval(posDB)
+                    wdl = evalDict['wdl']
+                    cp = evalDict['cp']
+                    if evalDict['depth'] <= 0:
+                        info = analysisCP(board, sf, timeLimit)
+                        cp = info['score']
+                        depth = info['depth']
+                        evalDB.update(position=posDB, cp=cp, depth=depth)
+                    if evalDict['nodes'] <= 0:
+                        info = analysisWDL(board, lc0, nodeLimit)
+                        wdl = list(chess.engine.PovWdl.white(info['wdl']))
+                        print(wdl)
+                        evalDB.update(position=posDB, nodes=nodeLimit, w=wdl[0], d=wdl[1], l=wdl[2])
+                        print(f'WDL calculated: {wdl}')
+                    print('Cache hit!')
+                    print(wdl, cp)
+                    node.comment = f'{str(wdl)};{cp}'
+                else:
+                    iSF = analysisCP(board, sf, timeLimit)
+                    iLC0 = analysisWDL(board, lc0, nodeLimit)
+                    if iSF and iLC0:
+                        ana = formatInfo(iLC0, iSF)
+                        print(ana)
+                        node.comment = ana
+                        cp = int(ana.split(';')[1])
+                        wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
+                        evalDB.insert(posDB, nodes=nodeLimit, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
+            print(newGame, file=open(outfile, 'a+'), end='\n\n')
+
+
+
 def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: engine, cache: bool = False) -> list:
     """
     This function plays thorugh the games in a file and makes comments to them.
@@ -91,8 +160,7 @@ def makeComments(gamesFile: str, outfile: str, analysis, limit: int, engine: eng
     return []
 
 
-def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) -> str:
-    # TODO: change like analysisCPnWDL
+def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False):
     """
     This function analyses a given chess position with LC0 to get the WDL from whtie's perspective.
     position:Board
@@ -108,18 +176,13 @@ def analysisWDL(position: Board, lc0: engine, limit: int, time: bool = False) ->
     """
     # The analyse() method gives an error if the game is over (i.e. checkmate, stalemate or insuffucient material)
     if position.is_game_over():
-        return ""
+        return None
     
     if time:
         info = lc0.analyse(position, chess.engine.Limit(time=limit))
     else:
         info = lc0.analyse(position, chess.engine.Limit(nodes=limit))
-
-    wdl = []
-    wdl_w = engine.PovWdl.white(info['wdl'])
-    for w in wdl_w:
-        wdl.append(w)
-    return str(wdl)
+    return info
 
 
 def analysisCP(position: Board, sf: engine, timeLimit: int):
@@ -135,12 +198,12 @@ def analysisCP(position: Board, sf: engine, timeLimit: int):
         The centipawn score
     """
     # TODO: fix this somehow
-    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    # sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     if position.is_game_over():
-        return ""
+        return None
 
     info = sf.analyse(position, chess.engine.Limit(time=timeLimit))
-    sf.quit()
+    # sf.quit()
     return info
 
 
@@ -570,6 +633,7 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
 if __name__ == '__main__':
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
     leela = configureEngine('lc0', op)
+    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     """
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
@@ -589,8 +653,10 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    makeComments('../resources/jkClassical.pgn', '../out/jkClassical-out.pgn', analysisCPnWDL, 5000, leela, True)
-    makeComments('../resources/sharjah.pgn', '../out/sharjah-out.pgn', analysisCPnWDL, 5000, leela, True)
+    # makeComments('../resources/jkClassical.pgn', '../out/jkClassical-out.pgn', analysisCPnWDL, 5000, leela, True)
+    # makeComments('../resources/sharjah.pgn', '../out/sharjah-out.pgn', analysisCPnWDL, 5000, leela, True)
+    analyseGame('../resources/2700games2023.pgn', '../out/2700games2023-out.pgn', sf, leela, 4, 5000)
+    sf.quit()
     leela.quit()
     """
     playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
