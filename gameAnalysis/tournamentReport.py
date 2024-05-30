@@ -361,19 +361,20 @@ def plotMultAccDistributions(pgnPaths: list, filename: str = None):
 
 
 if __name__ == '__main__':
-    t = '../out/candidates2024-WDL+CP.pgn'
+    t = '../out/2700games2023-out.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
-    # createMovePlot(getMoveSituation(t), nicknames)
-    # sharpChange = analysis.sharpnessChangePerPlayer(t)
-    # analysis.plotSharpChange(sharpChange, short=nicknames)
+    createMovePlot(getMoveSituation(t), nicknames)
+    sharpChange = analysis.sharpnessChangePerPlayer(t)
+    analysis.plotSharpChange(sharpChange, short=nicknames)
     # plotScores(scores, nicknames)
     worse = worseGames(t)
-    # plotWorseGames(worse, nicknames)
+    plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
 
+    """
     arjunC = '../out/arjun_closed.pgn'
     arjunO = '../out/arjun_open-5000-30.pgn'
     name = 'Erigaisi, Arjun'
@@ -388,4 +389,4 @@ if __name__ == '__main__':
     # generateAccDistributionGraphs(arjunC, p2)
     # generateAccDistributionGraphs(arjunO, p2)
     # analysis.plotSharpChange(analysis.sharpnessChangePerPlayer(arjunC))
-
+    """

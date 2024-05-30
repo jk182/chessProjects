@@ -42,10 +42,7 @@ def update(position: str, nodes: int = -1, w: int = None, d: int = None, l: int 
     cur = con.cursor()
     # TODO: update for CP
     cur.execute(f'UPDATE eval SET nodes={nodes}, w={w}, d={d}, l={l} WHERE position="{position}"')
-    # nd = cur.execute(f'SELECT nodes, depth FROM eval WHERE position="{position}"')
-    # if not contains(position):
-    #     insert(position, nodes, w, d, l, depth, cp, mate, pv)
-    # TODO: check if position is in DB and nodes or depth are higher than before, then update
+    con.commit()
 
 
 def getEval(position: str):
