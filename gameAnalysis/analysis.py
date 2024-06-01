@@ -655,7 +655,7 @@ if __name__ == '__main__':
 
     # makeComments('../resources/jkClassical.pgn', '../out/jkClassical-out.pgn', analysisCPnWDL, 5000, leela, True)
     # makeComments('../resources/sharjah.pgn', '../out/sharjah-out.pgn', analysisCPnWDL, 5000, leela, True)
-    analyseGame('../resources/2700games2023.pgn', '../out/2700games2023-out.pgn', sf, leela, 4, 5000)
+    analyseGame('../resources/sharjah.pgn', '../out/2700games2023-out.pgn', sf, leela, 4, 5000)
     sf.quit()
     leela.quit()
     """
