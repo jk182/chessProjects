@@ -6,6 +6,7 @@ from flask import Flask, render_template_string
 import plotly.graph_objects as go
 import plotly.express as px
 import chess
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -17,6 +18,8 @@ def getAccuracyDistribution(pgnPath: str) -> dict:
             if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
                 wRating = int(game.headers['WhiteElo'])
                 bRating = int(game.headers['BlackElo'])
+            else:
+                continue
             ratingRange = (2700, 2900)
             node = game
             cpBefore = None
@@ -34,22 +37,39 @@ def getAccuracyDistribution(pgnPath: str) -> dict:
                     wpA = functions.winP(cpAfter * -1)
                     acc = min(100, functions.accuracy(wpB, wpA))
                     accuracies['acc'].append(int(acc))
-                    accuracies['rating'].append((bRating//100)*100)
-                elif ratingRange[0] <= wRating <= ratingRange[1]:
+                    accuracies['rating'].append(bRating)
+                else:
                     wpB = functions.winP(cpBefore)
                     wpA = functions.winP(cpAfter)
                     acc = min(100, functions.accuracy(wpB, wpA))
                     accuracies['acc'].append(int(acc))
-                    accuracies['rating'].append((wRating//100)*100)
+                    accuracies['rating'].append(wRating)
                 cpBefore = cpAfter
     return accuracies
 
 
 def plotAccuracies(accuracies: dict):
-    fig = px.histogram(accuracies, x='acc', color='rating', log_y=True, histnorm='probability density')
+    colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa']
+    df = pd.DataFrame(accuracies)
+    # fig = px.histogram(df[df['rating'].isin(range(2750, 2900))], x='acc', color='rating', log_y=True, histnorm='probability density')
+    ratingBoundaries = (2400, 2750, 2900)
+    x1 = list(df[df['rating'].isin(range(ratingBoundaries[1], ratingBoundaries[2]))]['acc'])
+    x2 = list(df[df['rating'].isin(range(ratingBoundaries[0], ratingBoundaries[1]))]['acc'])
+
+    candidates = getAccuracyDistribution('../out/candidates2024-WDL+CP.pgn')
+
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(x=x1, histnorm='probability density', name=f'{ratingBoundaries[1]}-{ratingBoundaries[2]}', marker_color=colors[0]))
+    fig.add_trace(go.Histogram(x=x2, histnorm='probability density', name=f'{ratingBoundaries[0]}-{ratingBoundaries[1]}', marker_color=colors[1]))
+    fig.add_trace(go.Histogram(x=list(candidates['acc']), histnorm='probability density', marker_color=colors[2]))
+    fig.update_yaxes(type="log")
     fig.update_layout(
-        xaxis = dict(autorange="reversed")
+        height=700,
+        xaxis = dict(autorange="reversed"),
+        barmode='overlay',
+        plot_bgcolor='#e6f7f2'
     )
+    fig.update_traces(opacity=0.70)
     return fig.to_html(full_html=False)
 
 
