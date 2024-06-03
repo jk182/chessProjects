@@ -13,7 +13,7 @@ import logging
 import evalDB
 
 
-def analyseGame(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit: int, nodeLimit: int) -> None:
+def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit: int, nodeLimit: int) -> None:
     """
     This function analyses a PGN and generates a new PGN with the analysis in the comments.
     It replaces the makeComments function
@@ -653,9 +653,8 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    # makeComments('../resources/jkClassical.pgn', '../out/jkClassical-out.pgn', analysisCPnWDL, 5000, leela, True)
-    # makeComments('../resources/sharjah.pgn', '../out/sharjah-out.pgn', analysisCPnWDL, 5000, leela, True)
-    analyseGame('../resources/sharjah.pgn', '../out/2700games2023-out.pgn', sf, leela, 4, 5000)
+    # analyseGames('../resources/sharjah.pgn', '../out/sharjah-out.pgn', sf, leela, 4, 5000)
+    analyseGames('../resources/2700games2023.pgn', '../out/2700games2023-out.pgn', sf, leela, 4, 5000)
     sf.quit()
     leela.quit()
     """
