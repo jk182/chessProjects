@@ -4,6 +4,7 @@
 import analysis
 import chess
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 import numpy as np
 
 
@@ -226,11 +227,12 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
         The name of the file to which the graph should be saved. 
         If no name is specified, the graph will be shown instead of saved
     """
-    colors = ['#39b84e', '#6fc97e', '#ECECEC', '#F69E7B', '#EF4B4B']
+    colors = ['#4ba35a', '#9CF196', '#F0EBE3', '#F69E7B', '#EF4B4B']
 
     fig, ax = plt.subplots()
-    ax.set_facecolor('#e6f7f2')
+    ax.set_facecolor('#CDFCF6')
     plt.xticks(rotation=90)
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 
     for player, m in moves.items():
         p = player.split(',')[0]
@@ -238,12 +240,15 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
             if p in short.keys():
                 p = short[p]
         bottom = 0
+        totalMoves = sum(m)
+        factor = 200/totalMoves
         for i in range(len(m)-1, 0, -1):
-            ax.bar(p, m[i], bottom=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2)
-            bottom += m[i]
+            ax.bar(p, m[i]*factor, bottom=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2)
+            bottom += m[i]*factor
 
     fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
-    plt.title('Number of moves where players were better, equal and worse')
+    plt.title('Percentage of moves where players were better, equal and worse')
+    # TODO: Legend
     if filename:
         plt.savefig(filename, dpi=500)
     else:
@@ -317,6 +322,46 @@ def plotWorseGames(worse: dict, short: dict = None, filename: str = None):
         plt.show()
 
 
+def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict = None, filename: str = None, sortIndex: int = 0) -> None:
+    """
+    This is a general function to create a bar chart with the players on the x-axis
+    """
+    sort = list(reversed(sortPlayers(data, sortIndex)))
+    xLabels = list()
+    for i, player in enumerate(sort):
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
+        xLabels.append(p)
+
+    colors = ['#689bf2', '#5afa8d']
+
+    fig, ax = plt.subplots()
+    ax.set_facecolor('#e6f7f2')
+    plt.xticks(rotation=90)
+    # plt.yticks(range(0,10))
+    plt.xticks(ticks=range(1, len(sort)+1), labels=xLabels)
+    
+    # Number of bars to plot
+    nBars = len(data[sort[0]])
+    width = 0.4
+    offset = -width / nBars
+
+    for j in range(nBars):
+        ax.bar([i+1+offset+(width*j) for i in range(len(sort))], [data[p][j] for p in sort], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=width, label=labels[j])
+
+    ax.legend()
+    plt.title(title)
+    ax.set_ylabel(yLabel)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
+
+
 def normaliseAccDistribution(accDis: dict) -> dict:
     """
     This takes an accuracy distribution and normalises the values.
@@ -360,18 +405,44 @@ def plotMultAccDistributions(pgnPaths: list, filename: str = None):
         plt.show()
 
 
+def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str = None) -> None:
+    players = getPlayers(pgnPath)
+    generateAccDistributionGraphs(pgnPath, players)
+    scores = getPlayerScores(pgnPath)
+    moveSit = getMoveSituation(pgnPath)
+    worse = worseGames(pgnPath)
+    better = betterGames(pgnPath)
+    sharpChange = analysis.sharpnessChangePerPlayer(pgnPath)
+
+    if filename:
+        createMovePlot(moveSit, nicknames, f'{filename}-movePlot.png')
+        analysis.plotSharpChange(sharpChange, short=nicknames, filename=f'{filename}-sharpChange.png')
+        plotScores(scores, nicknames, f'{filename}-scores.png')
+        plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1)
+        plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
+    else:
+        createMovePlot(moveSit, nicknames)
+        analysis.plotSharpChange(sharpChange, short=nicknames)
+        plotScores(scores, nicknames)
+        plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, sortIndex=1)
+        plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, sortIndex=1)
+
+
+
 if __name__ == '__main__':
-    t = '../out/2700games2023-out.pgn'
+    t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
+    generateTournamentPlots(t, nicknames, '../out/candidates2024')
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
-    createMovePlot(getMoveSituation(t), nicknames)
-    sharpChange = analysis.sharpnessChangePerPlayer(t)
-    analysis.plotSharpChange(sharpChange, short=nicknames)
+    # createMovePlot(getMoveSituation(t), nicknames)
+    # sharpChange = analysis.sharpnessChangePerPlayer(t)
+    # analysis.plotSharpChange(sharpChange, short=nicknames)
     # plotScores(scores, nicknames)
-    worse = worseGames(t)
-    plotWorseGames(worse, nicknames)
+    # worse = worseGames(t)
+    # plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames)
+    # plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
 
     """
