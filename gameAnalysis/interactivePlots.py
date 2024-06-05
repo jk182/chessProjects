@@ -7,14 +7,16 @@ import plotly.graph_objects as go
 import plotly.express as px
 import chess
 import pandas as pd
+import glob
+import math
+import scipy.stats as stats
+
 
 app = Flask(__name__)
-
 
 def getAccuracyDistribution(paths: list) -> dict:
     accuracies = {'acc': list(), 'rating': list()}
     for pgnPath in paths:
-        print(pgnPath)
         with open(pgnPath, 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
                 if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
@@ -34,6 +36,9 @@ def getAccuracyDistribution(paths: list) -> dict:
                     if not cpBefore:
                         cpBefore = cpAfter
                         continue
+                    if abs(cpBefore) > 5000 and abs(cpAfter) > 5000:
+                        cpBefore = cpAfter
+                        continue
                     if node.turn():
                         wpB = functions.winP(cpBefore * -1)
                         wpA = functions.winP(cpAfter * -1)
@@ -51,19 +56,21 @@ def getAccuracyDistribution(paths: list) -> dict:
 
 
 def plotAccuracies(accuracies: dict):
-    colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa']
+    colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa', '#A1EEBD']
     df = pd.DataFrame(accuracies)
     # fig = px.histogram(df[df['rating'].isin(range(2750, 2900))], x='acc', color='rating', log_y=True, histnorm='probability density')
-    ratingBoundaries = (2400, 2750, 2900)
-    x1 = list(df[df['rating'].isin(range(ratingBoundaries[1], ratingBoundaries[2]))]['acc'])
-    x2 = list(df[df['rating'].isin(range(ratingBoundaries[0], ratingBoundaries[1]))]['acc'])
+    ratingBoundaries = (2000, 2400, 2550, 2650, 2750, 2900)
 
     candidates = getAccuracyDistribution(['../out/candidates2024-WDL+CP.pgn'])
 
     fig = go.Figure()
-    fig.add_trace(go.Histogram(x=x1, histnorm='probability density', name=f'{ratingBoundaries[1]}-{ratingBoundaries[2]}', marker_color=colors[0]))
-    fig.add_trace(go.Histogram(x=x2, histnorm='probability density', name=f'{ratingBoundaries[0]}-{ratingBoundaries[1]}', marker_color=colors[1]))
-    fig.add_trace(go.Histogram(x=list(candidates['acc']), histnorm='probability density', marker_color=colors[2]))
+    for i in range(len(ratingBoundaries)-1):
+        x1 = list(df[df['rating'].isin(range(ratingBoundaries[i], ratingBoundaries[i+1]))]['acc'])
+        lmb = 1/(100-sum(x1)/(len(x1)))
+        x2 = [100-x for x in x1]
+        b, loc, scale = stats.pareto.fit(x2)
+        fig.add_trace(go.Histogram(x=x1, histnorm='probability density', name=f'{ratingBoundaries[i]}-{ratingBoundaries[i+1]}', marker_color=colors[i%len(colors)]))
+        fig.add_trace(go.Scatter(x=list(range(1, 101)), y=list(reversed([stats.pareto.pdf(x, b, loc, scale) for x in range(1, 101)])), mode='lines', name='lines 1'))
     fig.update_yaxes(type="log")
     fig.update_layout(
         height=700,
@@ -90,7 +97,8 @@ def create_plot():
 @app.route('/')
 def home():
     # plot_html = create_plot()
-    accuracies = getAccuracyDistribution(['../out/2700games2023-out.pgn'])
+    games = glob.glob('../out/games/*')
+    accuracies = getAccuracyDistribution(games)
     plot_html = plotAccuracies(accuracies)
     return render_template_string('''
         <!doctype html>
