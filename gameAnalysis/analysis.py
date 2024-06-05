@@ -7,6 +7,7 @@ from chess import engine, pgn, Board
 import chess
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import functions
 from functions import configureEngine, sharpnessLC0
 import logging
@@ -545,12 +546,20 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
 
     fig, ax = plt.subplots()
     ax.set_yscale("log")
+
     xy = [ (k,v) for k,v in accDis.items() if k <= 100]
-    ax.bar([x[0] for x in xy], [y[1] for y in xy], width=1, color='#689bf2', edgecolor='black', linewidth=0.5)
+    nMoves = sum(accDis.values())
+    ax.bar([x[0] for x in xy], [y[1]/nMoves for y in xy], width=1, color='#689bf2', edgecolor='black', linewidth=0.5)
+
     plt.xlim(0, 100)
     ax.invert_xaxis()
-    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.set_xlabel('Move Accuracy')
+    ax.set_ylabel('Relative number of moves')
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.15, right=0.95)
     plt.title(f'Accuracy per move: {p}')
+    ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
+    ax.yaxis.get_major_formatter().set_scientific(False)
+
     if outFile:
         plt.savefig(outFile, dpi=500)
     else:
@@ -586,12 +595,13 @@ def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, fil
             y.append(sum(finSharp)/len(finSharp))
 
     fig, ax = plt.subplots()
-    # plt.xticks(rotation=90)
+    plt.xticks(rotation=90)
     ax.set_facecolor('#e6f7f2')
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.15, right=0.95)
     plt.xlim(-0.5, len(x)-0.5)
     ax.bar(x,y, edgecolor='black', linewidth=0.5, color='#fa5a5a', width=0.7)
+    ax.set_ylabel('Average sharpness change per move')
     # ax.legend(['Avg. sharp change per move'])
     plt.title('Average sharpness change per move')
     if filename:

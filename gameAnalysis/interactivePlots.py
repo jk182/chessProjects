@@ -11,40 +11,42 @@ import pandas as pd
 app = Flask(__name__)
 
 
-def getAccuracyDistribution(pgnPath: str) -> dict:
+def getAccuracyDistribution(paths: list) -> dict:
     accuracies = {'acc': list(), 'rating': list()}
-    with open(pgnPath, 'r') as pgn:
-        while game := chess.pgn.read_game(pgn):
-            if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
-                wRating = int(game.headers['WhiteElo'])
-                bRating = int(game.headers['BlackElo'])
-            else:
-                continue
-            ratingRange = (2700, 2900)
-            node = game
-            cpBefore = None
-            while not node.is_end():
-                node = node.variations[0]
-                acc = None
-                if not functions.readComment(node, True, True):
-                    continue
-                cpAfter = functions.readComment(node, True, True)[1]
-                if not cpBefore:
-                    cpBefore = cpAfter
-                    continue
-                if node.turn():
-                    wpB = functions.winP(cpBefore * -1)
-                    wpA = functions.winP(cpAfter * -1)
-                    acc = min(100, functions.accuracy(wpB, wpA))
-                    accuracies['acc'].append(int(acc))
-                    accuracies['rating'].append(bRating)
+    for pgnPath in paths:
+        print(pgnPath)
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
+                    wRating = int(game.headers['WhiteElo'])
+                    bRating = int(game.headers['BlackElo'])
                 else:
-                    wpB = functions.winP(cpBefore)
-                    wpA = functions.winP(cpAfter)
-                    acc = min(100, functions.accuracy(wpB, wpA))
-                    accuracies['acc'].append(int(acc))
-                    accuracies['rating'].append(wRating)
-                cpBefore = cpAfter
+                    continue
+                ratingRange = (2700, 2900)
+                node = game
+                cpBefore = None
+                while not node.is_end():
+                    node = node.variations[0]
+                    acc = None
+                    if not functions.readComment(node, True, True):
+                        continue
+                    cpAfter = functions.readComment(node, True, True)[1]
+                    if not cpBefore:
+                        cpBefore = cpAfter
+                        continue
+                    if node.turn():
+                        wpB = functions.winP(cpBefore * -1)
+                        wpA = functions.winP(cpAfter * -1)
+                        acc = min(100, functions.accuracy(wpB, wpA))
+                        accuracies['acc'].append(int(acc))
+                        accuracies['rating'].append(bRating)
+                    else:
+                        wpB = functions.winP(cpBefore)
+                        wpA = functions.winP(cpAfter)
+                        acc = min(100, functions.accuracy(wpB, wpA))
+                        accuracies['acc'].append(int(acc))
+                        accuracies['rating'].append(wRating)
+                    cpBefore = cpAfter
     return accuracies
 
 
@@ -56,7 +58,7 @@ def plotAccuracies(accuracies: dict):
     x1 = list(df[df['rating'].isin(range(ratingBoundaries[1], ratingBoundaries[2]))]['acc'])
     x2 = list(df[df['rating'].isin(range(ratingBoundaries[0], ratingBoundaries[1]))]['acc'])
 
-    candidates = getAccuracyDistribution('../out/candidates2024-WDL+CP.pgn')
+    candidates = getAccuracyDistribution(['../out/candidates2024-WDL+CP.pgn'])
 
     fig = go.Figure()
     fig.add_trace(go.Histogram(x=x1, histnorm='probability density', name=f'{ratingBoundaries[1]}-{ratingBoundaries[2]}', marker_color=colors[0]))
@@ -88,7 +90,7 @@ def create_plot():
 @app.route('/')
 def home():
     # plot_html = create_plot()
-    accuracies = getAccuracyDistribution('../out/2700games2023-out.pgn')
+    accuracies = getAccuracyDistribution(['../out/2700games2023-out.pgn'])
     plot_html = plotAccuracies(accuracies)
     return render_template_string('''
         <!doctype html>

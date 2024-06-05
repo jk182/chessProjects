@@ -246,9 +246,12 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
             ax.bar(p, m[i]*factor, bottom=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2)
             bottom += m[i]*factor
 
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.15, right=0.95)
     plt.title('Percentage of moves where players were better, equal and worse')
-    # TODO: Legend
+    ax.set_ylabel('Percentage of total moves')
+    # TODO legend
+    # ax.legend()
+
     if filename:
         plt.savefig(filename, dpi=500)
     else:
@@ -282,6 +285,8 @@ def plotScores(scores: dict, short: dict = None, filename: str = None):
 
     fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
     plt.title('Scores with White and Black')
+    ax.set_ylabel('Tournament Score')
+
     if filename:
         plt.savefig(filename, dpi=500)
     else:
@@ -433,7 +438,7 @@ if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
-    generateTournamentPlots(t, nicknames, '../out/candidates2024')
+    generateTournamentPlots(t, nicknames)
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
     # createMovePlot(getMoveSituation(t), nicknames)
