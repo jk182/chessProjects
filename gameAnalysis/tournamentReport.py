@@ -6,6 +6,13 @@ import chess
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import numpy as np
+import pandas as pd
+import glob
+import os, sys
+import scipy.stats as stats
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
 
 
 def getPlayers(pgnPath: str, whiteList: list = None) -> list:
@@ -35,6 +42,100 @@ def getPlayers(pgnPath: str, whiteList: list = None) -> list:
                     if b in whiteList:
                         players.append(b)
     return players
+
+
+def getMoveData(pgnPaths: list) -> pd.DataFrame:
+    """
+    This function reads PGN files and stores the data from each move in a dataframe
+    return -> pandas.DataFrame
+        A dataframe containing various fields where each contains a list with the data after each move
+    """
+    data = {'player': list(), 'rating': list(), 'acc': list(), 'sharp': list()}
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
+                    # TODO: add option to ignore the ratings
+                    wRating = int(game.headers['WhiteElo'])
+                    bRating = int(game.headers['BlackElo'])
+                else:
+                    continue
+                white = game.headers['White']
+                black = game.headers['Black']
+                
+                node = game
+                cpB = None
+                
+                while not node.is_end():
+                    if functions.readComment(node, True, True):
+                        sharp = functions.sharpnessLC0(functions.readComment(node, True, True)[0])
+                    node = node.variations[0]
+                    if not functions.readComment(node, True, True):
+                        continue
+                    cpA = functions.readComment(node, True, True)[1]
+                    if not cpB:
+                        cpB = cpA
+                        continue
+
+                    if node.turn():
+                        wpB = functions.winP(cpB * -1)
+                        wpA = functions.winP(cpA * -1)
+                        data['player'].append(black)
+                        data['rating'].append(bRating)
+                    else:
+                        wpB = functions.winP(cpB)
+                        wpA = functions.winP(cpA)
+                        data['player'].append(white)
+                        data['rating'].append(wRating)
+
+                    acc = min(100, functions.accuracy(wpB, wpA))
+                    data['acc'].append(round(acc))
+                    data['sharp'].append(sharp)
+
+                    cpB = cpA
+    df = pd.DataFrame(data)
+    return df
+
+
+def plotAccuracyDistribution(df: pd.DataFrame) -> None:
+    """
+    This plots the accuracy distribution for all moves in the given PGNs
+    """
+    fig, ax = plt.subplots(figsize=(10,6))
+
+    ratingBounds = (2600, 2700, 2850)
+    colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa', '#A1EEBD']
+    for i in range(len(ratingBounds)-1):
+        x1 = list(df[df['rating'].isin(range(ratingBounds[i], ratingBounds[i+1]))]['acc'])
+        nMoves = len(x1)
+        acc = [0] * 101
+        for x in list(x1):
+            acc[x] += 1
+        acc = [x/nMoves for x in acc]
+        ax.bar([x-0.5 for x in range(101)], acc, width=1, color=colors[i%len(ratingBounds)], edgecolor='black', linewidth=0.5, alpha=0.5, label=f'{ratingBounds[i]}-{ratingBounds[i+1]}')
+    """
+    nMoves = len(list(df['acc']))
+    acc = [0] * 101
+    for x in list(df['acc']):
+        acc[x] += 1
+    acc = [x/nMoves for x in acc]
+
+    ax.bar(list(range(101)), acc, width=1, color='#689bf2', edgecolor='black', linewidth=0.5)
+    """
+    ax.set_facecolor('#e6f7f2')
+    ax.set_yscale('log')
+    plt.xlim(0,100)
+    ax.invert_xaxis()
+    ax.set_xlabel('Move Accuracy')
+    ax.set_ylabel('Relative number of moves')
+    ax.legend(loc='best')
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title('Accuracy Distribution')
+    ax.yaxis.set_major_formatter(mtick.ScalarFormatter())
+    ax.yaxis.get_major_formatter().set_scientific(False)
+    
+    plt.savefig(f'../out/accDist2600-2800.png', dpi=500)
+    plt.show()
 
 
 def generateAccDistributionGraphs(pgnPath: str, players: list):
@@ -438,7 +539,10 @@ if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
-    generateTournamentPlots(t, nicknames)
+    games = glob.glob('../out/games/*')
+    df = getMoveData(games)
+    plotAccuracyDistribution(df)
+    # generateTournamentPlots(t, nicknames)
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
     # createMovePlot(getMoveSituation(t), nicknames)
