@@ -664,6 +664,8 @@ if __name__ == '__main__':
     """
 
     # analyseGames('../resources/grandSwiss2023.pgn', '../out/grandSwiss2023-out.pgn', sf, leela, 4, 5000)
+    analyseGames('../resources/norwayOpenR10.pgn', '../out/games/norwayChessOpen2024-out.pgn', sf, leela, 4, 5000)
+    analyseGames('../resources/norwayWomenR10.pgn', '../out/games/norwayChessWomen-out.pgn', sf, leela, 4, 5000)
     analyseGames('../resources/grenkeOpen2024.pgn', '../out/games/grenkeOpen2024.pgn', sf, leela, 4, 5000)
     sf.quit()
     leela.quit()
@@ -689,17 +691,13 @@ if __name__ == '__main__':
     # plotSharpChange(sharpnessChangePerPlayer(candidates))
     pgn = '../resources/naka-nepo.pgn'
     outf = '../out/naka-nepo-30000.pgn'
-    # makeComments(pgn, outf, analysisWDL, 30000, leela)
     # plotWDL(outf)
     pgns = ['../resources/Tal-Koblents-1957.pgn',
             '../resources/Ding-Nepo-G12.pgn',
             '../resources/Ponomariov-Carlsen-2010.pgn',
             '../resources/Vidit-Carlsen-2023.pgn']
-    praggNepo = '../resources/Pragg-Nepo.pgn'
     adventOpen = '../resources/Advent-Open.pgn'
     myGames = '../resources/Austria-Open.pgn'
-    # makeComments(myGames, '../out/myGames-sf.pgn',  analysisCP, 4, stockfish)
-    # makeComments('../resources/Vidit-Caruana.pgn', '../out/Vidit-Caruana-sf.pgn', analysisCP, 4, stockfish)
     # plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
     # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
     # plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
