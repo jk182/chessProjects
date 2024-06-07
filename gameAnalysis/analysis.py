@@ -663,11 +663,8 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    # analyseGames('../resources/sharjah.pgn', '../out/sharjah-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/womenCandidates2024.pgn', '../out/womenCandidates2024-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/norwayChessOpen2024.pgn', '../out/norwayChessOpen2024-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/norwayChessWomen2024.pgn', '../out/norwayChessWomen2024-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/grandSwiss2023.pgn', '../out/grandSwiss2023-out.pgn', sf, leela, 4, 5000)
+    # analyseGames('../resources/grandSwiss2023.pgn', '../out/grandSwiss2023-out.pgn', sf, leela, 4, 5000)
+    analyseGames('../resources/grenkeOpen2024.pgn', '../out/games/grenkeOpen2024.pgn', sf, leela, 4, 5000)
     sf.quit()
     leela.quit()
     """
