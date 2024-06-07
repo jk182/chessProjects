@@ -514,14 +514,14 @@ def getAccuracyDistributionPlayer(pgnPath: str, player: str) -> dict:
                     if lastWp is not None:
                         if not node.turn() and white:
                             acc = min(100, functions.accuracy(lastWp, wp))
-                            acc = int(acc)
+                            acc = round(acc)
                             if acc in accDis.keys():
                                 accDis[acc] += 1
                             else:
                                 accDis[acc] = 1
                         elif node.turn() and not white:
                             acc = min(100, functions.accuracy(wp, lastWp))
-                            acc = int(acc)
+                            acc = round(acc)
                             if acc in accDis.keys():
                                 accDis[acc] += 1
                             else:
@@ -546,10 +546,11 @@ def plotAccuracyDistributionPlayer(pgnPath: str, player: str, outFile: str = Non
 
     fig, ax = plt.subplots()
     ax.set_yscale("log")
+    ax.set_facecolor('#e6f7f2')
 
     xy = [ (k,v) for k,v in accDis.items() if k <= 100]
     nMoves = sum(accDis.values())
-    ax.bar([x[0] for x in xy], [y[1]/nMoves for y in xy], width=1, color='#689bf2', edgecolor='black', linewidth=0.5)
+    ax.bar([x[0]-0.5 for x in xy], [y[1]/nMoves for y in xy], width=1, color='#689bf2', edgecolor='black', linewidth=0.5)
 
     plt.xlim(0, 100)
     ax.invert_xaxis()
@@ -587,7 +588,6 @@ def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, fil
             # one sharp change was infinite, so I exclude them (TODO: investigate this)
             finSharp = [ s for s in sharp if not np.isinf(s) ]
             pl = p.split(',')[0]
-            pl = p
             if short:
                 if pl in short.keys():
                     pl = short[pl]

@@ -319,6 +319,49 @@ def sortPlayers(d: dict, index: int) -> list:
     return players
 
 
+def getInaccMistakesBlunders(pgnPath: str) -> dict:
+    games = dict()
+    # win percentage drop for inaccuracy, mistake and blunder
+    bounds = (10, 15, 20)
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            w = game.headers["White"]
+            b = game.headers["Black"]
+            r = game.headers["Result"]
+            if w not in games.keys():
+                games[w] = [0] * 3
+            if b not in games.keys():
+                games[b] = [0] * 3
+
+            node = game
+            cpB = None
+
+            while not node.is_end():
+                node = node.variations[0]
+                if node.comment:
+                    cpA = functions.readComment(node, True, True)[1]
+                    if cpB is None:
+                        cpB = cpA
+                        continue
+                    if node.turn():
+                        wpB = functions.winP(cpB * -1)
+                        wpA = functions.winP(cpA * -1)
+                        p = b
+                    else:
+                        wpB = functions.winP(cpB)
+                        wpA = functions.winP(cpA)
+                        p = w
+                    diff = -wpA + wpB
+                    if diff > bounds[2]:
+                        games[p][2] += 1
+                    elif diff > bounds[1]:
+                        games[p][1] += 1
+                    elif diff > bounds[0]:
+                        games[p][0] += 1
+                    cpB = cpA
+    return games
+
+
 def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     """
     This creates a plot with the number of moves a player spent being better or worse
@@ -352,6 +395,40 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     ax.set_ylabel('Percentage of total moves')
     # TODO legend
     # ax.legend()
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
+
+
+def plotScoresArmageddon(scores: dict, filename: str = None) -> None:
+    """
+    Plotting scores with armageddon games (like in Norway chess)
+    scores: dict
+        The scores indexed by players and the values is a list containing classical score with white and black
+        and the armageddon score with white and black
+    filename: str
+        The name of the file to which the graph should be saved. 
+        If no name is specified, the graph will be shown instead of saved
+    """
+    colors = ['#ffffff', '#111111']
+    patterns = ['', '', 'x', 'x']
+
+    fig, ax = plt.subplots(figsize=(10,6))
+    plt.xticks(rotation=90)
+    
+    for player in scores.keys():
+        bottom = 0
+        for i, s in enumerate(scores[player]):
+            ax.bar(player, s, bottom=bottom, color=colors[i%2], edgecolor='grey', linewidth=0.7, hatch=patterns[i])
+            bottom += s
+
+    ax.set_facecolor('#e6f7f2')
+    ax.legend()
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
+    plt.title('Scores with White and Black')
+    ax.set_ylabel('Tournament Score')
 
     if filename:
         plt.savefig(filename, dpi=500)
@@ -441,7 +518,7 @@ def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict 
                 p = short[p]
         xLabels.append(p)
 
-    colors = ['#689bf2', '#5afa8d']
+    colors = ['#689bf2', '#5afa8d', '#f8a978']
 
     fig, ax = plt.subplots()
     ax.set_facecolor('#e6f7f2')
@@ -451,8 +528,8 @@ def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict 
     
     # Number of bars to plot
     nBars = len(data[sort[0]])
-    width = 0.4
-    offset = -width / nBars
+    width = 0.8/nBars
+    offset = width * (1 / 2 - nBars/2)
 
     for j in range(nBars):
         ax.bar([i+1+offset+(width*j) for i in range(len(sort))], [data[p][j] for p in sort], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=width, label=labels[j])
@@ -537,11 +614,18 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
 
 if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
+    nwc = '../out/games/norwayChessClassical.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     players = getPlayers(t)
     games = glob.glob('../out/games/*')
-    df = getMoveData(games)
-    plotAccuracyDistribution(df)
+
+    generateTournamentPlots(nwc, nicknames)
+    
+    IMB = getInaccMistakesBlunders(nwc)
+    plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0)
+
+    # df = getMoveData(games)
+    # plotAccuracyDistribution(df)
     # generateTournamentPlots(t, nicknames)
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
@@ -550,9 +634,16 @@ if __name__ == '__main__':
     # analysis.plotSharpChange(sharpChange, short=nicknames)
     # plotScores(scores, nicknames)
     # worse = worseGames(t)
-    # plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames)
     # plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
+
+    scores = {'Carlsen': [8, 6, 1, 1], 
+              'Nakamura': [7, 6, 1, 0.5],
+              'Pragg': [8, 4, 1, 0],
+              'Firouzja': [7, 3, 1.5, 0.5],
+              'Caruana': [6, 3, 0.5, 1],
+              'Ding': [3, 2, 0.5, 0.5]}
+    plotScoresArmageddon(scores)
 
     """
     arjunC = '../out/arjun_closed.pgn'
