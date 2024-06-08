@@ -327,7 +327,6 @@ def getInaccMistakesBlunders(pgnPath: str) -> dict:
         while (game := chess.pgn.read_game(pgn)):
             w = game.headers["White"]
             b = game.headers["Black"]
-            r = game.headers["Result"]
             if w not in games.keys():
                 games[w] = [0] * 3
             if b not in games.keys():
@@ -353,6 +352,7 @@ def getInaccMistakesBlunders(pgnPath: str) -> dict:
                         p = w
                     diff = -wpA + wpB
                     if diff > bounds[2]:
+                        print(p, w, b)
                         games[p][2] += 1
                     elif diff > bounds[1]:
                         games[p][1] += 1
@@ -373,7 +373,7 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     """
     colors = ['#4ba35a', '#9CF196', '#F0EBE3', '#F69E7B', '#EF4B4B']
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10,6))
     ax.set_facecolor('#CDFCF6')
     plt.xticks(rotation=90)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
@@ -425,7 +425,7 @@ def plotScoresArmageddon(scores: dict, filename: str = None) -> None:
             bottom += s
 
     ax.set_facecolor('#e6f7f2')
-    ax.legend()
+    # ax.legend()
     fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
     plt.title('Scores with White and Black')
     ax.set_ylabel('Tournament Score')
@@ -446,7 +446,7 @@ def plotScores(scores: dict, short: dict = None, filename: str = None):
     sortedPlayers = sortPlayers(scores, 1)
     colors = {3: '#FFFFFF', 5: '#111111'}
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10,6))
     plt.xticks(rotation=90)
     plt.yticks(range(0,10))
 
@@ -487,7 +487,7 @@ def plotWorseGames(worse: dict, short: dict = None, filename: str = None):
                 p = short[p]
         labels.append(p)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10,6))
 
     ax.set_facecolor('#e6f7f2')
     plt.xticks(rotation=90)
@@ -520,7 +520,7 @@ def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict 
 
     colors = ['#689bf2', '#5afa8d', '#f8a978']
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10,6))
     ax.set_facecolor('#e6f7f2')
     plt.xticks(rotation=90)
     # plt.yticks(range(0,10))
@@ -596,6 +596,8 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
     worse = worseGames(pgnPath)
     better = betterGames(pgnPath)
     sharpChange = analysis.sharpnessChangePerPlayer(pgnPath)
+    IMB = getInaccMistakesBlunders(pgnPath)
+    print(IMB)
 
     if filename:
         createMovePlot(moveSit, nicknames, f'{filename}-movePlot.png')
@@ -603,26 +605,31 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
         plotScores(scores, nicknames, f'{filename}-scores.png')
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
+        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0)
     else:
         createMovePlot(moveSit, nicknames)
         analysis.plotSharpChange(sharpChange, short=nicknames)
         plotScores(scores, nicknames)
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, sortIndex=1)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, sortIndex=1)
+        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0)
 
 
 
 if __name__ == '__main__':
     t = '../out/candidates2024-WDL+CP.pgn'
     nwc = '../out/games/norwayChessClassical.pgn'
+    nwcW = '../out/games/norwayChessWomenClassical.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
+    nicknames2 = {'Lei': 'Lei Tingjie', 'Ju': 'Ju Wenjun'}
     players = getPlayers(t)
     games = glob.glob('../out/games/*')
 
-    generateTournamentPlots(nwc, nicknames)
+    # generateTournamentPlots(nwc, nicknames, '../out/NorwayChessOpen')
+    generateTournamentPlots(nwcW, nicknames2, '../out/NorwayChessWomen')
     
     IMB = getInaccMistakesBlunders(nwc)
-    plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0)
+    # plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, '../out/NorwayChessOpenIMB.png', sortIndex=0)
 
     # df = getMoveData(games)
     # plotAccuracyDistribution(df)
@@ -637,13 +644,20 @@ if __name__ == '__main__':
     # plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
 
-    scores = {'Carlsen': [8, 6, 1, 1], 
-              'Nakamura': [7, 6, 1, 0.5],
-              'Pragg': [8, 4, 1, 0],
-              'Firouzja': [7, 3, 1.5, 0.5],
-              'Caruana': [6, 3, 0.5, 1],
-              'Ding': [3, 2, 0.5, 0.5]}
-    plotScoresArmageddon(scores)
+    scores = {'Carlsen': [9, 6, 1.5, 1], 
+              'Nakamura': [7, 7, 1, 0.5],
+              'Pragg': [9, 4, 1.5, 0],
+              'Firouzja': [7, 4, 1.5, 1],
+              'Caruana': [6, 4, 0.5, 1],
+              'Ding': [4, 2, 0.5, 0.5]}
+    # plotScoresArmageddon(scores, '../out/NorwayChessOpenArmScores.png')
+    scoresW = {'Ju Wenjun': [9, 7, 1.5, 1.5],
+               'Muzychuk': [7, 7, 1, 1],
+               'Lei Tingjie': [9, 4, 0.5, 1],
+               'Vaishali': [6, 5, 1, 0.5],
+               'Humpy Koneru': [6, 3, 0.5, 0.5],
+               'Cramling': [4, 3, 0, 1]}
+    plotScoresArmageddon(scoresW, '../out/NorwayChessWomenArmScores.png')
 
     """
     arjunC = '../out/arjun_closed.pgn'
