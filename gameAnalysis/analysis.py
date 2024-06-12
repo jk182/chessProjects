@@ -664,8 +664,10 @@ if __name__ == '__main__':
     """
 
     # analyseGames('../resources/grandSwiss2023.pgn', '../out/grandSwiss2023-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/norwayOpenR10.pgn', '../out/games/norwayChessOpen2024-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/norwayWomenR10.pgn', '../out/games/norwayChessWomen-out.pgn', sf, leela, 4, 5000)
+    # analyseGames('../resources/norwayOpenR10.pgn', '../out/games/norwayChessOpen2024-out.pgn', sf, leela, 4, 5000)
+    # analyseGames('../resources/norwayWomenR10.pgn', '../out/games/norwayChessWomen-out.pgn', sf, leela, 4, 5000)
+    for i in [1, 2, 3]:
+        analyseGames(f'../resources/Norway202{i}.pgn', f'../out/games/Norway202{i}-out.pgn', sf, leela, 4, 5000)
     analyseGames('../resources/grenkeOpen2024.pgn', '../out/games/grenkeOpen2024.pgn', sf, leela, 4, 5000)
     sf.quit()
     leela.quit()
