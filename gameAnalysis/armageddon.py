@@ -103,8 +103,10 @@ def getAvgSharpChange(sharpChange: dict, maxMove: int = None) -> tuple:
     return -> tuple
         Average sharpness change per move for White and Black
     """
-    w = [s[0] for s in sharpChange['white'] if not maxMove or s[1] <= maxMove]
-    b = [s[0] for s in sharpChange['black'] if not maxMove or s[1] <= maxMove]
+    # sharpness seems to explode sometimes
+    w = [min(s[0], 10) for s in sharpChange['white'] if not maxMove or s[1] <= maxMove]
+    b = [min(s[0], 10) for s in sharpChange['black'] if not maxMove or s[1] <= maxMove]
+    print(max(w))
     return (sum(w)/len(w), sum(b)/len(b))
 
 
@@ -128,7 +130,6 @@ def getClockTimes(pgnPaths: list) -> dict:
                     node = node.variations[0]
                     time = node.clock()
                     if not time:
-                        print(game.headers)
                         break
 
                     if not node.turn():
@@ -137,6 +138,31 @@ def getClockTimes(pgnPaths: list) -> dict:
                         clock['black'].append((time, move))
                         move += 1
     return clock
+
+
+def getColorScore(pgnPaths: list) -> tuple:
+    """
+    This function returns the armageddon scores for each color
+    pgnPaths: list
+        The paths to the PGN files
+    return -> tuple
+        (whiteScore, blackScore)
+    """
+    nGames = 0
+    white = 0
+    black = 0
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                r = game.headers['Result']
+                if r == '*' or int(float(game.headers['Round'])) % 2 == 1:
+                    continue
+                nGames += 1
+                if r == '1-0':
+                    white += 1
+                else:
+                    black += 1
+    return (white/nGames, black/nGames)
 
 
 def plotClockTimes(clockTimes: dict) -> None:
@@ -157,12 +183,35 @@ def plotClockTimes(clockTimes: dict) -> None:
 
     fig, ax = plt.subplots()
 
-    ax.plot(range(1, len(wAvg)+1), wAvg)
-    ax.plot(range(1, len(bAvg)+1), bAvg)
+    ax.plot(range(len(wAvg)), wAvg, color='#AAAAAA', label='White clock time')
+    ax.plot(range(len(bAvg)), bAvg, color='#111111', label='Black clock time')
+    ax.plot(range(len(wAvg)), [wAvg[i]-bAvg[i] for i in range(len(wAvg))], label='White time advantage')
 
     ax.set_facecolor('#e6f7f2')
+    ax.set_xlim(0, len(wAvg))
+    ax.set_ylim(0, max(wAvg)+20)
+    ax.set_xlabel('Move number')
+    ax.set_ylabel('Clock time (in sec)')
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
-    plt.title('Accuracy Distribution')
+    plt.title('Average Clock Time')
+    ax.legend()
+    plt.show()
+
+
+def plotSharpChange(pgnPaths: list) -> None:
+    sharp = sharpChangeByColor(pgnPaths)
+    maxMove = 40
+
+    fig, ax = plt.subplots()
+
+    ax.plot(range(maxMove), [getAvgSharpChange(sharp, i)[0] for i in range(1, maxMove+1)], color='#999999', label='White sharpness change')
+    ax.plot(range(maxMove), [getAvgSharpChange(sharp, i)[1] for i in range(1, maxMove+1)], color='#111111', label='Black sharpness change')
+
+    ax.set_facecolor('#e6f7f2')
+    ax.set_xlabel('Move number')
+    ax.set_ylabel('Sharpness Change')
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title('Average Clock Time')
     ax.legend()
     plt.show()
 
@@ -187,5 +236,6 @@ if __name__ == '__main__':
     scores = compareScores(norway)
     # plotScores(scores)
     times = getClockTimes(n2)
-    print(times)
-    plotClockTimes(times)
+    # plotClockTimes(times)
+    print(getColorScore(norway))
+    plotSharpChange(norway)
