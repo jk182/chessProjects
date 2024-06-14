@@ -518,7 +518,7 @@ def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict 
                 p = short[p]
         xLabels.append(p)
 
-    colors = ['#689bf2', '#5afa8d', '#f8a978']
+    colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
 
     fig, ax = plt.subplots(figsize=(10,6))
     ax.set_facecolor('#e6f7f2')
