@@ -187,7 +187,7 @@ def plotClockTimes(clockTimes: dict, filename: str = None) -> None:
 
     ax.plot(range(len(wAvg)), wAvg, color='#f8a978', label='White clock time')
     ax.plot(range(len(bAvg)), bAvg, color='#111111', label='Black clock time')
-    # ax.plot(range(len(wAvg)), [wAvg[i]-bAvg[i] for i in range(len(wAvg))], label='White time advantage')
+    # ax.plot(range(len(wAvg)), [100*(wAvg[i]-bAvg[i])/bAvg[i] for i in range(len(wAvg))], label='White time advantage')
 
     ax.set_facecolor('#e6f7f2')
     ax.set_xlim(0, len(wAvg))
@@ -258,8 +258,8 @@ if __name__ == '__main__':
     for i in [5, 10, 15, 20, 25]:
         print(i, getAvgSharpChange(SC, i))
     scores = compareScores(norway)
-    plotScores(scores)
+    # plotScores(scores, '../out/armScores.png')
     times = getClockTimes(n2)
     plotClockTimes(times)
-    print(getColorScore(norway))
-    plotSharpChange(norway)
+    # print(getColorScore(norway))
+    # plotSharpChange(norway, '../out/armSharp.png')
