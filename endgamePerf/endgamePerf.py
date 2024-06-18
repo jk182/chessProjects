@@ -93,4 +93,5 @@ if __name__ == '__main__':
     # print(tablebaseLookup(token, pos)['category'])
     # print(tablebaseLookup(token, pos2))
     games = ['../out/games/norwayChessOpen2024-out.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/2700games2023-out.pgn']
-    print(getEndgameMistakes(token, games))
+    g2 = ['../out/games/2700games2023-out.pgn']
+    print(getEndgameMistakes(token, g2))

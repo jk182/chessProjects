@@ -158,7 +158,7 @@ def analysePositions(fens:dict, lc0:engine):
     '''
 
     sf = configureEngine('stockfish', {'Threads': '4'})
-    sftime = 12
+    sftime = 4
     phead = list()
     for fen, move in fens.items():
         board = chess.Board(fen)
@@ -170,9 +170,13 @@ def analysePositions(fens:dict, lc0:engine):
                     phead.append(float(p[0].split(' ')[-1][:-1]))
                     # Stockfish analysis to prove that a move is actually good
                     if phead[-1] < 2.5:
-                        bestMove = sf.analyse(board, chess.engine.Limit(time=sftime))['pv'][0]
+                        analysis = sf.analyse(board, chess.engine.Limit(time=sftime), multipv=2)
+                        bestMove = analysis[0]['pv'][0]
                         if bestMove.uci() == move:
-                            print('\033[92mBrilliancy!!\033[0m')
+                            s1 = analysis[0]['score'].pov(board.turn)
+                            s2 = analysis[1]['score'].pov(board.turn)
+                            # TODO: calculate change in win percentage and take account of mates
+                            print('\033[92mBrilliancy!!\033[0m', s1, s2)
                     print(board)
                     print(move)
                     print(p)
@@ -194,3 +198,4 @@ if __name__ == '__main__':
                  '4rrk1/1bpR1p2/1pq1pQp1/p3P2p/P1PR3P/5N2/2P2PP1/6K1 w - h6 0 31': 'g1h2',
                  'r5k1/ppp2r1p/3p3b/3Pn3/1n2PPp1/1P2K1P1/PBB1N2q/R2Q3R b - - 2 24': 'f7f4',
                  '5rk1/p1pb2pp/2p5/3p3q/2P3n1/1Q4B1/PP1NprPP/R3R1K1 b - - 0 20': 'f2g2'}
+    analysePositions(positions, leela)
