@@ -3,6 +3,10 @@ import chess
 from chess import pgn
 import re
 import time
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
 
 
 def analyse(gamesFile: str, outfile: str, engine: engine, nodes: int) -> list:
@@ -149,7 +153,7 @@ def compareNets(networks, pgn):
     leela.quit()
 
 
-def analysePositions(fens:dict, lc0:engine):
+def analysePositions(fens:dict, lc0:engine, sf: engine):
     '''
     fens:
         A dictionary containing the FENs of the positions and the move played in the game
@@ -157,14 +161,14 @@ def analysePositions(fens:dict, lc0:engine):
         Leela
     '''
 
-    sf = configureEngine('stockfish', {'Threads': '4'})
-    sftime = 4
+    sftime = 2
+    wpCutoff = 15
     phead = list()
     for fen, move in fens.items():
         board = chess.Board(fen)
         info = lc0.analysis(board, chess.engine.Limit(nodes=1))
         for i in info:
-              for j in i.values():
+            for j in i.values():
                 p = re.findall('P: *\d*\.\d\d%', str(j))
                 if move in str(j) and p:
                     phead.append(float(p[0].split(' ')[-1][:-1]))
@@ -175,18 +179,107 @@ def analysePositions(fens:dict, lc0:engine):
                         if bestMove.uci() == move:
                             s1 = analysis[0]['score'].pov(board.turn)
                             s2 = analysis[1]['score'].pov(board.turn)
-                            # TODO: calculate change in win percentage and take account of mates
-                            print('\033[92mBrilliancy!!\033[0m', s1, s2)
+                            print(s1, s2)
+                            if s1.is_mate() and s2.is_mate():
+                                if s1.mate() * s2.mate() > 0:
+                                    continue
+                            elif not (s1.is_mate() or s2.is_mate()):
+                                wp1 = functions.winP(s1.score())
+                                wp2 = functions.winP(s2.score())
+                                if wp1-wp2 < wpCutoff:
+                                    continue
+                            elif s1.is_mate() and not s2.is_mate():
+                                if s1.mate()*s2.score() > 0 and abs(s2.score()) > 500:
+                                    continue
+                            print('\033[92mBrilliancy!!\033[0m')
                     print(board)
                     print(move)
                     print(p)
-    sf.quit()
-    lc0.quit()
+
+
+def isBrilliancy(fen: str, move: str, lc0: engine, sf: engine) -> bool:
+    """
+    This function evaluates if a move in a given position is a brilliancy or not
+    fen: str
+        The FEN string of the position
+    move: str
+        The move played in the position
+    lc0: engine
+        A configured LC0 engine
+    sf: engine
+        A configured Stockfish engine
+    return -> bool
+        If the move was a brilliancy or not
+    """
+
+    sftime = 4
+    wpCutoff = 15
+    brilliancyCutoff = 2.5
+    phead = list()
+    board = chess.Board(fen)
+    info = lc0.analysis(board, chess.engine.Limit(nodes=1))
+    for i in info:
+        for j in i.values():
+            p = re.findall('P: *\d*\.\d\d%', str(j))
+            if move in str(j) and p:
+                phead.append(float(p[0].split(' ')[-1][:-1]))
+                # Stockfish analysis to prove that a move is actually good
+                if phead[-1] < brilliancyCutoff:
+                    analysis = sf.analyse(board, chess.engine.Limit(time=sftime), multipv=2)
+                    bestMove = analysis[0]['pv'][0]
+                    if bestMove.uci() == move:
+                        s1 = analysis[0]['score'].pov(board.turn)
+                        s2 = analysis[1]['score'].pov(board.turn)
+                        print(s1, s2)
+                        if s1.is_mate() and s2.is_mate():
+                            if s1.mate() * s2.mate() > 0:
+                                return False
+                        elif not (s1.is_mate() or s2.is_mate()):
+                            wp1 = functions.winP(s1.score())
+                            wp2 = functions.winP(s2.score())
+                            if wp1-wp2 < wpCutoff:
+                                return False
+                        elif s1.is_mate() and not s2.is_mate():
+                            if s1.mate()*s2.score() > 0 and abs(s2.score()) > 500:
+                                return False
+                        return True
+    return False
+
+
+def findBrilliancies(pgnPath: str, lc0: engine, sf: engine, outPath: str) -> list():
+    """
+    This functions finds the brilliancies in a given PGN file
+    """
+    brilliancies = list()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if 'Variant' in game.headers.keys():
+                if game.headers['Variant'] == 'Chess960':
+                    continue
+            board = chess.Board()
+            newGame = chess.pgn.Game()
+            newGame.headers = game.headers
+            node = newGame
+            hasBr = False
+            print(game.headers)
+            for move in game.mainline_moves():
+                node = node.add_variation(move)
+                if isBrilliancy(board.fen(), move.uci(), lc0, sf):
+                    print(board)
+                    print(move.uci())
+                    brilliancies.append((board.fen(), move.uci()))
+                    hasBr = True
+                    node.comment = "!"
+                board.push(move)
+            if hasBr:
+                print(newGame, file=open(outPath, 'a+'), end='\n\n')
+    return brilliancies
 
 
 if __name__ == '__main__':
     # leela = configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/w320x24', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
-    leela = configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/nets/smallNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    leela = configureEngine('lc0', {'WeightsFile': '/home/julian/Desktop/smallNet.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    sf = configureEngine('stockfish', {'Threads': '10'})
     networks = ['/Users/julian/chess/nets/smallNet', '/Users/julian/chess/nets/mediumNet', '/Users/julian/chess/nets/largeNet']
     positions = {'1n6/1b1n1k2/5P1p/p1p3qp/4r3/1P6/P1Q2NPP/R4RK1 b - - 0 1': 'g5g2', 'r4r1k/pp1b1p1p/1q1p4/4pP1P/3R4/1PN1Q3/1PP3P1/2K2R2 w - - 0 22': 'e3h6',
                  '4b3/1p2kp1N/pn1rp2p/q4P2/P2r4/3B4/1P2Q1PP/2R2RK1 w - - 1 25': 'b2b4',
@@ -198,4 +291,8 @@ if __name__ == '__main__':
                  '4rrk1/1bpR1p2/1pq1pQp1/p3P2p/P1PR3P/5N2/2P2PP1/6K1 w - h6 0 31': 'g1h2',
                  'r5k1/ppp2r1p/3p3b/3Pn3/1n2PPp1/1P2K1P1/PBB1N2q/R2Q3R b - - 2 24': 'f7f4',
                  '5rk1/p1pb2pp/2p5/3p3q/2P3n1/1Q4B1/PP1NprPP/R3R1K1 b - - 0 20': 'f2g2'}
-    analysePositions(positions, leela)
+    # analysePositions(positions, leela, sf)
+    outPath = '/home/julian/Desktop/brilliancies.pgn'
+    findBrilliancies('../resources/2700games2023.pgn', leela, sf, outPath)
+    sf.quit()
+    leela.quit()
