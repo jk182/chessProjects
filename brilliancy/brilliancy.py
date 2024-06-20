@@ -222,12 +222,15 @@ def isBrilliancy(fen: str, move: str, lc0: engine, sf: engine) -> bool:
         for j in i.values():
             p = re.findall('P: *\d*\.\d\d%', str(j))
             if move in str(j) and p:
-                phead.append(float(p[0].split(' ')[-1][:-1]))
-                # Stockfish analysis to prove that a move is actually good
-                if phead[-1] < brilliancyCutoff:
+                phead = float(p[0].split(' ')[-1][:-1])
+                print(phead)
+                if phead < brilliancyCutoff:
                     analysis = sf.analyse(board, chess.engine.Limit(time=sftime), multipv=2)
                     bestMove = analysis[0]['pv'][0]
                     if bestMove.uci() == move:
+                        if len(analysis) == 1:
+                            print(board, move)
+                            return False
                         s1 = analysis[0]['score'].pov(board.turn)
                         s2 = analysis[1]['score'].pov(board.turn)
                         print(s1, s2)
@@ -240,6 +243,8 @@ def isBrilliancy(fen: str, move: str, lc0: engine, sf: engine) -> bool:
                             if wp1-wp2 < wpCutoff:
                                 return False
                         elif s1.is_mate() and not s2.is_mate():
+                            if s1.mate() <= 5 and abs(s2.score()) < 1000:      # Unsure if quick mates should be called brilliant
+                                return True
                             if s1.mate()*s2.score() > 0 and abs(s2.score()) > 500:
                                 return False
                         return True
@@ -251,8 +256,11 @@ def findBrilliancies(pgnPath: str, lc0: engine, sf: engine, outPath: str) -> lis
     This functions finds the brilliancies in a given PGN file
     """
     brilliancies = list()
+    gameNr = 0
     with open(pgnPath, 'r') as pgn:
         while game := chess.pgn.read_game(pgn):
+            gameNr += 1
+            print(f'Game {gameNr}:')
             if 'Variant' in game.headers.keys():
                 if game.headers['Variant'] == 'Chess960':
                     continue
@@ -269,7 +277,7 @@ def findBrilliancies(pgnPath: str, lc0: engine, sf: engine, outPath: str) -> lis
                     print(move.uci())
                     brilliancies.append((board.fen(), move.uci()))
                     hasBr = True
-                    node.comment = "!"
+                    node.comment = "!!"
                 board.push(move)
             if hasBr:
                 print(newGame, file=open(outPath, 'a+'), end='\n\n')
@@ -292,7 +300,9 @@ if __name__ == '__main__':
                  'r5k1/ppp2r1p/3p3b/3Pn3/1n2PPp1/1P2K1P1/PBB1N2q/R2Q3R b - - 2 24': 'f7f4',
                  '5rk1/p1pb2pp/2p5/3p3q/2P3n1/1Q4B1/PP1NprPP/R3R1K1 b - - 0 20': 'f2g2'}
     # analysePositions(positions, leela, sf)
-    outPath = '/home/julian/Desktop/brilliancies.pgn'
-    findBrilliancies('../resources/2700games2023.pgn', leela, sf, outPath)
+    outPath = '../out/brillianciesAlekhine.pgn'
+    for k, v in positions.items():
+        print(isBrilliancy(k, v, leela, sf))
+    # findBrilliancies('../resources/alekhine2.pgn', leela, sf, outPath)
     sf.quit()
     leela.quit()
