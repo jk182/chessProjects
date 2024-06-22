@@ -299,9 +299,15 @@ if __name__ == '__main__':
                  '4rrk1/1bpR1p2/1pq1pQp1/p3P2p/P1PR3P/5N2/2P2PP1/6K1 w - h6 0 31': 'g1h2',
                  'r5k1/ppp2r1p/3p3b/3Pn3/1n2PPp1/1P2K1P1/PBB1N2q/R2Q3R b - - 2 24': 'f7f4',
                  '5rk1/p1pb2pp/2p5/3p3q/2P3n1/1Q4B1/PP1NprPP/R3R1K1 b - - 0 20': 'f2g2'}
+    aPos = {'r6r/qb2pk1p/p1np1ppQ/2pN4/4P3/5P2/PP4PP/2KR1B1R w - - 0 19': 'd5e7',
+            '3r2k1/p2r1pp1/1pQ3p1/3P2q1/P7/6P1/5P1P/2R1R1K1 w - - 0 30': 'c6d7',
+            '4n1k1/pbrq2p1/4rB1Q/4P3/4p3/6RP/PP4P1/5RK1 w - - 1 33': 'f6g7',
+            '8/1p3k1r/p3pp2/2PN2p1/PP6/7P/5qRK/3Q4 b - - 2 53': 'h7h3',
+            '3q1r1k/1b1nNppp/4p3/1Nnp4/1R6/4PP2/2Q1B1PP/6K1 w - - 9 27': 'c2h7',
+            '8/Q5p1/8/5pk1/1P2q3/KQq5/P7/8 b - - 2 46': 'e4b4'}
     # analysePositions(positions, leela, sf)
     outPath = '../out/brillianciesAlekhine.pgn'
-    for k, v in positions.items():
+    for k, v in aPos.items():
         print(isBrilliancy(k, v, leela, sf))
     # findBrilliancies('../resources/alekhine2.pgn', leela, sf, outPath)
     sf.quit()
