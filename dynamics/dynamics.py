@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 
 
-def depthChange(fen: str, engine: chess.engine, maxDepth: int = 17) -> list:
+def depthChange(fen: str, engine: chess.engine, maxDepth: int = 18) -> list:
     """
     This function evaluates the positions at various depths
     fen: str]
@@ -34,8 +34,8 @@ def isPuzzle(fen: str, engine: chess.engine) -> bool:
     mateScore = 10000
     evals = depthChange(fen, engine)
     startScore = min([s.score(mate_score=mateScore) for s in evals[:5]])
-    endScore = min([s.score(mate_score=mateScore) for s in evals[-5:]])
-    return endScore-startScore > 300
+    endScore = min([s.score(mate_score=mateScore) for s in evals[-3:]])
+    return functions.winP(endScore)-functions.winP(startScore) > 20
 
 
 def findPuzzles(pgnPath: str, engine: chess.engine) -> list:
@@ -51,12 +51,13 @@ def findPuzzles(pgnPath: str, engine: chess.engine) -> list:
             for move in game.mainline_moves():
                 board.push(move)
                 if isPuzzle(board.fen(), engine):
+                    print(board.fen())
                     puzzles.append(board.fen())
     return puzzles
 
 
 if __name__ == '__main__':
-    sf = functions.configureEngine('stockfish', {'Threads': 8})
+    sf = functions.configureEngine('stockfish', {'Threads': 10})
     fens = ['r1bq1rk1/2ppbppp/p1n2n2/1p2p3/4P3/1B3N2/PPPP1PPP/RNBQR1K1 w - - 2 8',
             '8/3RBk2/p3p3/2p2q2/3b4/8/PP4rP/6QK w - - 0 34',
             'b7/5p1k/1b2qp2/1P3N2/3p2P1/7P/2QN4/5K2 b - - 3 33',
@@ -76,5 +77,5 @@ if __name__ == '__main__':
         print(fen)
         print(isPuzzle(fen, sf))
     """
-    print(findPuzzles('/Users/julian/Desktop/testPGN.pgn', sf))
+    print(findPuzzles('../resources/jk_200.pgn', sf))
     sf.quit()
