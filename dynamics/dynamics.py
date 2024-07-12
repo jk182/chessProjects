@@ -76,5 +76,7 @@ if __name__ == '__main__':
         print(fen)
         print(isPuzzle(fen, sf))
     """
-    print(findPuzzles('/Users/julian/Desktop/testPGN.pgn', sf))
+    print(isPuzzle('r2q1rk1/pb3ppp/np1p4/b1pP4/8/P1P1P1P1/4NPBP/1RBQ1RK1 w - - 0 14', sf))
+    print(isPuzzle('r5k1/pbr1qpp1/1pp1p2p/4N3/1bPPpP2/1P2P2Q/PB4PP/R4RK1 w - - 0 18', sf))
+    # print(findPuzzles('/Users/julian/Desktop/testPGN.pgn', sf))
     sf.quit()
