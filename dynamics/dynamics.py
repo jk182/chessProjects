@@ -98,25 +98,7 @@ if __name__ == '__main__':
             'b7/5p1k/1b2qp2/1P3N2/3p2P1/7P/2QN4/5K2 b - - 3 33',
             'r2q1r2/p3bkp1/b4n1p/2pn4/3p4/1P3NPB/P1QBPP1P/R3R1K1 w - - 0 20']
     puzzleDB = '~/chess/resources/lichess_db_puzzle-10000.csv'
-<<<<<<< HEAD
-    df = pd.read_csv(puzzleDB)
-    for i in df.index:
-        if i > 15:
-            break
-        fen = df['FEN'][i]
-        move = df['Moves'][i].split(' ')[0]
-        # The puzzle starts with the setup move, so it has to be played before analysing
-        board = chess.Board(fen)
-        board.push_uci(move)
-        fen = board.fen()
-        print(fen)
-        print(isPuzzle(fen, sf))
-    """
-    print(isPuzzle('r2q1rk1/pb3ppp/np1p4/b1pP4/8/P1P1P1P1/4NPBP/1RBQ1RK1 w - - 0 14', sf))
-    print(isPuzzle('r5k1/pbr1qpp1/1pp1p2p/4N3/1bPPpP2/1P2P2Q/PB4PP/R4RK1 w - - 0 18', sf))
     # print(findPuzzles('/Users/julian/Desktop/testPGN.pgn', sf))
-=======
     print(testLichessPuzzles(puzzleDB, 2000))
     # print(findPuzzles('../resources/jk_200.pgn', sf))
->>>>>>> e7eadd39475767d94f0402bbc465409b2462bda1
     sf.quit()
