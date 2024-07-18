@@ -3,19 +3,19 @@ import requests
 import pandas as pd
 import chess
 from chess import engine
+import matplotlib.pyplot as plt
 import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 
 
-def getExplorerInfo(FEN: str, speeds: list = ['blitz', 'rapid', 'classical'], ratings: list = [2000]) -> dict:
+def getExplorerInfo(FEN: str, speeds: list = ['blitz', 'rapid', 'classical'], ratings: list = [1800, 2000]) -> dict:
     """
     This function gets the explorer information from Lichess as a dictionary
     """
     speedsStr = str(speeds)[1:-1].replace(' ', '').replace("'", "")
     ratingsStr = str(ratings)[1:-1].replace(' ', '')
-    print(speedsStr)
     rq = requests.get(f'https://explorer.lichess.ovh/lichess?variant=standard&speeds={speedsStr}&ratings={ratingsStr}&fen={FEN}')
     res = json.loads(rq.text)
     return res
@@ -36,6 +36,10 @@ def calcScore(white: int, black: int, draws: int, isWhite: bool = True) -> float
     This function calculates the score of a move
     """
     games = white+black+draws
+    if games != 1000:
+        print(games)
+    if games == 0:
+        return -1
     if isWhite:
         return (white+0.5*draws)/games
     return (black+0.5*draws)/games
@@ -65,13 +69,57 @@ def compareEngines(engines: list, fens: list) -> list:
     """
     This function calculates the score of various engines for various poisitions
     """
+    minGames = 300
     scores = [ list() for i in range(len(engines)+1) ]
     for fen in fens:
         expInfo = getExplorerInfo(fen)
+        if expInfo['white']+expInfo['black']+expInfo['draws'] < minGames:
+            continue
         scores[-1].append(calcScoreWDL(getExplorerWDL(expInfo)))
         for i, engine in enumerate(engines):
             scores[i].append(calcScoreWDL(getEngineWDL(engine, fen)))
     return scores
+
+
+def genPositions(pgnPath: str) -> list:
+    """
+    This function generates a list of FENs in order to compare the different engines on these positions
+    """
+    fens = list()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            board = game.board()
+            for i, move in enumerate(game.mainline_moves()):
+                if i == 18:
+                    fens.append(board.fen())
+                    break
+                board.push(move)
+    return fens
+
+
+def plotScoreDifferences(scores: list, filename: str = None):
+    """
+    This function plotes the differences in scores between engines and the Lichess database
+    It is assumed that the last entry in scores is from the Lichess database
+    """
+    db = scores[-1]
+    colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa']
+
+    fig, ax = plt.subplots()
+    ax.set_facecolor('#e6f7f2')
+
+    for j, s in enumerate(scores[:-1]):
+        y = [ abs(s[i]-db[i]) for i in range(len(s)) if db[i] >= 0 ]
+        ax.plot(range(len(y)), list(reversed(sorted(y))), color=colors[j])
+
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title('Accuracy Distribution')
+    ax.legend()
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -82,6 +130,8 @@ if __name__ == '__main__':
     positions = ['r1bq1rk1/2ppbppp/p1n2n2/1p2p3/3PP3/1B3N2/PPP2PPP/RNBQR1K1 b - - 0 8',
             'rnbqkbnr/pppp1ppp/8/4p3/4PP2/8/PPPP2PP/RNBQKBNR b KQkq - 0 2',
             'rnb1kb1r/1p3ppp/p2ppn2/6B1/3NPP2/q1N5/P1PQ2PP/1R2KB1R w Kkq - 2 10']
-    print(compareEngines([leela, maia], positions))
+    fens = genPositions('../resources/2700games2023.pgn')
+    scores = compareEngines([leela, maia], fens)
+    plotScoreDifferences(scores)
     leela.quit()
     maia.quit()
