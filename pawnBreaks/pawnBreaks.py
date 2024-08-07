@@ -28,17 +28,29 @@ def getBlockedPawns(board: Board) -> dict:
 
 
 def findPawnBreaks(pgns: list):
+    pawnBreaks = list()
     for pgnPath in pgns:
         with open(pgnPath, 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
                 board = game.board()
 
                 for move in game.mainline_moves():
-                    wPawns = board.pieces(chess.PAWN, chess.WHITE)
-                    bPawns = board.pieces(chess.PAWN, chess.BLACK)
-                    if (square := move.from_square) in wPawns:
-                        print(move)
+                    pawns = board.pieces(chess.PAWN, board.turn)
+                    if (startSquare := move.from_square) in pawns:
+                        if blockedPawns := getBlockedPawns(board):
+                            endSquare = move.to_square
+                            if (startSquare % 8) == (endSquare % 8):
+                                if board.turn:
+                                    bP = blockedPawns[False]
+                                    if (endSquare % 8 != 0 and endSquare+7 in bP) or (endSquare % 8 != 7 and endSquare+9 in bP):
+                                        pawnBreaks.append((board.fen(), move.uci()))
+                                else:
+                                    bP = blockedPawns[True]
+                                    if (endSquare % 8 != 7 and endSquare-7 in bP) or (endSquare % 8 != 0 and endSquare-9 in bP):
+                                        pawnBreaks.append((board.fen(), move.uci()))
+                    board.push(move)
+    return pawnBreaks
 
 
 if __name__ == '__main__':
-    findPawnBreaks(['../resources/Svidler-Malaniuk,1998.pgn'])
+    print(findPawnBreaks(['../resources/Norway2024.pgn']))
