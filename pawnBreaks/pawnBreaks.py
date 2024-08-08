@@ -28,7 +28,7 @@ def getBlockedPawns(board: Board) -> dict:
 
 
 def findPawnBreaks(pgns: list):
-    pawnBreaks = list()
+    pawnBreaks = dict()
     for pgnPath in pgns:
         with open(pgnPath, 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
@@ -43,14 +43,24 @@ def findPawnBreaks(pgns: list):
                                 if board.turn:
                                     bP = blockedPawns[False]
                                     if (endSquare % 8 != 0 and endSquare+7 in bP) or (endSquare % 8 != 7 and endSquare+9 in bP):
-                                        pawnBreaks.append((board.fen(), move.uci()))
+                                        if (m := move.uci()) not in pawnBreaks.keys():
+                                            pawnBreaks[m] = [board.fen()]
+                                        else:
+                                            pawnBreaks[m].append(board.fen())
                                 else:
                                     bP = blockedPawns[True]
                                     if (endSquare % 8 != 7 and endSquare-7 in bP) or (endSquare % 8 != 0 and endSquare-9 in bP):
-                                        pawnBreaks.append((board.fen(), move.uci()))
+                                        if (m := move.uci()) not in pawnBreaks.keys():
+                                            pawnBreaks[m] = [board.fen()]
+                                        else:
+                                            pawnBreaks[m].append(board.fen())
                     board.push(move)
     return pawnBreaks
 
 
 if __name__ == '__main__':
-    print(findPawnBreaks(['../resources/Norway2024.pgn']))
+    pb = findPawnBreaks(['../resources/benoni.pgn'])
+    for k,v in pb.items():
+        print(k)
+        for p in v:
+            print(p)
