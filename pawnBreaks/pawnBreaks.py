@@ -27,7 +27,14 @@ def getBlockedPawns(board: Board) -> dict:
     return blockedPawns
 
 
-def findPawnBreaks(pgns: list):
+def findPawnBreaks(pgns: list) -> dict:
+    """
+    This function finds all pawn breaks in a list of PGNs
+    pgns: list
+        List of the paths to the PGN files
+    return -> dict
+        Dictionary with the pawn breaks (in UCI notation) as keys and a list of FENs where they occur as values
+    """
     pawnBreaks = dict()
     for pgnPath in pgns:
         with open(pgnPath, 'r') as pgn:
