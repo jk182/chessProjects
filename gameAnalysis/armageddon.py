@@ -251,7 +251,7 @@ def plotScores(scores: dict, filename: str = None) -> None:
 
 
 if __name__ == '__main__':
-    norway = ['../out/games/Norway2021-out.pgn', '../out/games/Norway2022-out.pgn', '../out/games/Norway2023-out.pgn',  '../out/games/Norway2023-out.pgn']
+    norway = ['../out/games/Norway2021-out.pgn', '../out/games/Norway2022-out.pgn', '../out/games/Norway2023-out.pgn',  '../out/games/Norway2024-out.pgn']
     n2 = ['../resources/Norway2021.pgn', '../resources/Norway2022.pgn', '../resources/Norway2023.pgn', '../resources/Norway2024.pgn']
     SC = sharpChangeByColor(norway)
     print(getAvgSharpChange(SC))
