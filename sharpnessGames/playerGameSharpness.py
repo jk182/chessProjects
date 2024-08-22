@@ -1,5 +1,6 @@
 import chess
 from chess import engine, pgn, Board
+import matplotlib.pyplot as plt
 import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -107,7 +108,34 @@ def getAvgSharpChange(sharpChange: dict, maxMove: int = None) -> tuple:
     return (sum(w)/len(w), sum(b)/len(b))
 
 
+def plotGameSharpness(pgnPath: str):
+    """
+    This function plots the sharpness change of a single game, move by move
+    pgnPath: str
+        Path to a PGN file that contains only 1 game
+    """
+    sharpChange = sharpChangeByColor([pgnPath], False)
+    white = sharpChange['white']
+    black = sharpChange['black']
+
+    fig, ax = plt.subplots(figsize=(10,6))
+
+    ax.plot(range(len(white)), [min(w[0], 5) for w in white], color='#f8a978', label='White sharpness change')
+    ax.plot(range(len(black)), [min(b[0], 5) for b in black], color='#111111', label='Black sharpness change')
+
+    ax.set_facecolor('#e6f7f2')
+    ax.set_xlabel('Move Number')
+    ax.set_ylabel('Sharpness Change')
+    ax.set_xlim(0, len(white))
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    ax.legend()
+
+    plt.show()
+
+
 if __name__ == '__main__':
     pgns = ['../out/games/Norway2023-out.pgn']
     sharpChange = sharpChangeByColor(pgns)
-    print(sharpChange)
+    # print(sharpChange)
+    plotGameSharpness('../resources/tal-smyslov.pgn')
