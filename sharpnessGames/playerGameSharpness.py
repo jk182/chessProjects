@@ -83,11 +83,12 @@ def sharpChangeForPlayer(pgnPaths: list(), player: str) -> list:
                     else:
                         continue
 
-                    sharpDiff = cshapr-lastSharp
+                    sharpDiff = csharp-lastSharp
                     lastSharp = csharp
 
                     if node.turn() != white:
-                        sharp.append((diff, move))
+                        sharp.append((sharpDiff, move, white))
+                        move += 1
     return sharp
 
 
@@ -134,8 +135,36 @@ def plotGameSharpness(pgnPath: str):
     plt.show()
 
 
+def plotPlayerSharpness(sharpChange: list):
+    """
+    This function plots the average sharpness change of a player per move for White and Black
+    sharpChange: list
+        List returned by sharpChangeForPlayer    
+    """
+    white = [(sc[0], sc[1]) for sc in sharpChange if sc[2]]
+    black = [(sc[0], sc[1]) for sc in sharpChange if not sc[2]]
+
+    maxWMoves = max([w[1] for w in white])
+    wMoveAvg = [sum([w[0] for w in white if w[1] == move])/len([w[0] for w in white if w[1] == move]) for move in range(1, maxWMoves+1)]
+    print(wMoveAvg)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot(range(len(wMoveAvg)), wMoveAvg, color='#f8a978')
+    
+    ax.set_facecolor('#e6f7f2')
+
+    plt.show()
+
+
 if __name__ == '__main__':
     pgns = ['../out/games/Norway2023-out.pgn']
     sharpChange = sharpChangeByColor(pgns)
     # print(sharpChange)
-    plotGameSharpness('../resources/tal-smyslov.pgn')
+    # plotGameSharpness('../resources/tal-smyslov.pgn')
+    tal = ['../out/games/tal1959-1962-out.pgn']
+    bot = ['../out/games/botvinnik1959-1962-out.pgn']
+    scTal = sharpChangeForPlayer(tal, 'Tal, M')
+    scBot = sharpChangeForPlayer(bot, 'Botvinnik')
+    plotPlayerSharpness(scTal)
+    plotPlayerSharpness(scBot)
