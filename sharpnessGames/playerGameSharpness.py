@@ -17,7 +17,7 @@ def sharpChangeByColor(pgnPaths: list(), onlyArm: bool = True) -> dict:
     return -> dict
         A dictionary indexed by color and containing a list of tuples containing the sharpness change and the move number
     """
-    startSharp = 0.468
+    startSharp = 0.468*0.5
 
     sharp = {'white': list(), 'black': list()}
     for pgnPath in pgnPaths:
@@ -34,7 +34,7 @@ def sharpChangeByColor(pgnPaths: list(), onlyArm: bool = True) -> dict:
                 while not node.is_end():
                     node = node.variations[0]
                     if c := functions.readComment(node, True, True):
-                        csharp = functions.sharpnessLC0(c[0])
+                        csharp = functions.sharpnessLC0(c[0]) * ((1000-max(c[0]))/1000)
                     
                     diff = float(csharp-lastSharp)
                     lastSharp = csharp
@@ -57,7 +57,7 @@ def sharpChangeForPlayer(pgnPaths: list(), player: str) -> list:
     return -> list
         A list of tuples with the sharpness change and move number
     """
-    startSharp = 0.468
+    startSharp = 0.468 * 0.55
 
     sharp = list()
     for pgnPath in pgnPaths:
@@ -74,20 +74,24 @@ def sharpChangeForPlayer(pgnPaths: list(), player: str) -> list:
                 move = 1
 
                 lastSharp = startSharp
+                lastEval = 0.3
                 node = game
                 
                 while not node.is_end():
                     node = node.variations[0]
                     if c := functions.readComment(node, True, True):
-                        csharp = functions.sharpnessLC0(c[0])
+                        csharp = functions.sharpnessLC0(c[0]) * ((1000-max(c[0]))/1000)
+                        ceval = int(c[1])
                     else:
                         continue
 
                     sharpDiff = csharp-lastSharp
+
                     lastSharp = csharp
+                    lastEval = ceval
 
                     if node.turn() != white:
-                        sharp.append((sharpDiff, move, white))
+                        sharp.append((max(-3, min(3, sharpDiff)), move, white))
                         move += 1
     return sharp
 
@@ -146,22 +150,30 @@ def plotPlayerSharpness(sharpChange: list):
 
     maxWMoves = max([w[1] for w in white])
     wMoveAvg = [sum([w[0] for w in white if w[1] == move])/len([w[0] for w in white if w[1] == move]) for move in range(1, maxWMoves+1)]
-    print(wMoveAvg)
+
+    maxBMoves = max([b[1] for b in black])
+    bMoveAvg = [sum([b[0] for b in black if b[1] == move])/len([b[0] for b in black if b[1] == move]) for move in range(1, maxBMoves+1)]
+    print([b[0] for b in black if b[1] == 41])
+    print(bMoveAvg[40])
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
     ax.plot(range(len(wMoveAvg)), wMoveAvg, color='#f8a978')
+    ax.plot(range(len(bMoveAvg)), bMoveAvg, color='#111111')
+    plt.axhline(0, color='black', linewidth=0.5)
     
     ax.set_facecolor('#e6f7f2')
+    ax.set_xlim(0, 40)
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
     plt.show()
 
 
 if __name__ == '__main__':
-    pgns = ['../out/games/Norway2023-out.pgn']
+    pgns = ['../out/games/tal-bot-sac.pgn']
     sharpChange = sharpChangeByColor(pgns)
     # print(sharpChange)
-    # plotGameSharpness('../resources/tal-smyslov.pgn')
+    plotGameSharpness('../out/games/tal-bot-sac.pgn')
     tal = ['../out/games/tal1959-1962-out.pgn']
     bot = ['../out/games/botvinnik1959-1962-out.pgn']
     scTal = sharpChangeForPlayer(tal, 'Tal, M')
