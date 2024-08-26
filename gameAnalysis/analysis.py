@@ -594,7 +594,7 @@ def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, fil
             x.append(pl)
             y.append(sum(finSharp)/len(finSharp))
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10,6))
     plt.xticks(rotation=90)
     ax.set_facecolor('#e6f7f2')
     plt.axhline(0, color='black', linewidth=0.5)
@@ -652,9 +652,6 @@ if __name__ == '__main__':
         wdl.append(w)
     startSharp = sharpnessLC0(wdl)
     """
-    candidates = '../resources/wijkMasters2024.pgn'
-    outCan = '../out/wijk2024.pgn'
-    # makeComments(candidates, outCan, analysisCPnWDL, 5000, leela, True)
 
     """
     tournaments = ['arjun_biel.pgn', 'carlsen_open.pgn']
@@ -692,7 +689,8 @@ if __name__ == '__main__':
                 nv = [val for val in v if not np.isinf(val)]
                 print(k, sum(nv)/len(nv))
     """
-    # plotSharpChange(sharpnessChangePerPlayer(candidates))
+    candidates = '../resources/candidates_out.pgn'
+    plotSharpChange(sharpnessChangePerPlayer(candidates))
     pgn = '../resources/naka-nepo.pgn'
     outf = '../out/naka-nepo-30000.pgn'
     # plotWDL(outf)
