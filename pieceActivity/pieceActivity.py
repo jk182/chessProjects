@@ -14,6 +14,9 @@ def calculatePieceActivity(fen: str) -> list:
     activity = [0, 0]
     board = chess.Board(fen)
     for color in [chess.WHITE, chess.BLACK]:
+        king = list(board.pieces(6, not color))[0]
+        kingSquares = board.attacks(king)
+        kingSquares.add(king)
         if color:
             index = 0
         else:
@@ -24,18 +27,24 @@ def calculatePieceActivity(fen: str) -> list:
                 for square in board.attacks(piece):
                     if board.color_at(square) != color:
                         activity[index] += 1
+                        if square in kingSquares:
+                            # counting the attacked squares around the enemy king extra
+                            activity[index] += 1
                         if color == chess.WHITE and square >= 32:
+                            # counting the attacked squares in the opponent's half extra
                             activity[index] += 1
                         elif color == chess.BLACK and square <= 31:
                             activity[index] += 1
     return activity
 
 
-def plotPieceActivity(pgnPath: str, filename: str = None):
+def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
     """
     This function plots the piece activity for White and Black in a given game.
     pgnPath: str
         Path to the PGN file of the game
+    title: str
+        Title of the plot (usually the players of the game)
     filname: str
         The name of the file to which the graph will be saved.
         If no name is given, the graph will be shown instead of saved.
@@ -63,7 +72,8 @@ def plotPieceActivity(pgnPath: str, filename: str = None):
     ax.set_xticks(list(range(1, len(white)))[::10])
     ax.set_xticklabels([i//2 for i in range(len(white))[::10]])
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
-
+    if title:
+        plt.title(title)
     ax.legend()
 
     if filename:
@@ -73,7 +83,9 @@ def plotPieceActivity(pgnPath: str, filename: str = None):
 
 
 if __name__ == '__main__':
-    fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    fen = 'r6r/pp1qnkpp/5p2/3p4/3N4/8/PP2QPPP/2R1R1K1 w - - 2 19'
     pgn = '../resources/steinitz-vonBardeleben.pgn'
-    plotPieceActivity(pgn)
+    print(calculatePieceActivity(fen))
+    plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1985')
     plotPieceActivity('../resources/jinshi-ding.pgn')
+    plotPieceActivity('../resources/petrosian-savon.pgn')
