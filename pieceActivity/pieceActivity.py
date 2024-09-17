@@ -70,7 +70,7 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
     ax.set_xlim(1, len(white))
     ax.set_ylim(0)
     ax.set_xticks(list(range(1, len(white)))[::10])
-    ax.set_xticklabels([i//2 for i in range(len(white))[::10]])
+    ax.set_xticklabels([i//2 for i in range(len(white)-1)[::10]])
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     if title:
         plt.title(title)
@@ -85,7 +85,6 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
 if __name__ == '__main__':
     fen = 'r6r/pp1qnkpp/5p2/3p4/3N4/8/PP2QPPP/2R1R1K1 w - - 2 19'
     pgn = '../resources/steinitz-vonBardeleben.pgn'
-    print(calculatePieceActivity(fen))
-    plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1985')
-    plotPieceActivity('../resources/jinshi-ding.pgn')
-    plotPieceActivity('../resources/petrosian-savon.pgn')
+    plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1895', filename='../out/steinitz-vonBardeleben_activity.png')
+    plotPieceActivity('../resources/fedoseev-carlsen.pgn', title='Fedoseev-Carlsen, 2021', filename='../out/fedoseev-carlsen_activity.png')
+    plotPieceActivity('../resources/huzman-aronian.pgn', title='Huzman-Aronian, 2010', filename='../out/huzman-aronian_activity.png')
