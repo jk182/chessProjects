@@ -19,7 +19,7 @@ def getPieceData(pgnPath: str, pieceType: int, color: bool, minMove: int = 0, ma
     squares = [0] * 64
     totalMoves = 0
 
-    with open(pgnPath, 'r') as pgn:
+    with open(pgnPath, 'r', encoding="latin-1") as pgn:
         while game := chess.pgn.read_game(pgn):
             board = game.board()
             gameMoves = 0
@@ -59,7 +59,7 @@ def plotPieceHeatmaps(pgnPath: str, color: bool, minMove: int = 0, maxMove: int 
         # Mapping the chessboard to the output
         data = np.reshape(list(reversed(data)), (8, 8))
         data = [list(reversed(l)) for l in data]
-        ax[p-1].imshow(data, cmap='plasma')
+        im = ax[p-1].imshow(data, cmap='plasma')
         ax[p-1].set_title(pieceNames[p-1])
 
         ax[p-1].set_xticks(np.arange(8), labels=files)
@@ -67,6 +67,7 @@ def plotPieceHeatmaps(pgnPath: str, color: bool, minMove: int = 0, maxMove: int 
         ax[p-1].set_xticks(np.arange(9)-.5, minor=True)
         ax[p-1].set_yticks(np.arange(9)-.5, minor=True)
         ax[p-1].grid(which='minor', color="black", linestyle='-', linewidth=1)
+        ax[p-1].figure.colorbar(im)
 
         # annotating the heatmap (it looks horrible for now)
         """
@@ -75,9 +76,18 @@ def plotPieceHeatmaps(pgnPath: str, color: bool, minMove: int = 0, maxMove: int 
                 text = ax[p-1].text(j, i, round(data[i][j], 2), ha="center", va="center", color="w")
         """
     fig.tight_layout()
+    fig.patch.set_facecolor('#e6f7f2')
     plt.show()
 
 
 if __name__ == '__main__':
     pgn = '../resources/carlsbad.pgn'
-    plotPieceHeatmaps(pgn, chess.WHITE, minMove=5)
+    plotPieceHeatmaps(pgn, chess.WHITE)
+    plotPieceHeatmaps(pgn, chess.WHITE, minMove=7, maxMove=30)
+    # plotPieceHeatmaps(pgn, chess.BLACK)
+    spanish = '../resources/spanishMorphy.pgn'
+    # plotPieceHeatmaps(spanish, chess.WHITE)
+    # plotPieceHeatmaps(spanish, chess.BLACK)
+    kid = '../resources/KID.pgn'
+    # plotPieceHeatmaps(kid, chess.WHITE)
+    # plotPieceHeatmaps(kid, chess.BLACK)
