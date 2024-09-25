@@ -6,6 +6,7 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import re
+import matplotlib.pyplot as plt
 
 
 def reduceDataset(puzzles: str, minPlays: int):
@@ -71,14 +72,22 @@ def firstMovePolicy(lc0: chess.engine, FEN: str, solution: str, setup: bool = Tr
     return getMovePolicy(lc0, board, moves[0])
 
 
+def scatterPlot(x: list, y: list):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    ax.scatter(x, y)
+    ax.set_facecolor('#e6f7f2')
+    plt.show()
+
+
 if __name__ == '__main__':
-    # reduceDataset('../resources/lichess_puzzles_202409.csv', 10000)
-    puzzles = pd.read_csv('../resources/lichess_puzzles_202409-10000.csv')
+    # reduceDataset('../resources/lichess_puzzles_202409.csv', 100000)
+    puzzles = pd.read_csv('../resources/lichess_puzzles_202409-100000.csv')
+    # print(len(puzzles))
     lc0 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
     policies = list()
     for i in puzzles.index:
         policies.append(firstMovePolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i]))
-        if i > 1000:
-            break
     lc0.quit()
-    print(np.corrcoef(policies, list(puzzles['Rating'])[:1002]))
+    print(np.corrcoef(policies, list(puzzles['Rating'])))
+    scatterPlot(policies, list(puzzles['Rating']))
