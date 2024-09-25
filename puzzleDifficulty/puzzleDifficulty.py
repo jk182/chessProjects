@@ -46,6 +46,10 @@ def getMovePolicy(lc0: chess.engine, position: chess.Board, move: str) -> float:
         return getMovePolicy(lc0, position, 'e1h1')
     if move == 'e1c1':
         return getMovePolicy(lc0, position, 'e1a1')
+    if move == 'e8g8':
+        return getMovePolicy(lc0, position, 'e8h8')
+    if move == 'e8c8':
+        return getMovePolicy(lc0, position, 'e8a8')
     print(f'Error: FEN: {position.fen()}, move: {move}') 
     return None
 
@@ -82,12 +86,17 @@ def scatterPlot(x: list, y: list):
 
 if __name__ == '__main__':
     # reduceDataset('../resources/lichess_puzzles_202409.csv', 100000)
-    puzzles = pd.read_csv('../resources/lichess_puzzles_202409-100000.csv')
+    puzzles = pd.read_csv('../resources/lichess_puzzles_202409-10000.csv')
     # print(len(puzzles))
-    lc0 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
-    policies = list()
-    for i in puzzles.index:
-        policies.append(firstMovePolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i]))
-    lc0.quit()
-    print(np.corrcoef(policies, list(puzzles['Rating'])))
-    scatterPlot(policies, list(puzzles['Rating']))
+    # lc0 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    # networks = ['/home/julian/chess/nets/small.pb.gz', '/home/julian/chess/nets/medium.pb.gz',  '/home/julian/chess/nets/large.pb.gz',   '/home/julian/chess/nets/veryLarge.pb.gz']
+    networks = ['/home/julian/chess/nets/small.pb.gz']
+    for net in networks:
+        print(net)
+        lc0 = functions.configureEngine('lc0', {'WeightsFile': net, 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+        policies = list()
+        for i in puzzles.index:
+            policies.append(firstMovePolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i]))
+        lc0.quit()
+        print(np.corrcoef(policies, list(puzzles['Rating'])))
+    # scatterPlot(policies, list(puzzles['Rating']))
