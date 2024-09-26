@@ -38,7 +38,7 @@ def getMovePolicy(lc0: chess.engine, position: chess.Board, move: str) -> float:
     info = lc0.analysis(position, chess.engine.Limit(nodes=1))
     for i in info:
         for j in i.values():
-            p = re.findall(r'P: *\d*\.\d\d%', str(j))
+            p = re.findall(r'P: *\d*\.\d{1,2}%', str(j))
             if move in str(j) and p:
                 return round(float(p[0].split(' ')[-1][:-1]), 2)
     # Here castling is represented by e1a1 and e1h1 instead of the standard e1c1 and e1g1
@@ -54,10 +54,43 @@ def getMovePolicy(lc0: chess.engine, position: chess.Board, move: str) -> float:
     return None
 
 
+def getHighestMovePolicy(lc0: chess.engine, position: chess.Board, excludedMove: str = None) -> float:
+    """
+    This function gets the highest policy of any move on the given position
+    lc0: chess.engine
+        Configured LC0 engine to calculate the policies
+    position: chess.Board
+        The position in question
+    excludedMove: str
+        A possible move to exclude from the highest policy
+    return -> float
+        The highest move policy in the position
+    """
+    if excludedMove:
+        castlingRights = position.castling_rights
+        if bool(castlingRights & chess.BB_H1) and excludedMove == 'e1g1':
+            excludedMove = 'e1h1'
+        if bool(castlingRights & chess.BB_A1) and excludedMove == 'e1c1':
+            excludedMove = 'e1a1'
+        if bool(castlingRights & chess.BB_H8) and excludedMove == 'e8g8':
+            excludedMove = 'e8h8'
+        if bool(castlingRights & chess.BB_A8) and excludedMove == 'e8c8':
+            excludedMove = 'e8a8'
+
+    info = lc0.analysis(position, chess.engine.Limit(nodes=1))
+    policies = list()
+    for i in info:
+        for j in i.values():
+            p = re.findall(r'P: *\d*\.\d{1,2}%', str(j))
+            if p and excludedMove not in str(j):
+                policies.append(round(float(p[0].split(' ')[-1][:-1]), 2))
+    return max(policies)
+
+
 def firstMovePolicy(lc0: chess.engine, FEN: str, solution: str, setup: bool = True) -> float:
     """
     This function returns the policy of the correct first move in a puzzle
-    leela: chess.engine
+    lc0: chess.engine
         Configured LC0 engine to determine the policy
     FEN: str
         The FEN string of the puzzle
@@ -76,6 +109,64 @@ def firstMovePolicy(lc0: chess.engine, FEN: str, solution: str, setup: bool = Tr
     return getMovePolicy(lc0, board, moves[0])
 
 
+def solutionPolicy(lc0: chess.engine, FEN: str, solution: str, excludedMove: str = None, setup: bool = True) -> list:
+    """
+    This function calculates the policy for eahc move in the solution
+    lc0: chess.engine
+        Configured LC0 engine to calculate the policy
+    FEN: str
+        The FEN string of the puzzle
+    solution: str
+        The solution moves (split by spaces)
+    setup: bool
+        If Ture, the first move in the solution is the setup move and will be played
+    return -> list
+        The policy of each move in the solution for the side to play
+    """
+    board = chess.Board(FEN)
+    moves = solution.split(' ')
+    if setup:
+        board.push_uci(moves[0])
+        moves = moves[1:]
+
+    white = board.turn
+    policies = list()
+    for move in moves:
+        if board.turn == white:
+            policies.append(getMovePolicy(lc0, board, move))
+        board.push_uci(move)
+    return policies
+
+
+def solutionPolicyDifferences(lc0: chess.engine, FEN: str, solution: str, setup: bool = True) -> list:
+    """
+    This function calculates the difference between the highest policy in each position and the policies in the solution of the puzzle. 
+    lc0: chess.engine
+        Configured LC0 engine to determine the policy
+    FEN: str
+        The FEN string of the puzzle
+    solution: str
+        The solution moves (split by spaces)
+    setup: bool
+        If True, the first move in the solution is the setup move and will be played
+    return -> list
+        The difference between the policy of the highest policy move and the best move
+    """
+    board = chess.Board(FEN)
+    moves = solution.split(' ')
+    if setup:
+        board.push_uci(moves[0])
+        moves = moves[1:]
+
+    white = board.turn
+    policyDifferences = list()
+    for move in moves:
+        if board.turn == white:
+            policyDifferences.append(getHighestMovePolicy(lc0, board, excludedMove=move)-getMovePolicy(lc0, board, move))
+        board.push_uci(move)
+    return policyDifferences
+
+
 def scatterPlot(x: list, y: list):
     fig, ax = plt.subplots(figsize=(10, 6))
     
@@ -85,18 +176,41 @@ def scatterPlot(x: list, y: list):
 
 
 if __name__ == '__main__':
-    # reduceDataset('../resources/lichess_puzzles_202409.csv', 100000)
-    puzzles = pd.read_csv('../resources/lichess_puzzles_202409-10000.csv')
+    # reduceDataset('../resources/lichess_puzzles_202409.csv', 50000)
+    puzzles = pd.read_csv('../resources/lichess_puzzles_202409-50000.csv')
     # print(len(puzzles))
-    # lc0 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    lc0 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/chess/nets/mediumNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    # lc0 = functions.configureEngine('lc0', {'WeightsFile': '/Users/julian/Downloads/weights_run2_792013.lc0', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    avgPolicies = list()
+    ratings = list()
+    firstMovePolicies = list()
+    for i in puzzles.index:
+        if puzzles['Rating'][i] < 1800:
+            continue
+        ratings.append(puzzles['Rating'][i])
+        """
+        policies = solutionPolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i])
+        firstMovePolicies.append(policies[0])
+        avgPolicies.append(1)
+        for p in policies:
+            avgPolicies[-1] *= p/100
+        avgPolicies[-1] = sum(policies)/len(policies)
+        """
+        polDiffs = solutionPolicyDifferences(lc0, puzzles['FEN'][i], puzzles['Moves'][i])
+        firstMovePolicies.append(polDiffs[0])
+        avgPolicies.append(sum(polDiffs)/len(polDiffs))
+    print(np.corrcoef(avgPolicies, ratings))
+    print(np.corrcoef(firstMovePolicies, ratings))
+    lc0.quit()
     # networks = ['/home/julian/chess/nets/small.pb.gz', '/home/julian/chess/nets/medium.pb.gz',  '/home/julian/chess/nets/large.pb.gz',   '/home/julian/chess/nets/veryLarge.pb.gz']
-    networks = ['/home/julian/chess/nets/small.pb.gz']
+    """
+    networks = [ '/Users/julian/chess/nets/smallNet',  '/Users/julian/chess/nets/mediumNet',  '/Users/julian/chess/nets/largeNet']
     for net in networks:
-        print(net)
         lc0 = functions.configureEngine('lc0', {'WeightsFile': net, 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
         policies = list()
         for i in puzzles.index:
             policies.append(firstMovePolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i]))
         lc0.quit()
         print(np.corrcoef(policies, list(puzzles['Rating'])))
-    # scatterPlot(policies, list(puzzles['Rating']))
+    """
+    scatterPlot(avgPolicies, ratings)
