@@ -16,15 +16,30 @@ def findThreats(sf: chess.engine, board: chess.Board) -> list:
     return -> list
         All threat moves as a list.
     """
-    winPDifference = 15
-    startEval = sf.analyse(board, chess.engine.Limit(time=2))['score'].white().score()
+    analysisTime = 2
+    pvs = 3
+    wpCutoff = 10
+    threats = list()
+    POV = not board.turn
+
+    startEval = sf.analyse(board, chess.engine.Limit(time=analysisTime))['score'].pov(POV).score()
     board.turn = not board.turn
-    threatEval = sf.analyse(board, chess.engine.Limit(time=2))['score'].white().score()
-    print(startEval, threatEval)
+    threatInfo = sf.analyse(board, chess.engine.Limit(time=analysisTime), multipv=pvs)
+    for info in threatInfo:
+        if functions.winP(info['score'].pov(POV).score()) - wpCutoff >= functions.winP(startEval):
+            threats.append(info['pv'][0].uci())
+    return threats
 
 
 if __name__ == '__main__':
     sf = functions.configureEngine('stockfish', {'Threads': '4', 'Hash': '8192'})
-    board = chess.Board('r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQR1K1 b kq - 5 6')
-    findThreats(sf, board)
+    board = chess.Board('rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1')
+    # print(findThreats(sf, board))
+    with open('../resources/bernstein-capablanca.pgn', 'r') as pgn:
+        game = chess.pgn.read_game(pgn)
+        board = game.board()
+        for move in game.mainline_moves():
+            board.push(move)
+            threats = findThreats(sf, board)
+            print(move.uci(), threats)
     sf.quit()
