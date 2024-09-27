@@ -167,12 +167,18 @@ def solutionPolicyDifferences(lc0: chess.engine, FEN: str, solution: str, setup:
     return policyDifferences
 
 
-def scatterPlot(x: list, y: list):
+def scatterPlot(x: list, y: list, filename: str = None):
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    ax.scatter(x, y)
+    ax.scatter(x, y, color='#f8a978')
     ax.set_facecolor('#e6f7f2')
-    plt.show()
+    ax.set_xlabel('Average Move Policy')
+    ax.set_ylabel('Puzzle Ratings')
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -185,8 +191,10 @@ if __name__ == '__main__':
     ratings = list()
     firstMovePolicies = list()
     for i in puzzles.index:
+        """
         if puzzles['Rating'][i] < 1800:
             continue
+        """
         ratings.append(puzzles['Rating'][i])
         """
         policies = solutionPolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i])
@@ -196,11 +204,12 @@ if __name__ == '__main__':
             avgPolicies[-1] *= p/100
         avgPolicies[-1] = sum(policies)/len(policies)
         """
-        polDiffs = solutionPolicyDifferences(lc0, puzzles['FEN'][i], puzzles['Moves'][i])
-        firstMovePolicies.append(polDiffs[0])
-        avgPolicies.append(sum(polDiffs)/len(polDiffs))
+        policies = solutionPolicy(lc0, puzzles['FEN'][i], puzzles['Moves'][i])
+        avgPolicies.append(sum(policies)/len(policies))
+        # polDiffs = solutionPolicyDifferences(lc0, puzzles['FEN'][i], puzzles['Moves'][i])
+        # firstMovePolicies.append(polDiffs[0])
+        # avgPolicies.append(sum(polDiffs)/len(polDiffs))
     print(np.corrcoef(avgPolicies, ratings))
-    print(np.corrcoef(firstMovePolicies, ratings))
     lc0.quit()
     # networks = ['/home/julian/chess/nets/small.pb.gz', '/home/julian/chess/nets/medium.pb.gz',  '/home/julian/chess/nets/large.pb.gz',   '/home/julian/chess/nets/veryLarge.pb.gz']
     """
@@ -213,4 +222,4 @@ if __name__ == '__main__':
         lc0.quit()
         print(np.corrcoef(policies, list(puzzles['Rating'])))
     """
-    scatterPlot(avgPolicies, ratings)
+    scatterPlot(avgPolicies, ratings, '../out/puzzlePolicy.png')
