@@ -668,6 +668,7 @@ if __name__ == '__main__':
     # analyseGames(f'../resources/tal1959-1962.pgn', f'../out/games/tal1959-1962-out.pgn', sf, leela, 4, 5000)
     # analyseGames(f'../resources/botvinnik1959-1962.pgn', f'../out/games/botvinnik1959-1962-out.pgn', sf, leela, 4, 5000)
     # analyseGames('../resources/sacGames.pgn', '../out/games/sacs-out.pgn', sf, leela, 4, 5000)
+    analyseGames('../resources/greatGames.pgn', '../out/games/greatGames.pgn', sf, leela, 4, 10000)
     sf.quit()
     leela.quit()
     """
@@ -690,7 +691,7 @@ if __name__ == '__main__':
                 print(k, sum(nv)/len(nv))
     """
     candidates = '../resources/candidates_out.pgn'
-    plotSharpChange(sharpnessChangePerPlayer(candidates))
+    # plotSharpChange(sharpnessChangePerPlayer(candidates))
     pgn = '../resources/naka-nepo.pgn'
     outf = '../out/naka-nepo-30000.pgn'
     # plotWDL(outf)
