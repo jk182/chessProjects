@@ -130,6 +130,7 @@ def readComment(node, wdl: bool, cp: bool) -> tuple:
     wdlList = [ int(w) for w in sp[0].replace('[', '').replace(']', '').strip().split(',') ]
     return (wdlList, int(float(sp[1])))
 
+
 def modifyFEN(fen: str) -> str:
     """
     This function takes a standard FEN string and removes the halfmove clock and the fullmove number
@@ -151,5 +152,5 @@ def getNumberOfGames(fen: str) -> int:
     db = '/home/julian/chess/database/gameDB/novelties'
     output = str(subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout)
     print(output)
-    games = re.findall('\d+', output)[0]
+    games = re.findall(r'\d+', output)[0]
     return int(games)
