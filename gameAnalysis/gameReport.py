@@ -54,8 +54,10 @@ def plotWDL(scores: list, filename: str = None):
     d = [ wdl[1]/1000 for wdl in wdls ]
     l = [ wdl[2]/1000 for wdl in wdls ]
 
-    fig, ax = genFigure(title="WDL Plot", xLabel="Move Number", yLabel="Probability")
+    fig, ax = genFigure(title="WDL Plot", xLabel="Move Number", yLabel="Win Probability")
     plt.xlim(0, len(wdls)-1)
+    ax.set_xticks([i for i in range(0, len(wdls), 20)])
+    ax.set_xticklabels([i//2 for i in range(0, len(wdls), 20)])
     plt.ylim(0,1)
     ax.stackplot(range(len(wdls)), np.vstack([w, d, l]), colors=colors, edgecolor='grey')
 
@@ -99,8 +101,8 @@ def plotSharpnessChange(scores: list, filename: str = None):
     black = sharpChange['black']
 
     fig, ax = genFigure(title='Sharpness Change', xLabel='Move Number', yLabel='Sharpness Change')
-    ax.plot(range(1, len(white)+1), white, color='#f8a978', label='White sharpness change')
-    ax.plot(range(1, len(black)+1), black, color='#111111', label='Black sharpness change')
+    ax.plot(range(1, len(white)+1), white, color='#f8a978', label='Carlsen sharpness change')
+    ax.plot(range(1, len(black)+1), black, color='#111111', label='Nepo sharpness change')
     plt.axhline(0, color='black', linewidth=0.5)
     ax.set_xlim(1, len(white)+1)
     ax.legend()
@@ -111,14 +113,69 @@ def plotSharpnessChange(scores: list, filename: str = None):
         plt.show()
 
 
+def getInaccMistakesBlunders(scores: list) -> dict:
+    imb = {'white': [0, 0, 0], 'black': [0, 0, 0]}
+    cutOffs = (10, 15, 20)
+    lastWP = None
+
+    for ply, (wdl, cp) in enumerate(scores):
+        winP = functions.winP(cp)
+        if not lastWP:
+            lastWP = winP
+            continue
+
+        if ply % 2 == 0:
+            diff = lastWP - winP
+            for i in range(len(cutOffs)):
+                j = len(cutOffs) - i - 1
+                if diff >= cutOffs[j]:
+                    imb['white'][j] += 1
+                    break
+        else:
+            diff = (100-lastWP) - (100-winP)
+            for i in range(len(cutOffs)):
+                j = len(cutOffs) - i - 1
+                if diff >= cutOffs[j]:
+                    imb['black'][j] += 1
+                    break
+
+        lastWP = winP
+    return imb
+
+
+def getMoveAccuracies(scores: list) -> dict:
+    accuracies = {'white': list(), 'black': list()}
+    lastWP = None
+
+    for ply, (wdl, cp) in enumerate(scores):
+        winP = functions.winP(cp)
+        if not lastWP:
+            lastWP = winP
+            continue
+
+        if ply % 2 == 0:
+            accuracies['white'].append(functions.accuracy(lastWP, winP))
+        else:
+            accuracies['black'].append(functions.accuracy(100-lastWP, 100-winP))
+        lastWP = winP
+
+    return accuracies
+
+
+
 if __name__ == '__main__':
     pgn = '../out/games/greatGames.pgn'
+    gamePGN = '../out/games/carlsenNepo.pgn'
     comments = getComments(pgn)
     carlsenNepo = comments[1]
-    # plotWDL(carlsenNepo)
-    plotSharpnessChange(carlsenNepo)
-    pa.plotPieceActivity(pgn)
-    heatmapDataW = heatmap.getAllPieceData(pgn, chess.WHITE)
-    heatmapDataB = heatmap.getAllPieceData(pgn, chess.BLACK)
-    heatmap.plotPieceHeatmaps(heatmapDataW, chess.WHITE)
-    heatmap.plotPieceHeatmaps(heatmapDataB, chess.BLACK)
+
+    print(getInaccMistakesBlunders(carlsenNepo))
+    for side, acc in getMoveAccuracies(carlsenNepo).items():
+        print(sum(acc)/len(acc))
+    plotWDL(carlsenNepo, filename='../out/carlsenNepoWDL.png')
+    plotSharpnessChange(carlsenNepo, filename='../out/carlsenNepoSharp.png')
+    pa.plotPieceActivity(gamePGN, filename='../out/carlsenNepoAct.png')
+    heatmapDataW = heatmap.getAllPieceData(gamePGN, chess.WHITE)
+    heatmapDataB = heatmap.getAllPieceData(gamePGN, chess.BLACK)
+    heatmap.plotPieceHeatmaps(heatmapDataW, chess.WHITE, filename='carlsenNepoHeatW')
+    heatmap.plotPieceHeatmaps(heatmapDataB, chess.BLACK, filename='carlsenNepoHeatB')
