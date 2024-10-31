@@ -1,6 +1,11 @@
 import tournamentReport
 import matplotlib.pyplot as plt
 import chess
+import analysis
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
 
 
 def getPlayerScores(pgnPaths: list, playerName: str) -> list:
@@ -108,6 +113,7 @@ def plotBarChart(data: list, xlabels: list, ylabel: str, title: str, legend: lis
 
     ax.legend()
     plt.title(title)
+    plt.axhline(0, color='black', linewidth=0.5)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
     if filename:
@@ -140,6 +146,29 @@ def getInaccMistakesBlunders(pgnPaths: list, playerName: str, perMoves: int = 40
     return imb
 
 
+def getAvgSharpness(pgnPaths: list) -> list:
+    """
+    This calculates the average sharpness of all positions in the given PGNs
+    pgnPaths: list
+        Paths to the PGN files to analyse
+    return -> list
+        Average sharpnesses of the games
+    """
+    sharp = list()
+    for pgnPath in pgnPaths:
+        pgnSharp = list()
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                node = game
+                while not node.is_end():
+                    node = node.variations[0]
+                    if node.comment:
+                        wdl = functions.readComment(node, True, True)[0]
+                        pgnSharp.append(functions.sharpnessLC0(wdl))
+        sharp.append(sum(pgnSharp)/len(pgnSharp))
+    return sharp
+
+
 if __name__ == '__main__':
     # Ding games
     name = 'Ding Liren'
@@ -161,10 +190,19 @@ if __name__ == '__main__':
     better = getBetterWorseGames(games, name, False)
     # plotBarChart(better, xlabels, 'Relative number of games', 'Percentage of better and won games', ['Percentage of better games', 'Percentage of won games'])
     worse = getBetterWorseGames(games, name, True)
-    # plotBarChart(worse, xlabels, 'Relative number of games', 'Percentage of worse and lost games', ['Percentage of worse games', 'Percentage of lost games'], colors=['#f8a978', '#ff6961'])
+    # plotBarChart(worse, xlabels, 'Relative number of games', 'Percentage of worse and lost games', ['Percentage of worse games', 'Percentage of lost games'], colors=['#f8a978', '#fa5a5a'])
     
     # TODO: how to visualise the accuracy distribution best?
     # tournamentReport.plotMultAccDistributions(games, [name, name, name], xlabels)
 
     imb = getInaccMistakesBlunders(games, name)
-    print(imb)
+    # plotBarChart(imb, xlabels, 'Inaccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'blunders'])
+
+    sharpChange = list()
+    avgSC = list()
+    print(getAvgSharpness(games))
+    for game in games:
+        sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
+        avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
+
+    plotBarChart(avgSC, xlabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'])

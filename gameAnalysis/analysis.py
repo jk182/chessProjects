@@ -291,7 +291,6 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
     return sharpPlayer
 
 
-
 def findMistakes(pgnPath: str) -> list:
     """
     This function takes a PGN with WDL evaluations and finds the mistakes in the game

@@ -10,6 +10,7 @@ import pandas as pd
 import glob
 import os, sys
 import scipy.stats as stats
+import collections
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
@@ -577,6 +578,14 @@ def plotMultAccDistributions(pgnPaths: list, playerNames: list, labels: list, fi
         accDis = analysis.getAccuracyDistributionPlayer(pgn, playerNames[i])
         accDis = normaliseAccDistribution(accDis)
         ax.bar(accDis.keys(), accDis.values(), width=1, color=colors[i], edgecolor='black', linewidth=0.5, label=labels[i], alpha=0.5)
+        # Plotting the distributions as lines
+        """
+        for j in range(100):
+            if j not in accDis.keys():
+                accDis[j] = 0
+        ordered = collections.OrderedDict(sorted(accDis.items()))
+        ax.plot(ordered.keys(), ordered.values(), color=colors[i], label=labels[i])
+        """
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.title('Accuracy Distribution')
     ax.legend()
