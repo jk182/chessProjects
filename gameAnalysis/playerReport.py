@@ -169,6 +169,29 @@ def getAvgSharpness(pgnPaths: list) -> list:
     return sharp
 
 
+def getOppRatings(pgnPaths: list, playerName: str) -> list:
+    """
+    This function calculates the average rating of the opponents in the PGNs
+    pgnPaths: list
+        The paths to the PGN files
+    playerName: str
+        The name of the player for whom the opponents rating will be calculated
+    return -> list
+        The average opponents rating for each PGN
+    """
+    avgRatings = list()
+    for pgnPath in pgnPaths:
+        pgnRating = list()
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if playerName == game.headers['White']:
+                    pgnRating.append(int(game.headers['BlackElo']))
+                elif playerName == game.headers['Black']:
+                    pgnRating.append(int(game.headers['WhiteElo']))
+        avgRatings.append(sum(pgnRating)/len(pgnRating))
+    return avgRatings
+
+
 if __name__ == '__main__':
     # Ding games
     name = 'Ding Liren'
@@ -205,4 +228,5 @@ if __name__ == '__main__':
         sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
         avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
 
-    plotBarChart(avgSC, xlabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'])
+    # plotBarChart(avgSC, xlabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'])
+    print(getOppRatings(games, name))
