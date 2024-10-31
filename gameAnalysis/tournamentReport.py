@@ -352,7 +352,6 @@ def getInaccMistakesBlunders(pgnPath: str) -> dict:
                         p = w
                     diff = -wpA + wpB
                     if diff > bounds[2]:
-                        print(p, w, b)
                         games[p][2] += 1
                     elif diff > bounds[1]:
                         games[p][1] += 1
@@ -556,17 +555,18 @@ def normaliseAccDistribution(accDis: dict) -> dict:
     return norm
 
 
-def plotMultAccDistributions(pgnPaths: list, filename: str = None):
+def plotMultAccDistributions(pgnPaths: list, playerNames: list, labels: list, filename: str = None):
     """
     This function plots multiple accuracy distribution graphs in one graph
     pgnPaths: list
         The path to the PGN files
+    playerNames: list
+        The names of the player to look at in each PGN
     filename: str
         The name of the file to which the graph should be saved.
         If no name is specified, the graph will be shown instead of saved.
     """
     colors = ['#689bf2', '#f8a978', '#ff87ca', '#beadfa']
-    labels = ['Arjun\nClosed', 'Arjun\nOpen']
 
     fig, ax = plt.subplots()
     ax.set_facecolor('#e6f7f2')
@@ -574,10 +574,9 @@ def plotMultAccDistributions(pgnPaths: list, filename: str = None):
     plt.xlim(0, 100)
     ax.invert_xaxis()
     for i, pgn in enumerate(pgnPaths):
-        # TODO: handle the players
-        accDis = analysis.getAccuracyDistributionPlayer(pgn, 'Erigaisi, Arjun')
+        accDis = analysis.getAccuracyDistributionPlayer(pgn, playerNames[i])
         accDis = normaliseAccDistribution(accDis)
-        ax.bar(accDis.keys(), accDis.values(), width=1, color=colors[i], edgecolor='black', linewidth='0.5', label=labels[i], alpha=0.5)
+        ax.bar(accDis.keys(), accDis.values(), width=1, color=colors[i], edgecolor='black', linewidth=0.5, label=labels[i], alpha=0.5)
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.title('Accuracy Distribution')
     ax.legend()
@@ -617,6 +616,17 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
 
 
 if __name__ == '__main__':
+    # Ding games
+    preCovid = '../out/games/dingPreCovid-out.pgn'
+    covid = '../out/games/dingCovid-out.pgn'
+    postWC = '../out/games/dingPostWC-out.pgn'
+    
+    for pgn in [preCovid, covid, postWC]:
+        scores = getPlayerScores(pgn)
+        print(scores['Ding Liren'])
+
+    """
+    # Candidates data
     t = '../out/candidates2024-WDL+CP.pgn'
     nwc = '../out/games/norwayChessClassical.pgn'
     nwcW = '../out/games/norwayChessWomenClassical.pgn'
@@ -658,6 +668,7 @@ if __name__ == '__main__':
                'Humpy Koneru': [6, 3, 0.5, 0.5],
                'Cramling': [4, 3, 0, 1]}
     plotScoresArmageddon(scoresW, '../out/NorwayChessWomenArmScores.png')
+    """
 
     """
     arjunC = '../out/arjun_closed.pgn'
