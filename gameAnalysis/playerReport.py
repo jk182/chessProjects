@@ -204,22 +204,24 @@ if __name__ == '__main__':
     scoreColors = ['#f8a978', '#FFFFFF', '#111111']
     scoreLabels = ['Total Score', 'Score with White', 'Score with Black']
     scores = getPlayerScores(games, name)
+    print(scores)
     normalisedScores = list()
     for score in scores:
         normalisedScores.append([score[2*i+1]/score[2*i] for i in range(3)])
-    # plotBarChart(normalisedScores, xlabels, 'Score', "Ding's game scores", scoreLabels, colors=scoreColors)
+    # plotBarChart(normalisedScores, xlabels, 'Score', "Ding's game scores", scoreLabels, colors=scoreColors, filename='../out/dingGames/scores.png')
     # plotPlayerScores(scores, xlabels, "Ding's scores")
 
     better = getBetterWorseGames(games, name, False)
-    # plotBarChart(better, xlabels, 'Relative number of games', 'Percentage of better and won games', ['Percentage of better games', 'Percentage of won games'])
+    # plotBarChart(better, xlabels, 'Relative number of games', 'Relative number of better and won games', ['better games', 'won games'], filename='../out/dingGames/better.png')
     worse = getBetterWorseGames(games, name, True)
-    # plotBarChart(worse, xlabels, 'Relative number of games', 'Percentage of worse and lost games', ['Percentage of worse games', 'Percentage of lost games'], colors=['#f8a978', '#fa5a5a'])
+    # plotBarChart(worse, xlabels, 'Relative number of games', 'Relative number of worse and lost games', ['worse games', 'lost games'], colors=['#f8a978', '#fa5a5a'], filename='../out/dingGames/worse.png')
     
     # TODO: how to visualise the accuracy distribution best?
     # tournamentReport.plotMultAccDistributions(games, [name, name, name], xlabels)
 
     imb = getInaccMistakesBlunders(games, name)
-    # plotBarChart(imb, xlabels, 'Inaccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'blunders'])
+    imbColors = ['#689bf2', '#f8a978', '#fa5a5a']
+    # plotBarChart(imb, xlabels, 'Relative number of naccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors, filename='../out/dingGames/imb.png')
 
     sharpChange = list()
     avgSC = list()
@@ -228,5 +230,5 @@ if __name__ == '__main__':
         sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
         avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
 
-    # plotBarChart(avgSC, xlabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'])
+    # plotBarChart(avgSC, xlabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'], filename='../out/dingGames/sharpChange.png')
     print(getOppRatings(games, name))
