@@ -192,6 +192,34 @@ def getOppRatings(pgnPaths: list, playerName: str) -> list:
     return avgRatings
 
 
+def generatePlayerReport(name: str, pgns: list, xLabels: list, filename: str = None):
+    if not filename:
+        scoreColors = ['#f8a978', '#FFFFFF', '#111111']
+        scoreLabels = ['Total Score', 'Score with White', 'Score with Black']
+        scores = getPlayerScores(games, name)
+        normalisedScores = list()
+        for score in scores:
+            normalisedScores.append([score[2*i+1]/score[2*i] for i in range(3)])
+        plotBarChart(normalisedScores, xLabels, 'Score', f"{name} game scores", scoreLabels, colors=scoreColors)
+
+        better = getBetterWorseGames(games, name, False)
+        plotBarChart(better, xLabels, 'Relative number of games', 'Relative number of better and won games', ['better games', 'won games'])
+        worse = getBetterWorseGames(games, name, True)
+        plotBarChart(worse, xLabels, 'Relative number of games', 'Relative number of worse and lost games', ['worse games', 'lost games'], colors=['#f8a978', '#fa5a5a'])
+
+        imbColors = ['#689bf2', '#f8a978', '#fa5a5a']
+        imb = getInaccMistakesBlunders(games, name)
+        plotBarChart(imb, xLabels, 'Relative number of naccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors)
+
+        sharpChange = list()
+        avgSC = list()
+        for game in games:
+            sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
+            avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
+
+        plotBarChart(avgSC, xLabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'])
+
+
 if __name__ == '__main__':
     # Ding games
     name = 'Ding Liren'
@@ -201,34 +229,9 @@ if __name__ == '__main__':
     postWC = '../out/games/dingPostWC-out.pgn'
     games = [preCovid, covid, postWC]
 
-    scoreColors = ['#f8a978', '#FFFFFF', '#111111']
-    scoreLabels = ['Total Score', 'Score with White', 'Score with Black']
-    scores = getPlayerScores(games, name)
-    print(scores)
-    normalisedScores = list()
-    for score in scores:
-        normalisedScores.append([score[2*i+1]/score[2*i] for i in range(3)])
-    # plotBarChart(normalisedScores, xlabels, 'Score', "Ding's game scores", scoreLabels, colors=scoreColors, filename='../out/dingGames/scores.png')
-    # plotPlayerScores(scores, xlabels, "Ding's scores")
+    # generatePlayerReport(name, games, xlabels)
 
-    better = getBetterWorseGames(games, name, False)
-    # plotBarChart(better, xlabels, 'Relative number of games', 'Relative number of better and won games', ['better games', 'won games'], filename='../out/dingGames/better.png')
-    worse = getBetterWorseGames(games, name, True)
-    # plotBarChart(worse, xlabels, 'Relative number of games', 'Relative number of worse and lost games', ['worse games', 'lost games'], colors=['#f8a978', '#fa5a5a'], filename='../out/dingGames/worse.png')
-    
-    # TODO: how to visualise the accuracy distribution best?
-    # tournamentReport.plotMultAccDistributions(games, [name, name, name], xlabels)
-
-    imb = getInaccMistakesBlunders(games, name)
-    imbColors = ['#689bf2', '#f8a978', '#fa5a5a']
-    # plotBarChart(imb, xlabels, 'Relative number of naccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors, filename='../out/dingGames/imb.png')
-
-    sharpChange = list()
-    avgSC = list()
-    print(getAvgSharpness(games))
-    for game in games:
-        sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
-        avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
-
-    # plotBarChart(avgSC, xlabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'], filename='../out/dingGames/sharpChange.png')
-    print(getOppRatings(games, name))
+    gukesh = 'Gukesh, D'
+    xLabels = ['2019', '2020', '2021', '2022', '2023', '2024']
+    games = ['../out/games/gukesh2019-out.pgn', '../out/games/gukesh2020-out.pgn', '../out/games/gukesh2021-out.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/gukesh2023-out.pgn', '../out/games/gukesh2024-out.pgn']
+    generatePlayerReport(gukesh, games, xLabels)
