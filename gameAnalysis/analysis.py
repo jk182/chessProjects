@@ -667,9 +667,9 @@ if __name__ == '__main__':
     # analyseGames(f'../resources/tal1959-1962.pgn', f'../out/games/tal1959-1962-out.pgn', sf, leela, 4, 5000)
     # analyseGames(f'../resources/botvinnik1959-1962.pgn', f'../out/games/botvinnik1959-1962-out.pgn', sf, leela, 4, 5000)
     # analyseGames('../resources/sacGames.pgn', '../out/games/sacs-out.pgn', sf, leela, 4, 5000)
-    analyseGames('../resources/gukesh2022.pgn', '../out/games/gukesh2022-out.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/gukesh2023.pgn', '../out/games/gukesh2023-out.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/gukesh2024.pgn', '../out/games/gukesh2024-out.pgn', sf, leela, 4, 10000)
+    analyseGames('../resources/gukesh2019.pgn', '../out/games/gukesh2019-out.pgn', sf, leela, 4, 10000)
+    analyseGames('../resources/gukesh2020.pgn', '../out/games/gukesh2020-out.pgn', sf, leela, 4, 10000)
+    analyseGames('../resources/gukesh2021.pgn', '../out/games/gukesh2021-out.pgn', sf, leela, 4, 10000)
     sf.quit()
     leela.quit()
     """
