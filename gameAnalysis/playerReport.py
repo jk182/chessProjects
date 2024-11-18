@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import chess
 import analysis
 import os, sys
+import datetime as dt
+import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
@@ -192,6 +194,127 @@ def getOppRatings(pgnPaths: list, playerName: str) -> list:
     return avgRatings
 
 
+def getPlayerRatings(pgnPaths: list, playerName: str) -> dict:
+    """
+    This function reads the ratings of the specified player in the given PGNs
+    pgnPaths: list
+        Paths to the PGN files
+    playerName: str
+        Name of the player
+    return -> dict:
+        Dictonary indexed by the date and containing the rating at that date as value
+    """
+    ratings = dict()
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                date = game.headers['Date']
+                if playerName == game.headers['White']:
+                    ratings[date] = int(game.headers['WhiteElo'])
+                elif playerName == game.headers['Black']:
+                    ratings[date] = int(game.headers['BlackElo'])
+    return ratings
+
+
+def plotPlayerRatings(ratings: dict, oppData: dict, filename: str = None):
+    """
+    This function plots the ratings of a player given the data from getPlayerRatings and the performance rating
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+
+    # Calculate performance Ratings
+    perfDates = list()
+    perfRatings = list()
+    for k, v in oppData.items():
+        year = int(k[:4])
+        month = int(k[-1])*3 - 1
+        day = 15
+        perfDates.append(dt.datetime(year, month, day))
+        perfRatings.append(v[0]+800*v[1]-400)
+
+    x = [dt.datetime.strptime(d,'%Y.%m.%d').date() for d in ratings.keys()]
+    sratings = [d for _, d in sorted(zip(x, ratings.values()))]
+    ax.plot(sorted(x), sratings, color=colors[0], label='FIDE rating')
+    ax.scatter(perfDates, perfRatings, color=colors[2], label='Performance rating')
+
+    for r in range(2500, 2900, 100):
+        plt.axhline(r, color='black', linewidth=1)
+    for r in range(2550, 2950, 100):
+        plt.axhline(r, color='black', linewidth=0.5)
+
+    plt.xlim(dt.datetime(2019, 1, 1), dt.datetime(2025, 1, 1))
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.legend(loc='upper left')
+    ax.set_ylabel('Rating')
+    plt.title("Gukesh's rating and performance")
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+def getOpponentDataPerQuarter(pgnPaths: list, playerName: str, cutOff400: bool = False) -> dict:
+    """
+    This function calculates data from the opponents of the given player and groups it by quarter
+    cutOff400: bool
+        If this is set, the opponent rating is the maximum of their rating and the player rating - 400 (for performance rating calculations)
+    """
+    data = dict()
+    ratings = dict()
+    score = dict()
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if playerName == game.headers['White']:
+                    rating = int(game.headers['BlackElo'])
+                    if cutOff400:
+                        rating = max(rating, int(game.headers['WhiteElo'])-400)
+                elif playerName == game.headers['Black']:
+                    rating = int(game.headers['WhiteElo'])
+                    if cutOff400:
+                        rating = max(rating, int(game.headers['BlackElo'])-400)
+                else:
+                    continue
+                if '1/2' in (r := game.headers['Result']):
+                    s = 0.5
+                elif r == '1-0':
+                    if playerName == game.headers['White']:
+                        s = 1
+                    else:
+                        s = 0
+                elif r == '0-1':
+                    if playerName == game.headers['White']:
+                        s = 0
+                    else:
+                        s = 1
+                else:
+                    continue
+
+                date = dt.datetime.strptime(game.headers['Date'], '%Y.%m.%d').date()
+                quarter = pd.Timestamp(date).quarter
+                key = f'{date.year}Q{quarter}'
+                
+                if key in ratings.keys():
+                    ratings[key].append(rating)
+                else:
+                    ratings[key] = [rating]
+                
+                if key in score.keys():
+                    score[key][0] += s
+                    score[key][1] += 1
+                else:
+                    score[key] = [s, 1]
+
+    for k in ratings.keys():
+        data[k] = list()
+        data[k].append(sum(ratings[k])/len(ratings[k]))
+        data[k].append(score[k][0]/score[k][1])
+        data[k].append(score[k][1])
+    return data
+
+
 def generatePlayerReport(name: str, pgns: list, xLabels: list, filename: str = None):
     if not filename:
         scoreColors = ['#f8a978', '#FFFFFF', '#111111']
@@ -209,7 +332,7 @@ def generatePlayerReport(name: str, pgns: list, xLabels: list, filename: str = N
 
         imbColors = ['#689bf2', '#f8a978', '#fa5a5a']
         imb = getInaccMistakesBlunders(games, name)
-        plotBarChart(imb, xLabels, 'Relative number of naccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors)
+        plotBarChart(imb, xLabels, 'Relative number of inaccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors)
 
         sharpChange = list()
         avgSC = list()
@@ -234,4 +357,9 @@ if __name__ == '__main__':
     gukesh = 'Gukesh, D'
     xLabels = ['2019', '2020', '2021', '2022', '2023', '2024']
     games = ['../out/games/gukesh2019-out.pgn', '../out/games/gukesh2020-out.pgn', '../out/games/gukesh2021-out.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/gukesh2023-out.pgn', '../out/games/gukesh2024-out.pgn']
-    generatePlayerReport(gukesh, games, xLabels)
+    print(getPlayerScores(games, gukesh))
+    print(getOppRatings(games, gukesh))
+    # generatePlayerReport(gukesh, games, xLabels)
+    ratings = getPlayerRatings(games, gukesh)
+    oppData = getOpponentDataPerQuarter(games, gukesh, True)
+    plotPlayerRatings(ratings, oppData)
