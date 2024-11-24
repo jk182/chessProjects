@@ -255,6 +255,47 @@ def plotPlayerRatings(ratings: dict, oppData: dict, filename: str = None):
         plt.show()
 
 
+def getAccuracies(pgnPaths: list, playerName: str) -> list:
+    accuracies = list()
+    for pgnPath in pgnPaths:
+        acc = 0
+        moves = 0
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if playerName == game.headers['White']:
+                    pTurn = True
+                elif playerName == game.headers['Black']:
+                    pTurn = False
+                else:
+                    continue
+
+                node = game
+                cpB = None
+                
+                while not node.is_end():
+                    if functions.readComment(node, True, True):
+                        sharp = functions.sharpnessLC0(functions.readComment(node, True, True)[0])
+                    node = node.variations[0]
+                    if not functions.readComment(node, True, True):
+                        continue
+                    cpA = functions.readComment(node, True, True)[1]
+                    if not cpB:
+                        cpB = cpA
+                        continue
+
+                    if node.turn() != pTurn:
+                        if node.turn():
+                            wpB = functions.winP(cpB * -1)
+                            wpA = functions.winP(cpA * -1)
+                        else:
+                            wpB = functions.winP(cpB)
+                            wpA = functions.winP(cpA)
+                        acc += min(100, functions.accuracy(wpB, wpA))
+                        moves += 1
+        accuracies.append(float(round(acc/moves, 2)))
+    return accuracies
+
+
 def getOpponentDataPerQuarter(pgnPaths: list, playerName: str, cutOff400: bool = False) -> dict:
     """
     This function calculates data from the opponents of the given player and groups it by quarter
@@ -316,30 +357,38 @@ def getOpponentDataPerQuarter(pgnPaths: list, playerName: str, cutOff400: bool =
 
 
 def generatePlayerReport(name: str, pgns: list, xLabels: list, filename: str = None):
-    if not filename:
-        scoreColors = ['#f8a978', '#FFFFFF', '#111111']
-        scoreLabels = ['Total Score', 'Score with White', 'Score with Black']
-        scores = getPlayerScores(games, name)
-        normalisedScores = list()
-        for score in scores:
-            normalisedScores.append([score[2*i+1]/score[2*i] for i in range(3)])
-        plotBarChart(normalisedScores, xLabels, 'Score', f"{name} game scores", scoreLabels, colors=scoreColors)
+    """
+    Filename format: directory without file extension (e.g. ../out/gukesh)
+    """
+    scoreColors = ['#f8a978', '#FFFFFF', '#111111']
+    scoreLabels = ['Total Score', 'Score with White', 'Score with Black']
+    scores = getPlayerScores(games, name)
+    normalisedScores = list()
+    for score in scores:
+        normalisedScores.append([score[2*i+1]/score[2*i] for i in range(3)])
+    better = getBetterWorseGames(games, name, False)
+    worse = getBetterWorseGames(games, name, True)
 
-        better = getBetterWorseGames(games, name, False)
+    imbColors = ['#689bf2', '#f8a978', '#fa5a5a']
+    imb = getInaccMistakesBlunders(games, name)
+
+    sharpChange = list()
+    avgSC = list()
+    for game in games:
+        sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
+        avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
+    if filename:
+        plotBarChart(normalisedScores, xLabels, 'Score', f"{name} game scores", scoreLabels, colors=scoreColors, filename=f'{filename}_scores.png')
+        plotBarChart(better, xLabels, 'Relative number of games', 'Relative number of better and won games', ['better games', 'won games'], filename=f'{filename}_better.png')
+        plotBarChart(worse, xLabels, 'Relative number of games', 'Relative number of worse and lost games', ['worse games', 'lost games'], colors=['#f8a978', '#fa5a5a'], filename=f'{filename}_worse.png')
+        plotBarChart(imb, xLabels, 'Relative number of inaccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors, filename=f'{filename}_imb.png')
+        plotBarChart(avgSC, xLabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'], filename=f'{filename}_sharp.png')
+    else: 
+        plotBarChart(normalisedScores, xLabels, 'Score', f"{name} game scores", scoreLabels, colors=scoreColors)
         plotBarChart(better, xLabels, 'Relative number of games', 'Relative number of better and won games', ['better games', 'won games'])
-        worse = getBetterWorseGames(games, name, True)
         plotBarChart(worse, xLabels, 'Relative number of games', 'Relative number of worse and lost games', ['worse games', 'lost games'], colors=['#f8a978', '#fa5a5a'])
 
-        imbColors = ['#689bf2', '#f8a978', '#fa5a5a']
-        imb = getInaccMistakesBlunders(games, name)
         plotBarChart(imb, xLabels, 'Relative number of inaccuracies, mistakes, blunders per 40 moves', 'Inaccuracies, mistakes, blunders per 40 moves', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=imbColors)
-
-        sharpChange = list()
-        avgSC = list()
-        for game in games:
-            sharpChange.append(analysis.sharpnessChangePerPlayer(game)[name])
-            avgSC.append([sum(sharpChange[-1])/len(sharpChange[-1])])
-
         plotBarChart(avgSC, xLabels, 'Average sharpness change per move', 'Average sharpness change per move', ['Avg sharp change'], colors=['#fa5a5a'])
 
 
@@ -359,7 +408,9 @@ if __name__ == '__main__':
     games = ['../out/games/gukesh2019-out.pgn', '../out/games/gukesh2020-out.pgn', '../out/games/gukesh2021-out.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/gukesh2023-out.pgn', '../out/games/gukesh2024-out.pgn']
     print(getPlayerScores(games, gukesh))
     print(getOppRatings(games, gukesh))
-    # generatePlayerReport(gukesh, games, xLabels)
+    # generatePlayerReport(gukesh, games, xLabels, '../out/gukesh')
+    acc = getAccuracies(games, gukesh)
+    # plotBarChart([[a] for a in acc], xLabels, 'Accuracy', "Gukesh's average move accuracy", ['Move Accuracy'], filename='../out/gukesh-accuracy.png')
     ratings = getPlayerRatings(games, gukesh)
     oppData = getOpponentDataPerQuarter(games, gukesh, True)
-    plotPlayerRatings(ratings, oppData)
+    plotPlayerRatings(ratings, oppData, filename='../out/gukesh_ratings.png')
