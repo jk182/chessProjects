@@ -101,8 +101,8 @@ def plotSharpnessChange(scores: list, filename: str = None):
     black = sharpChange['black']
 
     fig, ax = genFigure(title='Sharpness Change', xLabel='Move Number', yLabel='Sharpness Change')
-    ax.plot(range(1, len(white)+1), white, color='#f8a978', label='Carlsen sharpness change')
-    ax.plot(range(1, len(black)+1), black, color='#111111', label='Nepo sharpness change')
+    ax.plot(range(1, len(white)+1), white, color='#f8a978', label='White sharpness change')
+    ax.plot(range(1, len(black)+1), black, color='#111111', label='Black sharpness change')
     plt.axhline(0, color='black', linewidth=0.5)
     ax.set_xlim(1, len(white)+1)
     ax.legend()
@@ -162,8 +162,17 @@ def getMoveAccuracies(scores: list) -> dict:
     return accuracies
 
 
+def generateGameReport(pgnPath: str):
+    comments = getComments(pgnPath)
+    for c in comments:
+        plotWDL(c, filename='../out/dingGukesh/R1WDL.png')
+        plotSharpnessChange(c, filename='../out/dingGukesh/R1Sharp.png')
+        pa.plotPieceActivity(pgnPath, filename='../out/dingGukesh/R1Activity.png')
+
 
 if __name__ == '__main__':
+    generateGameReport('../out/games/ding-gukesh-out.pgn')
+    """
     pgn = '../out/games/greatGames.pgn'
     gamePGN = '../out/games/carlsenNepo.pgn'
     comments = getComments(pgn)
@@ -179,3 +188,4 @@ if __name__ == '__main__':
     heatmapDataB = heatmap.getAllPieceData(gamePGN, chess.BLACK)
     heatmap.plotPieceHeatmaps(heatmapDataW, chess.WHITE, filename='carlsenNepoHeatW')
     heatmap.plotPieceHeatmaps(heatmapDataB, chess.BLACK, filename='carlsenNepoHeatB')
+    """
