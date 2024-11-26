@@ -114,6 +114,13 @@ def plotSharpnessChange(scores: list, filename: str = None):
 
 
 def getInaccMistakesBlunders(scores: list) -> dict:
+    """
+    This function calculates the number of inaccuracies, mistakes and blunders given the CP scores
+    scores: list
+        The CP scores of a game
+    return -> dict
+        Dictionary indexed by color, containing a list [inaccuracies, mistakes, blunders]
+    """
     imb = {'white': [0, 0, 0], 'black': [0, 0, 0]}
     cutOffs = (10, 15, 20)
     lastWP = None
@@ -144,6 +151,13 @@ def getInaccMistakesBlunders(scores: list) -> dict:
 
 
 def getMoveAccuracies(scores: list) -> dict:
+    """
+    This function calculates the move accuracies given the scores of a game
+    scores: list
+        The CP scores from a game
+    return -> dict
+        Dictionary index by color with the move accuracies
+    """
     accuracies = {'white': list(), 'black': list()}
     lastWP = None
 
@@ -162,16 +176,53 @@ def getMoveAccuracies(scores: list) -> dict:
     return accuracies
 
 
-def generateGameReport(pgnPath: str):
+def getClockTimes(pgnPaths: str) -> dict:
+    """
+    This function gets the clocktimes for each move for Black and White
+    pgnPaths: str
+        Path to the PGN file which contains the clock times
+    return -> dict
+        A dictionary indexed by color and containing a list with the clocktimes
+    """
+    clock = {'white': list(), 'black': list()}
+    with open(pgnPath, 'r') as pgn:
+        while (game := chess.pgn.read_game(pgn)):
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+                time = node.clock()
+                if not time:
+                    break
+
+                if not node.turn():
+                    clock['white'].append(time)
+                else:
+                    clock['black'].append(time)
+    return clock
+
+
+def generateGameReport(pgnPath: str, filename: str = None):
+    """
+    This function generates a game report for the given PGN file
+    pgnPath: str
+        The path to the PGN file
+    filename: str
+        Template for the filenames of the graphs. If no name is given, the graphs will be shown instead of saved.
+    """
     comments = getComments(pgnPath)
     for c in comments:
-        plotWDL(c, filename='../out/dingGukesh/R1WDL.png')
-        plotSharpnessChange(c, filename='../out/dingGukesh/R1Sharp.png')
-        pa.plotPieceActivity(pgnPath, filename='../out/dingGukesh/R1Activity.png')
+        if filename:
+            plotWDL(c, filename=f'{filename}WDL.png')
+            plotSharpnessChange(c, filename=f'{filename}Sharp.png')
+            pa.plotPieceActivity(pgnPath, filename=f'{filename}Activity.png')
+        else:
+            plotWDL(c)
+            plotSharpnessChange(c)
+            pa.plotPieceActivity(pgnPath)
 
 
 if __name__ == '__main__':
-    generateGameReport('../out/games/ding-gukesh-out.pgn')
+    generateGameReport('../out/games/ding-gukesh-out.pgn', '../out/dingGukesh/R1')
     """
     pgn = '../out/games/greatGames.pgn'
     gamePGN = '../out/games/carlsenNepo.pgn'
