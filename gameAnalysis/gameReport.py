@@ -176,10 +176,10 @@ def getMoveAccuracies(scores: list) -> dict:
     return accuracies
 
 
-def getClockTimes(pgnPaths: str) -> dict:
+def getClockTimes(pgnPath: str) -> dict:
     """
     This function gets the clocktimes for each move for Black and White
-    pgnPaths: str
+    pgnPath: str
         Path to the PGN file which contains the clock times
     return -> dict
         A dictionary indexed by color and containing a list with the clocktimes
@@ -190,7 +190,7 @@ def getClockTimes(pgnPaths: str) -> dict:
             node = game
             while not node.is_end():
                 node = node.variations[0]
-                time = node.clock()
+                time = int(node.clock())
                 if not time:
                     break
 
@@ -198,7 +198,36 @@ def getClockTimes(pgnPaths: str) -> dict:
                     clock['white'].append(time)
                 else:
                     clock['black'].append(time)
+            # TODO
+            break
     return clock
+
+
+def plotLineGraph(data: dict(), yLabel: str, labels: list, title: str, filename: str = None):
+    """
+    This plots a line graph for both colors where the number of moves are on the x-axis
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.set_facecolor('#e6f7f2')
+    ax.set_xlabel('Move number')
+    ax.set_ylabel(yLabel)
+    plt.title(title)
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    
+    white = data['white']
+    black = data['black']
+
+    ax.plot(range(1, len(white)+1), white, color='#f8a978', label=labels[0])
+    ax.plot(range(1, len(black)+1), black, color='#111111', label=labels[1])
+    plt.axhline(0, color='black', linewidth=0.5)
+    ax.set_xlim(1, len(white)+1)
+    ax.legend()
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
 
 
 def generateGameReport(pgnPath: str, filename: str = None):
@@ -222,7 +251,10 @@ def generateGameReport(pgnPath: str, filename: str = None):
 
 
 if __name__ == '__main__':
-    generateGameReport('../out/games/ding-gukesh-out.pgn', '../out/dingGukesh/R1')
+    # generateGameReport('../out/games/ding-gukesh-out.pgn')
+    clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
+    print(clocks)
+    plotLineGraph(clocks, 'Remaining time', ['White time', 'Black time'], 'Clock time')
     """
     pgn = '../out/games/greatGames.pgn'
     gamePGN = '../out/games/carlsenNepo.pgn'
