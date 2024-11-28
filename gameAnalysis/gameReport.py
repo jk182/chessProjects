@@ -44,7 +44,7 @@ def getComments(pgnPath: str) -> list:
     return scores
 
 
-def plotWDL(scores: list, filename: str = None):
+def plotWDL(scores: list, players: tuple = ('White', 'Black'), filename: str = None):
     """
     Plots a WDL graph given the scores from a game
     """
@@ -59,7 +59,14 @@ def plotWDL(scores: list, filename: str = None):
     ax.set_xticks([i for i in range(0, len(wdls), 20)])
     ax.set_xticklabels([i//2 for i in range(0, len(wdls), 20)])
     plt.ylim(0,1)
-    ax.stackplot(range(len(wdls)), np.vstack([w, d, l]), colors=colors, edgecolor='grey')
+    labels = [f"{players[0]} win percentage", "Draw percentage", f"{players[1]} win percentage"]
+    ax.stackplot(range(len(wdls)), np.vstack([w, d, l]), colors=colors, edgecolor='grey', labels=labels)
+
+    plt.subplots_adjust(bottom=0.07, top=0.95, left=0.07, right=0.97)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), fancybox=True, shadow=True, ncol=5)
 
     if filename:
         plt.savefig(filename, dpi=400)
@@ -203,7 +210,7 @@ def getClockTimes(pgnPath: str) -> dict:
     return clock
 
 
-def plotLineGraph(data: dict(), yLabel: str, labels: list, title: str, filename: str = None):
+def plotTimes(data: dict(), title: str, startTime: int = 7200, players: tuple = ('White', 'Black'), filename: str = None):
     """
     This plots a line graph for both colors where the number of moves are on the x-axis
     """
@@ -211,17 +218,19 @@ def plotLineGraph(data: dict(), yLabel: str, labels: list, title: str, filename:
 
     ax.set_facecolor('#e6f7f2')
     ax.set_xlabel('Move number')
-    ax.set_ylabel(yLabel)
+    ax.set_ylabel('Time left in minutes')
     plt.title(title)
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     
     white = data['white']
     black = data['black']
 
-    ax.plot(range(1, len(white)+1), white, color='#f8a978', label=labels[0])
-    ax.plot(range(1, len(black)+1), black, color='#111111', label=labels[1])
+    ax.plot(range(1, len(white)+1), white, color='#f8a978', label=f"{players[0]}'s time left")
+    ax.plot(range(1, len(black)+1), black, color='#111111', label=f"{players[1]}'s time left")
     plt.axhline(0, color='black', linewidth=0.5)
     ax.set_xlim(1, len(white)+1)
+    ax.set_ylim(0, startTime*1.05)
+    ax.set_yticks([int(i) for i in range(0, startTime+1, int(startTime/6))], [int(i/60) for i in range(0, startTime+1, int(startTime/6))])
     ax.legend()
 
     if filename:
@@ -254,7 +263,9 @@ if __name__ == '__main__':
     # generateGameReport('../out/games/ding-gukesh-out.pgn')
     clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
     print(clocks)
-    plotLineGraph(clocks, 'Remaining time', ['White time', 'Black time'], 'Clock time')
+    # plotTimes(clocks, 'Remaining time', players=('Gukesh', 'Ding'))
+    c = getComments('../out/games/ding-gukesh-out.pgn')[0]
+    plotWDL(c, players=('Gukesh', 'Ding'))
     """
     pgn = '../out/games/greatGames.pgn'
     gamePGN = '../out/games/carlsenNepo.pgn'

@@ -51,8 +51,11 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
     """
     white = list()
     black = list()
+    players = list()
     with open(pgnPath, 'r') as pgn:
         game = chess.pgn.read_game(pgn)
+        players.append(game.headers['White'])
+        players.append(game.headers['Black'])
         board = game.board()
         for move in game.mainline_moves():
             board.push(move)
@@ -61,8 +64,8 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
             black.append(activity[1])
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(range(1, len(white)+1), white, color='#f8a978', label='White piece activity')
-    ax.plot(range(1, len(black)+1), black, color='#111111', label='Black piece activity')
+    ax.plot(range(1, len(white)+1), white, color='#f8a978', label=f"{players[0]}'s piece activity")
+    ax.plot(range(1, len(black)+1), black, color='#111111', label=f"{players[1]}'sBlack piece activity")
 
     ax.set_facecolor('#e6f7f2')
     ax.set_xlabel('Move number')
