@@ -44,7 +44,28 @@ def getComments(pgnPath: str) -> list:
     return scores
 
 
-def plotWDL(scores: list, players: tuple = ('White', 'Black'), filename: str = None):
+def getPlayers(pgnPath: str) -> list:
+    """
+    This function reads the player names from a PGN file
+    """
+    players = list()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            w = game.headers['White']
+            b = game.headers['Black']
+            if ',' in w:
+                w = w.split(',')[0]
+            elif ' ' in w:
+                w = w.split(' ')[0]
+            if ',' in b:
+                b = b.split(',')[0]
+            elif ' ' in b:
+                b = b.split(' ')[0]
+            players.append((w, b))
+    return players
+
+
+def plotWDL(scores: list, title: str = 'WDL Plot', players: tuple = ('White', 'Black'), filename: str = None):
     """
     Plots a WDL graph given the scores from a game
     """
@@ -54,19 +75,19 @@ def plotWDL(scores: list, players: tuple = ('White', 'Black'), filename: str = N
     d = [ wdl[1]/1000 for wdl in wdls ]
     l = [ wdl[2]/1000 for wdl in wdls ]
 
-    fig, ax = genFigure(title="WDL Plot", xLabel="Move Number", yLabel="Win Probability")
+    fig, ax = genFigure(title=title, xLabel="Move Number", yLabel="Win Probability")
     plt.xlim(0, len(wdls)-1)
     ax.set_xticks([i for i in range(0, len(wdls), 20)])
     ax.set_xticklabels([i//2 for i in range(0, len(wdls), 20)])
     plt.ylim(0,1)
-    labels = [f"{players[0]} win percentage", "Draw percentage", f"{players[1]} win percentage"]
+    labels = [f"{players[0]} win probability", "Draw probability", f"{players[1]} win probability"]
     ax.stackplot(range(len(wdls)), np.vstack([w, d, l]), colors=colors, edgecolor='grey', labels=labels)
 
-    plt.subplots_adjust(bottom=0.07, top=0.95, left=0.07, right=0.97)
+    plt.subplots_adjust(bottom=0.07, top=0.95, left=0.1, right=0.95)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), fancybox=True, shadow=True, ncol=5)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=3)
 
     if filename:
         plt.savefig(filename, dpi=400)
@@ -99,19 +120,31 @@ def sharpChangeByColor(scores: list) -> dict:
     return sharp
 
 
-def plotSharpnessChange(scores: list, filename: str = None):
+def getSharpness(scores: list) -> list:
+    """
+    This function calculates the absolute sharpness of the position after each ply
+    """
+    sharp = list()
+    for (wdl, cp) in scores:
+        sharp.append(functions.sharpnessLC0(wdl) * ((1000-max(wdl))/1000))
+    return sharp
+
+
+def plotSharpnessChange(scores: list, title: str = 'Sharpness Change', players: tuple = ('White', 'Black'), filename: str = None):
     """
     This function plots the sharpness change for a game with the scores given
     """
     sharpChange = sharpChangeByColor(scores)
+    sharpness = getSharpness(scores)
     white = sharpChange['white']
     black = sharpChange['black']
 
-    fig, ax = genFigure(title='Sharpness Change', xLabel='Move Number', yLabel='Sharpness Change')
-    ax.plot(range(1, len(white)+1), white, color='#f8a978', label='White sharpness change')
-    ax.plot(range(1, len(black)+1), black, color='#111111', label='Black sharpness change')
+    fig, ax = genFigure(title=title, xLabel='Move Number', yLabel='Sharpness Change')
+    ax.plot(range(1, len(white)+1), white, color='#f8a978', label=f"{players[0]}'s sharpness change")
+    ax.plot([i+0.5 for i in range(1, len(black)+1)], black, color='#111111', label=f"{players[1]}'s sharpness change")
+    ax.plot([(i/2)+1 for i in range(len(sharpness))], sharpness, color='#fa5a5a', label='Sharpness of the position')
     plt.axhline(0, color='black', linewidth=0.5)
-    ax.set_xlim(1, len(white)+1)
+    ax.set_xlim(1, len(white)+0.5)
     ax.legend()
 
     if filename:
@@ -183,7 +216,7 @@ def getMoveAccuracies(scores: list) -> dict:
     return accuracies
 
 
-def getClockTimes(pgnPath: str) -> dict:
+def getClockTimes(pgnPath: str) -> list:
     """
     This function gets the clocktimes for each move for Black and White
     pgnPath: str
@@ -191,9 +224,10 @@ def getClockTimes(pgnPath: str) -> dict:
     return -> dict
         A dictionary indexed by color and containing a list with the clocktimes
     """
-    clock = {'white': list(), 'black': list()}
+    times = list()
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
+            clock = {'white': list(), 'black': list()}
             node = game
             while not node.is_end():
                 node = node.variations[0]
@@ -205,12 +239,11 @@ def getClockTimes(pgnPath: str) -> dict:
                     clock['white'].append(time)
                 else:
                     clock['black'].append(time)
-            # TODO
-            break
-    return clock
+            times.append(clock)
+    return times
 
 
-def plotTimes(data: dict(), title: str, startTime: int = 7200, players: tuple = ('White', 'Black'), filename: str = None):
+def plotTimes(clock: dict(), title: str = 'Clock Times', startTime: int = 7200, players: tuple = ('White', 'Black'), filename: str = None):
     """
     This plots a line graph for both colors where the number of moves are on the x-axis
     """
@@ -222,13 +255,13 @@ def plotTimes(data: dict(), title: str, startTime: int = 7200, players: tuple = 
     plt.title(title)
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     
-    white = data['white']
-    black = data['black']
+    white = clock['white']
+    black = clock['black']
 
     ax.plot(range(1, len(white)+1), white, color='#f8a978', label=f"{players[0]}'s time left")
     ax.plot(range(1, len(black)+1), black, color='#111111', label=f"{players[1]}'s time left")
-    plt.axhline(0, color='black', linewidth=0.5)
-    ax.set_xlim(1, len(white)+1)
+
+    ax.set_xlim(1, len(white))
     ax.set_ylim(0, startTime*1.05)
     ax.set_yticks([int(i) for i in range(0, startTime+1, int(startTime/6))], [int(i/60) for i in range(0, startTime+1, int(startTime/6))])
     ax.legend()
@@ -239,7 +272,7 @@ def plotTimes(data: dict(), title: str, startTime: int = 7200, players: tuple = 
         plt.show()
 
 
-def generateGameReport(pgnPath: str, filename: str = None):
+def generateGameReport(analysedGames: str, timeGames: str, filename: str = None):
     """
     This function generates a game report for the given PGN file
     pgnPath: str
@@ -247,25 +280,26 @@ def generateGameReport(pgnPath: str, filename: str = None):
     filename: str
         Template for the filenames of the graphs. If no name is given, the graphs will be shown instead of saved.
     """
-    comments = getComments(pgnPath)
-    for c in comments:
+    if filename:
+        pa.plotPieceActivity(analysedGames, filename=f'{filename}Activity')
+    else:
+        pa.plotPieceActivity(analysedGames)
+    comments = getComments(analysedGames)
+    players = getPlayers(analysedGames)
+    clocks = getClockTimes(timeGames)
+    for i, c in enumerate(comments):
         if filename:
-            plotWDL(c, filename=f'{filename}WDL.png')
-            plotSharpnessChange(c, filename=f'{filename}Sharp.png')
-            pa.plotPieceActivity(pgnPath, filename=f'{filename}Activity.png')
+            plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i], filename=f'{filename}WDL_G{i+1}.png')
+            plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i], filename=f'{filename}Sharp_G{i+1}.png')
+            plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i], filename=f'{filename}Clocks_G{i+1}.png')
         else:
-            plotWDL(c)
-            plotSharpnessChange(c)
-            pa.plotPieceActivity(pgnPath)
+            plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i])
+            plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i])
+            plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i])
 
 
 if __name__ == '__main__':
-    # generateGameReport('../out/games/ding-gukesh-out.pgn')
-    clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
-    print(clocks)
-    # plotTimes(clocks, 'Remaining time', players=('Gukesh', 'Ding'))
-    c = getComments('../out/games/ding-gukesh-out.pgn')[0]
-    plotWDL(c, players=('Gukesh', 'Ding'))
+    generateGameReport('../out/games/ding-gukesh-out.pgn', '../resources/ding-gukesh-clocks.pgn', filename='../out/dingGukesh/')
     """
     pgn = '../out/games/greatGames.pgn'
     gamePGN = '../out/games/carlsenNepo.pgn'

@@ -52,37 +52,55 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
     white = list()
     black = list()
     players = list()
+    gameNr = 0
     with open(pgnPath, 'r') as pgn:
-        game = chess.pgn.read_game(pgn)
-        players.append(game.headers['White'])
-        players.append(game.headers['Black'])
-        board = game.board()
-        for move in game.mainline_moves():
-            board.push(move)
-            activity = calculatePieceActivity(board.fen())
-            white.append(activity[0])
-            black.append(activity[1])
+        while game := chess.pgn.read_game(pgn):
+            gameNr += 1
+            w = game.headers['White']
+            b = game.headers['Black']
+            if ',' in w:
+                w = w.split(',')[0]
+            elif ' ' in w:
+                w = w.split(' ')[0]
+            if ',' in b:
+                b = b.split(',')[0]
+            elif ' ' in b:
+                b = b.split(' ')[0]
+            players.append(w)
+            players.append(b)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(range(1, len(white)+1), white, color='#f8a978', label=f"{players[0]}'s piece activity")
-    ax.plot(range(1, len(black)+1), black, color='#111111', label=f"{players[1]}'sBlack piece activity")
+            board = game.board()
+            for move in game.mainline_moves():
+                board.push(move)
+                activity = calculatePieceActivity(board.fen())
+                white.append(activity[0])
+                black.append(activity[1])
 
-    ax.set_facecolor('#e6f7f2')
-    ax.set_xlabel('Move number')
-    ax.set_ylabel('Piece activity')
-    ax.set_xlim(1, len(white))
-    ax.set_ylim(0)
-    ax.set_xticks(list(range(1, len(white)))[::10])
-    ax.set_xticklabels([i//2 for i in range(len(white)-1)[::10]])
-    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
-    if title:
-        plt.title(title)
-    ax.legend()
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.plot(range(1, len(white)+1), white, color='#f8a978', label=f"{players[0]}'s piece activity")
+            ax.plot(range(1, len(black)+1), black, color='#111111', label=f"{players[1]}'s piece activity")
 
-    if filename:
-        plt.savefig(filename, dpi=500)
-    else:
-        plt.show()
+            ax.set_facecolor('#e6f7f2')
+            ax.set_xlabel('Move number')
+            ax.set_ylabel('Piece activity')
+            ax.set_xlim(1, len(white))
+            ax.set_ylim(0)
+            ax.set_xticks(list(range(1, len(white)))[::10])
+            ax.set_xticklabels([i//2 for i in range(len(white)-1)[::10]])
+            plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+            if title:
+                plt.title(title)
+            else:
+                plt.title(f"Game {gameNr} Piece Activity")
+            ax.legend()
+
+            if filename:
+                plt.savefig(f'{filename}G{gameNr}.png', dpi=500)
+            else:
+                plt.show()
+            white = list()
+            black = list()
+            players = list()
 
 
 if __name__ == '__main__':
