@@ -127,3 +127,6 @@ if __name__ == '__main__':
     KIDdataB = getAllPieceData(kid, chess.BLACK, minMove=7, maxMove=30)
     plotPieceHeatmaps(KIDdataW, chess.WHITE)
     plotPieceHeatmaps(KIDdataB, chess.BLACK)
+    # wcc = '../out/games/ding-gukesh-G3.pgn'
+    # wccData = getAllPieceData(wcc, chess.WHITE)
+    # plotPieceHeatmaps(wccData, chess.WHITE, filename='wcc2024G3Heatmap')

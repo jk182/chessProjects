@@ -8,6 +8,7 @@ from chess import engine, pgn, Board
 import chess
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
 
 
 def genFigure(figsize: tuple = (10,6), title: str = "", xLabel: str = "", yLabel: str = "") -> tuple:
@@ -272,7 +273,7 @@ def plotTimes(clock: dict(), title: str = 'Clock Times', startTime: int = 7200, 
         plt.show()
 
 
-def generateGameReport(analysedGames: str, timeGames: str, filename: str = None):
+def generateGameReport(analysedGames: str, timeGames: str = None, filename: str = None):
     """
     This function generates a game report for the given PGN file
     pgnPath: str
@@ -284,22 +285,32 @@ def generateGameReport(analysedGames: str, timeGames: str, filename: str = None)
         pa.plotPieceActivity(analysedGames, filename=f'{filename}Activity')
     else:
         pa.plotPieceActivity(analysedGames)
+
     comments = getComments(analysedGames)
     players = getPlayers(analysedGames)
-    clocks = getClockTimes(timeGames)
+    if timeGames:
+        clocks = getClockTimes(timeGames)
     for i, c in enumerate(comments):
         if filename:
             plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i], filename=f'{filename}WDL_G{i+1}.png')
             plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i], filename=f'{filename}Sharp_G{i+1}.png')
-            plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i], filename=f'{filename}Clocks_G{i+1}.png')
+            if timeGames:
+                plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i], filename=f'{filename}Clocks_G{i+1}.png')
         else:
             plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i])
             plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i])
-            plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i])
+            if timeGames:
+                plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i])
 
 
 if __name__ == '__main__':
-    generateGameReport('../out/games/ding-gukesh-out.pgn', '../resources/ding-gukesh-clocks.pgn', filename='../out/dingGukesh/')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename', help='path to the PGN file with the analysed games')
+    parser.add_argument('-t', '--time_file', help='path to PGN file with clock times')
+    parser.add_argument('-o', '--out_file', help='output path for the graphs')
+    args = parser.parse_args()
+    generateGameReport(args.filename, args.time_file, args.out_file)
+    # generateGameReport('../out/games/ding-gukesh-out.pgn', '../resources/ding-gukesh-clocks.pgn', filename='../out/dingGukesh/')
     """
     pgn = '../out/games/greatGames.pgn'
     gamePGN = '../out/games/carlsenNepo.pgn'
