@@ -38,7 +38,8 @@ def getComments(pgnPath: str) -> list:
             node = game
             while not node.is_end():
                 node = node.variations[0]
-                curScores.append(functions.readComment(node, True, True))
+                if c := functions.readComment(node, True, True):
+                    curScores.append(c)
 
             scores.append(curScores)
 
