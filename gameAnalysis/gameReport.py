@@ -273,6 +273,38 @@ def plotTimes(clock: dict(), title: str = 'Clock Times', startTime: int = 7200, 
         plt.show()
 
 
+def plotTimeRemainingPerMove(clock: dict(), increment: int = 0, timeControlMove: int = 40, title: str = 'Avg time per move remaining', startTime: int = 7200, players: tuple = ('White', 'Black'), filename: str = None):
+    """
+    This plots the average remaining time per move
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.set_facecolor('#e6f7f2')
+    ax.set_xlabel('Move number')
+    ax.set_ylabel('Time left per move in minutes')
+    plt.title(title)
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    
+    white = [c/(timeControlMove-(i+1))+increment for i,c in enumerate(clock['white']) if i < timeControlMove-1]
+    black = [c/(timeControlMove-(i+1))+increment for i,c in enumerate(clock['black']) if i < timeControlMove-1]
+    white.insert(0, startTime/timeControlMove+increment)
+    black.insert(0, startTime/timeControlMove+increment)
+
+    ax.plot(range(1, min(timeControlMove+1, len(white)+1)), white, color='#f8a978', label=f"{players[0]}'s avg move time left")
+    ax.plot(range(1, min(timeControlMove+1, len(black)+1)), black, color='#111111', label=f"{players[1]}'s avg move time left")
+    ax.set_xlim(1, min(timeControlMove, len(white)))
+
+    maximum = max(max(white), max(black))
+    ax.set_yticks([int(i*60) for i in range(0, int(maximum/60)+1)], [int(i) for i in range(0, int(maximum/60)+1)])
+
+    ax.legend()
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
 def generateGameReport(analysedGames: str, timeGames: str = None, filename: str = None):
     """
     This function generates a game report for the given PGN file
@@ -281,6 +313,11 @@ def generateGameReport(analysedGames: str, timeGames: str = None, filename: str 
     filename: str
         Template for the filenames of the graphs. If no name is given, the graphs will be shown instead of saved.
     """
+    # TODO: Where should this be defined?
+    increment = 0
+    timeControlMove = 40
+    startTime = 7200
+
     if filename:
         pa.plotPieceActivity(analysedGames, filename=f'{filename}Activity')
     else:
@@ -295,12 +332,15 @@ def generateGameReport(analysedGames: str, timeGames: str = None, filename: str 
             plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i], filename=f'{filename}WDL_G{i+1}.png')
             plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i], filename=f'{filename}Sharp_G{i+1}.png')
             if timeGames:
-                plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i], filename=f'{filename}Clocks_G{i+1}.png')
+                plotTimes(clocks[i], startTime=startTime, title=f'Game {i+1} Clock Times', players=players[i], filename=f'{filename}Clocks_G{i+1}.png')
+                plotTimeRemainingPerMove(clocks[i], increment=increment, timeControlMove=timeControlMove, title=f'Game {i+1} remaining Time per Move', startTime=startTime, players=players[i], filename='{filename}MoveTime_G{i+1}.png')
         else:
             plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i])
             plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i])
             if timeGames:
                 plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i])
+                plotTimeRemainingPerMove(clocks[i], increment=increment, timeControlMove=timeControlMove, title=f'Game {i+1} remaining Time per Move', startTime=startTime, players=players[i])
+        plt.close()
 
 
 if __name__ == '__main__':
