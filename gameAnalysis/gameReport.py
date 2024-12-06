@@ -334,7 +334,7 @@ def generateGameReport(analysedGames: str, timeGames: str = None, filename: str 
             plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i], filename=f'{filename}Sharp_G{i+1}.png')
             if timeGames:
                 plotTimes(clocks[i], startTime=startTime, title=f'Game {i+1} Clock Times', players=players[i], filename=f'{filename}Clocks_G{i+1}.png')
-                plotTimeRemainingPerMove(clocks[i], increment=increment, timeControlMove=timeControlMove, title=f'Game {i+1} remaining Time per Move', startTime=startTime, players=players[i], filename='{filename}MoveTime_G{i+1}.png')
+                plotTimeRemainingPerMove(clocks[i], increment=increment, timeControlMove=timeControlMove, title=f'Game {i+1} remaining Time per Move', startTime=startTime, players=players[i], filename=f'{filename}MoveTime_G{i+1}.png')
         else:
             plotWDL(c, title=f'Game {i+1} WDL Probabilities', players=players[i])
             plotSharpnessChange(c, title=f'Game {i+1} Sharpness', players=players[i])
