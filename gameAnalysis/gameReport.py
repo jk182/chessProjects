@@ -272,6 +272,7 @@ def plotTimes(clock: dict(), title: str = 'Clock Times', startTime: int = 7200, 
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+    plt.close()
 
 
 def plotTimeRemainingPerMove(clock: dict(), increment: int = 0, timeControlMove: int = 40, title: str = 'Avg time per move remaining', startTime: int = 7200, players: tuple = ('White', 'Black'), filename: str = None):
@@ -304,6 +305,7 @@ def plotTimeRemainingPerMove(clock: dict(), increment: int = 0, timeControlMove:
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+    plt.close()
 
 
 def generateGameReport(analysedGames: str, timeGames: str = None, filename: str = None):
@@ -341,7 +343,6 @@ def generateGameReport(analysedGames: str, timeGames: str = None, filename: str 
             if timeGames:
                 plotTimes(clocks[i], title=f'Game {i+1} Clock Times', players=players[i])
                 plotTimeRemainingPerMove(clocks[i], increment=increment, timeControlMove=timeControlMove, title=f'Game {i+1} remaining Time per Move', startTime=startTime, players=players[i])
-        plt.close()
 
 
 if __name__ == '__main__':
