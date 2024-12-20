@@ -59,6 +59,52 @@ def getMoveSituation(pgnPath: str) -> dict:
     return moves
 
 
+def getBetterGames(pgnPath: str) -> list:
+    """
+    This function gets the number of better and won games for each player
+    pgnPath: str
+        The path to the PGN file of the match
+    return -> list
+        A list containing the better and won games for each player
+    """
+    better = [[0, 0], [0, 0]]
+    firstPlayer = None
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            r = game.headers["Result"]
+            if not firstPlayer:
+                firstPlayer = game.headers["White"]
+            if firstPlayer == game.headers["White"]:
+                index = 0
+                if r == '1-0':
+                    better[0][1] += 1
+                elif r == '0-1':
+                    better[1][1] += 1
+            else:
+                index = 1
+                if r == '0-1':
+                    better[0][1] += 1
+                elif r == '1-0':
+                    better[1][1] += 1
+
+            node = game
+            rec = [False, False]
+            
+            while not node.is_end():
+                if rec == [True, True]:
+                    break
+                node = node.variations[0]
+                if node.comment:
+                    cp = functions.readComment(node, True, True)[1]
+                    if cp < -100 and not rec[0]:
+                        rec[0] = True
+                        better[(index+1)%2][0] += 1
+                    elif cp > 100 and not rec[1]:
+                        rec[1] = True
+                        better[index][0] += 1
+    return better
+
+
 def getInaccMistakesBlunders(pgnPath: str) -> list:
     """
     This gets the number of inaccuaracies, mistakes and blunders for each player.
@@ -268,3 +314,5 @@ if __name__ == '__main__':
     # plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
     acc = getAccuracies(pgn)
     plotAccuracyDistribution(acc, players)
+    better = getBetterGames(pgn)
+    plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
