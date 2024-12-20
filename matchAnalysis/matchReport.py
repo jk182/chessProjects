@@ -1,6 +1,7 @@
 import chess
 import os, sys
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
@@ -136,13 +137,13 @@ def getAccuracies(pgnPath: str) -> list:
                         lastWP = wp
                         continue
                     if node.turn():
-                        acc = min(100, functions.accuracy(lastWP, wp))
+                        acc = min(100, functions.accuracy(wp, lastWP))
                         if game.headers["Black"] == firstPlayer:
                             index = 0
                         else:
                             index = 1
                     else:
-                        acc = min(100, functions.accuracy(wp, lastWP))
+                        acc = min(100, functions.accuracy(lastWP, wp))
                         if game.headers["White"] == firstPlayer:
                             index = 0
                         else:
@@ -150,6 +151,53 @@ def getAccuracies(pgnPath: str) -> list:
                     accuracies[index].append(float(acc))
                     lastWP = wp
     return accuracies
+
+
+def plotAccuracyDistribution(data: list, players: list, filename: str = None):
+    """
+    This method plots the accuracy distribution given the accuracy data
+    data: list
+        The path to the PGN file
+    players: list
+        The name of the players
+    filename: str
+        Filename of the plot if it should be saved instead of shown
+    """
+    colors = ['#689bf2', '#f8a978']
+    acd = [dict(), dict()]
+    for i in range(len(data)):
+        for acc in data[i]:
+            a = round(acc)
+            a = max(a, 41)
+            if a in acd[i].keys():
+                acd[i][a] += 1
+            else:
+                acd[i][a] = 1
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_yscale("log")
+    ax.set_facecolor('#e6f7f2')
+
+    for i, accDis in enumerate(acd):
+        xy = [ (k,v) for k,v in accDis.items() if k <= 100]
+        nMoves = sum(accDis.values())
+        ax.bar([x[0]-0.75+0.5*i for x in xy], [y[1]/nMoves for y in xy], width=0.5, color=colors[i], edgecolor='black', linewidth=0.5, label=players[i])
+
+    plt.xlim(40, 100)
+    ax.invert_xaxis()
+    ax.set_xlabel('Move Accuracy')
+    ax.set_ylabel('Relative number of moves')
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.15, right=0.95)
+    # plt.title(f'Accuracy per move: {p}')
+    ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
+    ax.yaxis.get_major_formatter().set_scientific(False)
+    ax.legend()
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(outFile, dpi=500)
+    else:
+        plt.show()
 
 
 def plotBarChart(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, filename: str = None):
@@ -217,6 +265,6 @@ if __name__ == '__main__':
     # plotMoveSituation(moveSituation)
     players = ["Gukesh", "Ding"]
     imb = getInaccMistakesBlunders(pgn)
-    plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
+    # plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
     acc = getAccuracies(pgn)
-    print(acc)
+    plotAccuracyDistribution(acc, players)
