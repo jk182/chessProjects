@@ -105,6 +105,38 @@ def getBetterGames(pgnPath: str) -> list:
     return better
 
 
+def getClockTimes(pgnPath: str) -> list:
+    """
+    This function reads the times from a PGN file with time stamps
+    """
+    times = [list(), list()]
+    firstPlayer = None
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if firstPlayer is None:
+                firstPlayer = game.headers["White"]
+            node = game
+            c = [list(), list()]
+            while not node.is_end():
+                node = node.variations[0]
+                time = int(node.clock())
+                if not time:
+                    break
+                if not node.turn():
+                    c[0].append(time)
+                else:
+                    c[1].append(time)
+
+            if game.headers["White"] == firstPlayer:
+                times[0].append(c[0])
+                times[1].append(c[1])
+            else:
+                times[0].append(c[1])
+                times[1].append(c[0])
+    return times
+
+
 def getSharpChange(pgnPath: str) -> list:
     """
     This function calculates the sharpness change for the players.
@@ -392,4 +424,6 @@ if __name__ == '__main__':
     better = getBetterGames(pgn)
     # plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
     sc = getSharpChange(pgn)
-    plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"])
+    # plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"])
+    clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
+    print(clocks)
