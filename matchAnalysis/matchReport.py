@@ -105,6 +105,51 @@ def getBetterGames(pgnPath: str) -> list:
     return better
 
 
+def getSharpChange(pgnPath: str) -> list:
+    """
+    This function calculates the sharpness change for the players.
+    pgnPath: str
+        The path to the PGN file of the match
+    return -> list
+        The sharpness change for each player. Each list contains a list for each game with the sharpness change for each move.
+    """
+    startSharp = 0.468 * 0.55
+    sharpChange = [list(), list()]
+    firstPlayer = None
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            sc1 = list()
+            sc2 = list()
+            if firstPlayer is None:
+                firstPlayer = game.headers["White"]
+            lastSharp = startSharp
+            node = game
+
+            while not node.is_end():
+                node = node.variations[0]
+                if c := functions.readComment(node, True, True):
+                    sharp = functions.sharpnessLC0(c[0]) * ((1000-max(c[0]))/1000)
+                    if max(c[0]) >= 800:
+                        sharp = 0
+                else:
+                    continue
+                sharpDiff = float(sharp-lastSharp)
+                if node.turn():
+                    if game.headers["Black"] == firstPlayer:
+                        sc1.append(sharpDiff)
+                    else:
+                        sc2.append(sharpDiff)
+                else:
+                    if game.headers["White"] == firstPlayer:
+                        sc1.append(sharpDiff)
+                    else:
+                        sc2.append(sharpDiff)
+                lastSharp = sharp
+            sharpChange[0].append(sc1)
+            sharpChange[1].append(sc2)
+    return sharpChange
+
+
 def getInaccMistakesBlunders(pgnPath: str) -> list:
     """
     This gets the number of inaccuaracies, mistakes and blunders for each player.
@@ -313,6 +358,8 @@ if __name__ == '__main__':
     imb = getInaccMistakesBlunders(pgn)
     # plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
     acc = getAccuracies(pgn)
-    plotAccuracyDistribution(acc, players)
+    # plotAccuracyDistribution(acc, players)
     better = getBetterGames(pgn)
-    plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
+    # plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
+    sc = getSharpChange(pgn)
+    print(sc)
