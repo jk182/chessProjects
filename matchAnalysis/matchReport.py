@@ -350,6 +350,36 @@ def plotMoveSituation(moveData: dict):
     plt.show()
 
 
+def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, maxMoves: int = 40, filename: str = None):
+    """
+    This function plots the average values of move data
+    """
+    if not colors:
+        colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    
+    for k, d in enumerate(data):
+        avg = list()
+        for i in range(maxMoves):
+            l = [c[i] for c in d if len(c) > i]
+            avg.append(sum(l)/len(l))
+        ax.plot(range(1, maxMoves+1), avg, color=colors[k], label=legend[k])
+    
+    plt.xlim(1, maxMoves)
+    ax.legend()
+    plt.title(title)
+    plt.axhline(0, color='black', linewidth=0.5)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+    
+
 if __name__ == '__main__':
     pgn = '../out/games/ding-gukesh-out.pgn'
     # moveSituation = getMoveSituation(pgn)
@@ -362,4 +392,4 @@ if __name__ == '__main__':
     better = getBetterGames(pgn)
     # plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
     sc = getSharpChange(pgn)
-    print(sc)
+    plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"])
