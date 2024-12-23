@@ -5,6 +5,7 @@ import matplotlib.ticker as mticker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
+import plotly.graph_objects as go
 
 
 def getMoveSituation(pgnPath: str) -> dict:
@@ -233,6 +234,31 @@ def getInaccMistakesBlunders(pgnPath: str) -> list:
     return data
 
 
+def getOpeningMoves(pgnPath: str, maxPly: int = 10) -> list:
+    """
+    This function gets the opening moves and positions after these moves for each player
+    """
+    openings = [list(), list()]
+    firstPlayer = None
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if firstPlayer is None:
+                firstPlayer = game.headers["White"]
+            board = game.board()
+            opening = list()
+            for i, move in enumerate(game.mainline_moves()):
+                if i >= maxPly:
+                    break
+                oldBoard = board.copy()
+                board.push(move)
+                opening.append((board.fen(), oldBoard.variation_san([move]))) # variation_san gives also the move numbers
+            if firstPlayer == game.headers["White"]:
+                openings[0].append(opening)
+            else:
+                openings[1].append(opening)
+    return openings
+
+
 def getAccuracies(pgnPath: str) -> list:
     """
     This function gets the accuracies for each player
@@ -410,6 +436,42 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
     else:
         plt.show()
 
+
+def plotOpeningDiagram(openings: list):
+    positions = dict()
+    moves = dict()
+    for opening in openings:
+        for i, o in enumerate(opening):
+            if o[0] not in positions.keys():
+                positions[o[0]] = o[1]
+            elif positions[o[0]] != o[1]:
+                print('Transposition')
+            if i < len(opening)-1:
+                k = (o[0], o[1], opening[i+1][0], opening[i+1][1])
+                if k not in moves.keys():
+                    moves[k] = 1
+                else:
+                    moves[k] += 1
+    items = list(positions.items())
+    labels = [i[1] for i in items]
+    link = dict(source=list(), target=list(), value=list())
+    for k, v in moves.items():
+        link['source'].append(items.index((k[0], k[1])))
+        link['target'].append(items.index((k[2], k[3])))
+        link['value'].append(v)
+    fig = go.Figure(data=[go.Sankey(
+        node = dict(
+          pad = 15,
+          thickness = 20,
+          line = dict(color = "black", width = 0.5),
+          label = labels,
+          color = "blue"
+        ),
+        link = link
+      )])
+
+    fig.update_layout(title_text="Basic Sankey Diagram", font_size=10)
+    fig.show()
     
 
 if __name__ == '__main__':
@@ -427,3 +489,5 @@ if __name__ == '__main__':
     # plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"])
     clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
     print(clocks)
+    openings = getOpeningMoves(pgn, maxPly = 8)
+    plotOpeningDiagram(openings[0])
