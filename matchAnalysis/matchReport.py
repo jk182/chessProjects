@@ -106,9 +106,11 @@ def getBetterGames(pgnPath: str) -> list:
     return better
 
 
-def getClockTimes(pgnPath: str) -> list:
+def getClockTimes(pgnPath: str, minutes: bool = True) -> list:
     """
     This function reads the times from a PGN file with time stamps
+    minutes: bool
+        If this is set, the time will be calculated in minutes
     """
     times = [list(), list()]
     firstPlayer = None
@@ -122,6 +124,8 @@ def getClockTimes(pgnPath: str) -> list:
             while not node.is_end():
                 node = node.variations[0]
                 time = int(node.clock())
+                if minutes:
+                    time /= 60
                 if not time:
                     break
                 if not node.turn():
@@ -162,11 +166,9 @@ def getSharpChange(pgnPath: str) -> list:
                 node = node.variations[0]
                 if c := functions.readComment(node, True, True):
                     sharp = functions.sharpnessLC0(c[0]) * ((1000-max(c[0]))/1000)
-                    if max(c[0]) >= 800:
-                        sharp = 0
                 else:
                     continue
-                sharpDiff = float(sharp-lastSharp)
+                sharpDiff = max(-3, min(3, float(sharp-lastSharp)))
                 if node.turn():
                     if game.headers["Black"] == firstPlayer:
                         sc1.append(sharpDiff)
@@ -312,7 +314,7 @@ def plotAccuracyDistribution(data: list, players: list, filename: str = None):
     filename: str
         Filename of the plot if it should be saved instead of shown
     """
-    colors = ['#689bf2', '#f8a978']
+    colors = ['#f8a978', '#689bf2']
     acd = [dict(), dict()]
     for i in range(len(data)):
         for acc in data[i]:
@@ -337,14 +339,14 @@ def plotAccuracyDistribution(data: list, players: list, filename: str = None):
     ax.set_xlabel('Move Accuracy')
     ax.set_ylabel('Relative number of moves')
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.15, right=0.95)
-    # plt.title(f'Accuracy per move: {p}')
+    plt.title(f'Accuracy distribution')
     ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
     ax.yaxis.get_major_formatter().set_scientific(False)
     ax.legend()
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
     if filename:
-        plt.savefig(outFile, dpi=500)
+        plt.savefig(filename, dpi=400)
     else:
         plt.show()
 
@@ -380,35 +382,47 @@ def plotBarChart(data: list, playerNames: list, ylabel: str, title: str, legend:
         plt.show()
 
 
-def plotMoveSituation(moveData: dict):
+def plotMoveSituation(moveData: dict, filename: str = None):
     """
     This function plots the number of better, equal and worse moves from getMoveSituation
     moveData: dict
         The dictionary returned by getMoveSituation
     """
     colors = ['#4ba35a', '#9CF196', '#F0EBE3', '#F69E7B', '#EF4B4B']
+    labels = ['Much better', 'Slightly better', 'Equal', 'Slightly worse', 'Much worse']
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor('#e6f7f2')
 
     player, m = list(moveData.items())[0]
-    player = player.split(',')[0]
+    print(player, m)
+    player = player.split(',')[0].split()[0]
     bottom = 0
     factor = 1/m[0]
     for i in range(len(m)-1, 0, -1):
-        ax.barh(player, m[i]*factor, left=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2)
+        ax.barh(player, m[i]*factor, left=bottom, color=colors[i-1], edgecolor='black', linewidth=0.2, label=labels[i-1])
         bottom += m[i]*factor
     ax.set_xlim(0, 1)
+    """
     y2 = ax.twinx()
     y2.set_ylim(ax.get_ylim())
     y2.set_yticks([0])
     y2.set_yticklabels([list(moveData.keys())[1].split(',')[0]])
+    """
+    plt.subplots_adjust(bottom=0.07, top=0.95, left=0.1, right=0.95)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
-    plt.title('Number of moves where the players were better, equal or worse')
-    plt.show()
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=5)
+
+    plt.title(f'Relative number of moves where {player} was better, equal or worse')
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
 
 
-def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, maxMoves: int = 40, filename: str = None):
+def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, maxMoves: int = 39, filename: str = None):
     """
     This function plots the average values of move data
     """
@@ -418,14 +432,21 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor('#e6f7f2')
     
+    yMin = 0
+    yMax = 0
     for k, d in enumerate(data):
         avg = list()
         for i in range(maxMoves):
             l = [c[i] for c in d if len(c) > i]
             avg.append(sum(l)/len(l))
         ax.plot(range(1, maxMoves+1), avg, color=colors[k], label=legend[k])
+        yMin = min(yMin, min(avg))
+        yMax = max(yMax, max(avg))
     
     plt.xlim(1, maxMoves)
+    plt.ylim(yMin*1.05, yMax*1.05)
+    ax.set_xlabel('Move Number')
+    ax.set_ylabel(ylabel)
     ax.legend()
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
@@ -438,6 +459,7 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
 
 
 def plotOpeningDiagram(openings: list):
+    # TODO: without many transpositions, this looks boring
     positions = dict()
     moves = dict()
     for opening in openings:
@@ -476,18 +498,20 @@ def plotOpeningDiagram(openings: list):
 
 if __name__ == '__main__':
     pgn = '../out/games/ding-gukesh-out.pgn'
-    # moveSituation = getMoveSituation(pgn)
-    # plotMoveSituation(moveSituation)
+    moveSituation = getMoveSituation(pgn)
+    folder = '../out/dingGukesh/'
+    plotMoveSituation(moveSituation, filename=f'{folder}matchMoveSituation.png')
     players = ["Gukesh", "Ding"]
+    playerColors = ['#f8a978', '#689bf2']
     imb = getInaccMistakesBlunders(pgn)
     # plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
     acc = getAccuracies(pgn)
-    # plotAccuracyDistribution(acc, players)
+    plotAccuracyDistribution(acc, players, filename=f'{folder}matchAccuracyDistribution.png')
     better = getBetterGames(pgn)
-    # plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
+    plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"], filename=f'{folder}matchBetter.png')
     sc = getSharpChange(pgn)
-    # plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"])
+    plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"], colors=playerColors, filename=f'{folder}matchSharp.png')
     clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
-    print(clocks)
-    openings = getOpeningMoves(pgn, maxPly = 8)
-    plotOpeningDiagram(openings[0])
+    plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", ["Gukesh's time left", "Ding's time left"], colors=playerColors, filename=f'{folder}matchClocks.png')
+    # openings = getOpeningMoves(pgn, maxPly = 8)
+    # plotOpeningDiagram(openings[0])
