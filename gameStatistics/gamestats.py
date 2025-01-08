@@ -13,8 +13,9 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
     """
     startEval = 20
     startWDL = [205, 614, 181]
-    columns = ["Position", "Move", "WhiteElo", "BlackElo", "EvalBefore", "EvalAfter", "WinPBefore", "DrawPBefore", "LossPBefore", "WinPAfter", "DrawPAfter", "LossPAfter", "Result"]
+    columns = ["GameID", "Position", "Move", "WhiteElo", "BlackElo", "EvalBefore", "EvalAfter", "WinPBefore", "DrawPBefore", "LossPBefore", "WinPAfter", "DrawPAfter", "LossPAfter", "Result"]
     data = dict()
+    gameID = 0
     for c in columns:
         data[c] = list()
     for pgnPath in pgnPaths:
@@ -31,6 +32,7 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
                     board = node.board()
                     node = node.variations[0]
                     if node.comment:
+                        data["GameID"].append(gameID)
                         move = node.move
                         data["WhiteElo"].append(wElo)
                         data["BlackElo"].append(bElo)
@@ -48,11 +50,23 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
                         data["Move"].append(move.uci())
                         evalBefore = cp
                         wdlBefore = wdl
+                gameID += 1
     df = pd.DataFrame(data)
     return df
+
+
+def getWinPercentage(df: pd.DataFrame, cpCutoff: int) -> float:
+    """
+    This calculates the win percentage when one side has an advantage of cpCutoff
+    """
+    results = df[((df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1-0")) | ((df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "0-1"))]
+    games = df[abs(df["EvalAfter"]) >= cpCutoff]
+    return len(set(results["GameID"]))/len(set(games["GameID"]))
 
 
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn']
     df = readMoveData(pgns)
-    print(df)
+    for cp in [0, 50, 100, 150, 200, 250, 300]:
+        prob = getWinPercentage(df, cp)
+        print(prob)
