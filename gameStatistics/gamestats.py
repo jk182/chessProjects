@@ -55,18 +55,60 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
     return df
 
 
-def getWinPercentage(df: pd.DataFrame, cpCutoff: int) -> float:
+def filterGamesByRating(df: pd.DataFrame, ratingRange: tuple, ratingDifference: int) -> pd.DataFrame:
+    """
+    This filters a dataframe to only include games with the specified rating.
+    df: pd.DataFrame
+        The dataframe with the move data
+    ratingRange: tuple
+        Minimum and maximum rating for one of these players
+    ratingDifference: int
+        The maximal difference in rating between these players
+    return -> pd.DataFrame
+        Dataframe with only the games where players are in the rating range
+    """
+    minElo, maxElo = ratingRange
+    filtered = df[(abs(df["WhiteElo"]-df["BlackElo"]) <= ratingDifference) & (((minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo)) | ((minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)))]
+    filtered = filtered.reset_index()
+    return filtered
+
+
+def getExpectedScore(df: pd.DataFrame, cpCutoff: int) -> float:
     """
     This calculates the win percentage when one side has an advantage of cpCutoff
     """
-    results = df[((df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1-0")) | ((df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "0-1"))]
+    wins = df[((df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1-0")) | ((df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "0-1"))]
+    draws = df[(abs(df["EvalAfter"]) >= cpCutoff) & (df["Result"] == "1/2-1/2")]
     games = df[abs(df["EvalAfter"]) >= cpCutoff]
-    return len(set(results["GameID"]))/len(set(games["GameID"]))
+
+    whiteWins = df[(df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1-0")]
+    blackWins = df[(df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "0-1")]
+    whiteDraws = df[(df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1/2-1/2")]
+    blackDraws = df[(df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "1/2-1/2")]
+    whiteGames = df[df["EvalAfter"] >= cpCutoff]
+    blackGames = df[df["EvalAfter"] <= -cpCutoff]
+
+    nWins = len(set(wins["GameID"]))
+    nDraws = len(set(draws["GameID"]))
+    nGames = len(set(games["GameID"]))
+
+    nWhiteWins = len(set(whiteWins["GameID"]))
+    nBlackWins = len(set(blackWins["GameID"]))
+    nWhiteDraws = len(set(whiteDraws["GameID"]))
+    nBlackDraws = len(set(blackDraws["GameID"]))
+    nWhiteGames = len(set(whiteGames["GameID"]))
+    nBlackGames = len(set(blackGames["GameID"]))
+    return ((nWhiteWins + 0.5*nWhiteDraws)/nWhiteGames, (nBlackWins + 0.5*nBlackDraws)/nBlackGames)
+    # return (nWins + 0.5*nDraws)/nGames
 
 
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn']
     df = readMoveData(pgns)
-    for cp in [0, 50, 100, 150, 200, 250, 300]:
-        prob = getWinPercentage(df, cp)
+    df26 = filterGamesByRating(df, (2600, 2700), 100)
+    df27 = filterGamesByRating(df, (2700, 2900), 100)
+    for cp in [0, 50, 100, 150, 200, 250, 300, 400, 500]:
+        prob = getExpectedScore(df, cp)
+        print(cp)
         print(prob)
+        print((prob[0]+prob[1])/2)
