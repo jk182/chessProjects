@@ -21,6 +21,9 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
     for pgnPath in pgnPaths:
         with open(pgnPath, 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
+                if "WhiteElo" not in game.headers.keys() or "BlackElo" not in game.headers.keys():
+                    print("No Elo")
+                    continue
                 wElo = int(game.headers["WhiteElo"])
                 bElo = int(game.headers["BlackElo"])
                 result = game.headers["Result"]
@@ -98,17 +101,19 @@ def getExpectedScore(df: pd.DataFrame, cpCutoff: int) -> float:
     nBlackDraws = len(set(blackDraws["GameID"]))
     nWhiteGames = len(set(whiteGames["GameID"]))
     nBlackGames = len(set(blackGames["GameID"]))
-    return ((nWhiteWins + 0.5*nWhiteDraws)/nWhiteGames, (nBlackWins + 0.5*nBlackDraws)/nBlackGames)
-    # return (nWins + 0.5*nDraws)/nGames
+    # return ((nWhiteWins + 0.5*nWhiteDraws)/nWhiteGames, (nBlackWins + 0.5*nBlackDraws)/nBlackGames)
+    return ((nWhiteWins + 0.5*nWhiteDraws)+ (nBlackWins + 0.5*nBlackDraws))/(nWhiteGames+nBlackGames)
 
 
 if __name__ == '__main__':
-    pgns = ['../out/games/2700games2023-out.pgn']
-    df = readMoveData(pgns)
-    df26 = filterGamesByRating(df, (2600, 2700), 100)
+    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn']
+    # df = readMoveData(pgns)
+    # df.to_pickle('../out/gameDF')
+    df = pd.read_pickle('../out/gameDF')
+    dfGM = filterGamesByRating(df, (2500, 2900), 50)
     df27 = filterGamesByRating(df, (2700, 2900), 100)
-    for cp in [0, 50, 100, 150, 200, 250, 300, 400, 500]:
-        prob = getExpectedScore(df, cp)
+    for cp in [0, 50, 100, 150, 200, 250, 300, 500]:
         print(cp)
-        print(prob)
-        print((prob[0]+prob[1])/2)
+        for d in [dfGM]:
+            prob = getExpectedScore(d, cp)
+            print(prob)
