@@ -5,6 +5,8 @@ import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
+import math
+import matplotlib.pyplot as plt
 
 
 def readMoveData(pgnPaths: list) -> pd.DataFrame:
@@ -105,6 +107,53 @@ def getExpectedScore(df: pd.DataFrame, cpCutoff: int) -> float:
     return ((nWhiteWins + 0.5*nWhiteDraws)+ (nBlackWins + 0.5*nBlackDraws))/(nWhiteGames+nBlackGames)
 
 
+def winPLichess(cp: int, k: float) -> float:
+    """
+    This calculates the win percentage with the formula used by Lichess
+    """
+    return 100/(1+math.exp(-k*cp))
+
+
+def expectedScore(cp: int, k: float) -> float:
+    return 50+100/math.pi * math.atan(k*cp)
+
+
+def plotExpectedScore(points: list, functions: list, labels: list, title: str, filename: str = None):
+    """
+    This function plots the given points and functions
+    """
+    maxEval = 1000
+    xRange = [i for i in range(-maxEval-100, maxEval+101)]
+    colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+    fig, ax = plt.subplots(figsize=(10,6))
+    ax.set_facecolor('#e6f7f2')
+    
+    xes = [p[0] for p in points]
+    ys = [p[1] for p in points]
+
+    plt.axhline(0, color='black', linewidth=0.5)
+    plt.axvline(0, color='black', linewidth=0.5)
+
+    ax.scatter(xes, ys, color=colors[0], label='Emperical expected score')
+    
+    for i, (function, parameter) in enumerate(functions):
+        ax.plot(xRange, [function(x, parameter) for x in xRange], color=colors[i+1], label=labels[i])
+
+    ax.legend()
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.xlim(-maxEval*1.05, maxEval*1.05)
+    ax.set_xlabel('Centipawn advantage')
+    ax.set_ylabel('Expected score')
+    plt.title(title)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+
+
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn']
     # df = readMoveData(pgns)
@@ -112,8 +161,9 @@ if __name__ == '__main__':
     df = pd.read_pickle('../out/gameDF')
     dfGM = filterGamesByRating(df, (2500, 2900), 50)
     df27 = filterGamesByRating(df, (2700, 2900), 100)
-    for cp in [0, 50, 100, 150, 200, 250, 300, 500]:
-        print(cp)
-        for d in [dfGM]:
-            prob = getExpectedScore(d, cp)
-            print(prob)
+    points = list()
+    for cp in [50, 100, 150, 200, 250, 300, 500]:
+        prob = getExpectedScore(dfGM, cp)
+        points.append((cp, prob*100))
+    # plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage")
+    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.008211), (expectedScore, 0.008738)], ["Lichess win probability", "Updated k", "Arctan"], "Lichess win percentage")
