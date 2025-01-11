@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import math
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 
 
 def readMoveData(pgnPaths: list) -> pd.DataFrame:
@@ -86,12 +87,20 @@ def getExpectedScore(df: pd.DataFrame, cpCutoff: int) -> float:
     draws = df[(abs(df["EvalAfter"]) >= cpCutoff) & (df["Result"] == "1/2-1/2")]
     games = df[abs(df["EvalAfter"]) >= cpCutoff]
 
+    """
     whiteWins = df[(df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1-0")]
     blackWins = df[(df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "0-1")]
     whiteDraws = df[(df["EvalAfter"] >= cpCutoff) & (df["Result"] == "1/2-1/2")]
     blackDraws = df[(df["EvalAfter"] <= -cpCutoff) & (df["Result"] == "1/2-1/2")]
     whiteGames = df[df["EvalAfter"] >= cpCutoff]
     blackGames = df[df["EvalAfter"] <= -cpCutoff]
+    """
+    whiteWins = df[(df["EvalAfter"] >= cpCutoff) & (df["EvalAfter"] <= cpCutoff+50) & (df["Result"] == "1-0")]
+    blackWins = df[(df["EvalAfter"] <= -cpCutoff) & (df["EvalAfter"] >= -cpCutoff-50) & (df["Result"] == "0-1")]
+    whiteDraws = df[(df["EvalAfter"] >= cpCutoff) & (df["EvalAfter"] <= cpCutoff+50) & (df["Result"] == "1/2-1/2")]
+    blackDraws = df[(df["EvalAfter"] <= -cpCutoff) & (df["EvalAfter"] >= -cpCutoff-50) & (df["Result"] == "1/2-1/2")]
+    whiteGames = df[(df["EvalAfter"] >= cpCutoff) & (df["EvalAfter"] <= cpCutoff+50)]
+    blackGames = df[(df["EvalAfter"] <= -cpCutoff) & (df["EvalAfter"] >= -cpCutoff-50)]
 
     nWins = len(set(wins["GameID"]))
     nDraws = len(set(draws["GameID"]))
@@ -124,26 +133,28 @@ def plotExpectedScore(points: list, functions: list, labels: list, title: str, f
     """
     maxEval = 1000
     xRange = [i for i in range(-maxEval-100, maxEval+101)]
-    colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+    colors = ['#689bf2', '#C3B1E1', '#f8a978', '#fa5a5a', '#5afa8d']
     fig, ax = plt.subplots(figsize=(10,6))
     ax.set_facecolor('#e6f7f2')
     
     xes = [p[0] for p in points]
     ys = [p[1] for p in points]
 
-    plt.axhline(0, color='black', linewidth=0.5)
-    plt.axvline(0, color='black', linewidth=0.5)
+    plt.axhline(0, color='black', linewidth=1)
+    plt.axvline(0, color='black', linewidth=1)
+    ax.grid(zorder=0)
 
-    ax.scatter(xes, ys, color=colors[0], label='Emperical expected score')
+    ax.scatter(xes, ys, color=colors[0], label='Avg score in GM games', zorder=3, edgecolor='blue')
     
     for i, (function, parameter) in enumerate(functions):
-        ax.plot(xRange, [function(x, parameter) for x in xRange], color=colors[i+1], label=labels[i])
+        ax.plot(xRange, [function(x, parameter) for x in xRange], color=colors[i+1], label=labels[i], linewidth=3)
 
     ax.legend()
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.xlim(-maxEval*1.05, maxEval*1.05)
     ax.set_xlabel('Centipawn advantage')
     ax.set_ylabel('Expected score')
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
     plt.title(title)
 
     if filename:
@@ -164,6 +175,8 @@ if __name__ == '__main__':
     points = list()
     for cp in [50, 100, 150, 200, 250, 300, 500]:
         prob = getExpectedScore(dfGM, cp)
+        print(prob)
         points.append((cp, prob*100))
-    # plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage")
-    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.008211), (expectedScore, 0.008738)], ["Lichess win probability", "Updated k", "Arctan"], "Lichess win percentage")
+    plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage compared to GM score", filename='../out/lichessWinp.png')
+    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
+    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
