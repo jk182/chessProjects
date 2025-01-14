@@ -16,7 +16,7 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
     """
     startEval = 20
     startWDL = [205, 614, 181]
-    columns = ["GameID", "Position", "Move", "WhiteElo", "BlackElo", "EvalBefore", "EvalAfter", "WinPBefore", "DrawPBefore", "LossPBefore", "WinPAfter", "DrawPAfter", "LossPAfter", "Result"]
+    columns = ["GameID", "Position", "Color", "Move", "MoveNr", "WhiteElo", "BlackElo", "EvalBefore", "EvalAfter", "WinPBefore", "DrawPBefore", "LossPBefore", "WinPAfter", "DrawPAfter", "LossPAfter", "Result"]
     data = dict()
     gameID = 0
     for c in columns:
@@ -27,6 +27,7 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
                 if "WhiteElo" not in game.headers.keys() or "BlackElo" not in game.headers.keys():
                     print("No Elo")
                     continue
+                ply = 1
                 wElo = int(game.headers["WhiteElo"])
                 bElo = int(game.headers["BlackElo"])
                 result = game.headers["Result"]
@@ -37,8 +38,10 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
                 while not node.is_end():
                     board = node.board()
                     node = node.variations[0]
+                    ply += 1
                     if node.comment:
                         data["GameID"].append(gameID)
+                        data["Color"].append(board.turn)
                         move = node.move
                         data["WhiteElo"].append(wElo)
                         data["BlackElo"].append(bElo)
@@ -54,6 +57,7 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
                         data["DrawPAfter"].append(wdl[1])
                         data["LossPAfter"].append(wdl[2])
                         data["Move"].append(move.uci())
+                        data["MoveNr"].append(ply//2)
                         evalBefore = cp
                         wdlBefore = wdl
                 gameID += 1
@@ -163,6 +167,57 @@ def plotExpectedScore(points: list, functions: list, labels: list, title: str, f
         plt.show()
 
 
+def getExpectedScoreDrop(df: pd.DataFrame, function: tuple, minMove: int = 0) -> dict:
+    """
+    This function calculates the percentage of moves where the expected score drops a specific amount.
+    df: pd.DataFrame
+        Containing the move data
+    function: tuple
+        The function together with the parameter to calculate the expected score
+    minMove: int
+        The least move number to be considered to exclude opening moves
+    """
+    f, k = function
+    drops = dict()
+    total = 0
+    for i, row in df.iterrows():
+        if row["MoveNr"] < minMove:
+            continue
+        total += 1
+        if row["Color"] == chess.WHITE:
+            esb = f(row["EvalBefore"], k)
+            esa = f(row["EvalAfter"], k)
+        else:
+            esb = -f(row["EvalBefore"], k)
+            esa = -f(row["EvalAfter"], k)
+        drop = max(0, esb-esa)
+        drop = int(drop)
+        # drop = round(drop, 1)
+        if drop in drops.keys():
+            drops[drop] += 1
+        else:
+            drops[drop] = 1
+
+    for k in drops.keys():
+        drops[k] /= total
+    return drops
+
+
+def accuracyLichess(winPB: float, winPA: float, start: float, k: float) -> float:
+    return start * math.exp(-k * (winPB - winPA)) + (100-start)
+
+
+def plotAccuracies(dropList: list):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_yscale("log")
+    ax.yaxis.set_major_formatter(mtick.ScalarFormatter())
+    ax.yaxis.get_major_formatter().set_scientific(False)
+    for drops in dropList:
+        lists = sorted(drops.items())
+        x, y = zip(*lists)
+        plt.plot(x, y)
+    plt.plot(range(0, 100), [accuracyLichess(x, 0, 103.1668, 0.04354)/100 for x in range(0, 100)])
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -172,11 +227,16 @@ if __name__ == '__main__':
     df = pd.read_pickle('../out/gameDF')
     dfGM = filterGamesByRating(df, (2500, 2900), 50)
     df27 = filterGamesByRating(df, (2700, 2900), 100)
+    """
     points = list()
     for cp in [50, 100, 150, 200, 250, 300, 500]:
         prob = getExpectedScore(dfGM, cp)
         print(prob)
         points.append((cp, prob*100))
-    plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage compared to GM score", filename='../out/lichessWinp.png')
-    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
-    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
+    """
+    # plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage compared to GM score", filename='../out/lichessWinp.png')
+    # plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
+    # plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
+    drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
+    dropsM10 = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 15)
+    plotAccuracies([drops, dropsM10])
