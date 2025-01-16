@@ -191,8 +191,9 @@ def getExpectedScoreDrop(df: pd.DataFrame, function: tuple, minMove: int = 0) ->
             esb = -f(row["EvalBefore"], k)
             esa = -f(row["EvalAfter"], k)
         drop = max(0, esb-esa)
-        drop = int(drop)
-        # drop = round(drop, 1)
+        # drop = esb-esa
+        # drop = int(drop)
+        drop = round(drop, 2)
         if drop in drops.keys():
             drops[drop] += 1
         else:
@@ -203,40 +204,104 @@ def getExpectedScoreDrop(df: pd.DataFrame, function: tuple, minMove: int = 0) ->
     return drops
 
 
+def getGameExpectedScoreDrops(df: pd.DataFrame, function: tuple, minMove: int = 0) -> dict:
+    f, k = function
+    drops = dict()
+    lastGameID = None
+    gameDrops = dict()
+    totalDrops = [0, 0]
+    moves = [0, 0]
+    for i, row in df.iterrows():
+        currentGameID = row["GameID"]
+        if lastGameID is None:
+            lastGameID = currentGameID
+        if lastGameID != currentGameID:
+            lastGameID = currentGameID
+            for i in [0, 1]:
+                avgDrop = totalDrops[i]/moves[i]
+                avgDrop = round(avgDrop, 2)
+                if avgDrop in gameDrops.keys():
+                    gameDrops[avgDrop] += 1
+                else:
+                    gameDrops[avgDrop] = 1
+            totalDrops = [0, 0]
+            moves = [0, 0]
+        if row["Color"] == chess.WHITE:
+            esb = f(row["EvalBefore"], k)
+            esa = f(row["EvalAfter"], k)
+            index = 0
+        else:
+            esb = -f(row["EvalBefore"], k)
+            esa = -f(row["EvalAfter"], k)
+            index = 1
+        drop = max(0, esb-esa)
+        totalDrops[index] += drop
+        moves[index] += 1
+    for i in [0, 1]:
+        avgDrop = totalDrops[i]/moves[i]
+        avgDrop = round(drop, 2)
+        if avgDrop in gameDrops.keys():
+            gameDrops[avgDrop] += 1
+        else:
+            gameDrops[avgDrop] = 1
+    totalGames = sum(gameDrops.values())
+    print(totalGames)
+    for k in gameDrops.keys():
+        gameDrops[k] /= totalGames
+    return gameDrops
+
+
+def getCumulativeDrop(drops: dict):
+    cumulative = dict()
+    for key in drops.keys():
+        cumulative[key] = sum([v for k,v in drops.items() if k >= key])
+    return cumulative
+
+
 def accuracyLichess(winPB: float, winPA: float, start: float, k: float) -> float:
     return start * math.exp(-k * (winPB - winPA)) + (100-start)
 
 
 def plotAccuracies(dropList: list):
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_yscale("log")
+    # ax.set_yscale("log")
     ax.yaxis.set_major_formatter(mtick.ScalarFormatter())
     ax.yaxis.get_major_formatter().set_scientific(False)
     for drops in dropList:
         lists = sorted(drops.items())
         x, y = zip(*lists)
         plt.plot(x, y)
-    plt.plot(range(0, 100), [accuracyLichess(x, 0, 103.1668, 0.04354)/100 for x in range(0, 100)])
+    mu = 2
+    sigma = 1
+    xr = [c/100 for c in range(0, 800)]
+    plt.plot(xr, [1-(1/2*(1+math.erf((x-mu)/(sigma*math.sqrt(2))))) for x in xr])
+    # plt.plot(range(0, 50), [accuracyLichess(x, 0, 103.1668, 0.04354)/100 for x in range(0, 50)])
     plt.show()
 
 
 if __name__ == '__main__':
-    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn']
+    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn']
     # df = readMoveData(pgns)
     # df.to_pickle('../out/gameDF')
     df = pd.read_pickle('../out/gameDF')
-    dfGM = filterGamesByRating(df, (2500, 2900), 50)
+    dfGM = filterGamesByRating(df, (2500, 2900), 100)
     df27 = filterGamesByRating(df, (2700, 2900), 100)
-    """
     points = list()
+    """
     for cp in [50, 100, 150, 200, 250, 300, 500]:
         prob = getExpectedScore(dfGM, cp)
         print(prob)
         points.append((cp, prob*100))
+    plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage compared to GM score", filename='../out/lichessWinp.png')
+    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
+    plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
     """
-    # plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage compared to GM score", filename='../out/lichessWinp.png')
-    # plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
-    # plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
     drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
     dropsM10 = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 15)
-    plotAccuracies([drops, dropsM10])
+    cDrops = getCumulativeDrop(drops)
+    gameDrops = getGameExpectedScoreDrops(dfGM, (expectedScore, 0.007851))
+    cGameDrops = getCumulativeDrop(gameDrops)
+    # print(sorted(cGameDrops.items()))
+    # print(sorted(cDrops.items()))
+    # plotAccuracies([cDrops])
+    plotAccuracies([cGameDrops])
