@@ -8,6 +8,9 @@ import functions
 import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+from scipy import integrate
+import numpy as np
+import scipy
 
 
 def readMoveData(pgnPaths: list) -> pd.DataFrame:
@@ -245,7 +248,6 @@ def getGameExpectedScoreDrops(df: pd.DataFrame, function: tuple, minMove: int = 
         else:
             gameDrops[avgDrop] = 1
     totalGames = sum(gameDrops.values())
-    print(totalGames)
     for k in gameDrops.keys():
         gameDrops[k] /= totalGames
     return gameDrops
@@ -262,6 +264,19 @@ def accuracyLichess(winPB: float, winPA: float, start: float, k: float) -> float
     return start * math.exp(-k * (winPB - winPA)) + (100-start)
 
 
+def genGamma(t, x, l):
+    return np.exp(-t)*t**(x-1)
+
+
+def gammaInt(x, l):
+    upper = np.inf
+    return integrate.quad(genGamma, l, upper, args=(x,l))[0]
+
+
+def logistic(a, x):
+    return 1 / (1+np.exp((-a*x)))
+
+
 def plotAccuracies(dropList: list):
     fig, ax = plt.subplots(figsize=(10, 6))
     # ax.set_yscale("log")
@@ -271,11 +286,20 @@ def plotAccuracies(dropList: list):
         lists = sorted(drops.items())
         x, y = zip(*lists)
         plt.plot(x, y)
-    mu = 2
-    sigma = 1
+    mu = 1.965
+    sigma = 0.9
     xr = [c/100 for c in range(0, 800)]
-    plt.plot(xr, [1-(1/2*(1+math.erf((x-mu)/(sigma*math.sqrt(2))))) for x in xr])
+    # plt.plot(xr, [1-(1/2*(1+math.erf((x-mu)/(sigma*math.sqrt(2))))) for x in xr])
+
+    a = 1.5
+    lmb = 1.75
+    npRange = np.arange(0, 8, 0.1)
+    contPoisson = [1-scipy.special.gammaincc(x, lmb) for x in npRange]
+    for a in [1.5, 1.7, 2, 2.2]:
+        plt.plot(npRange, [1-logistic(a, x-mu) for x in npRange], label=a)
+    # plt.plot(npRange, contPoisson)
     # plt.plot(range(0, 50), [accuracyLichess(x, 0, 103.1668, 0.04354)/100 for x in range(0, 50)])
+    plt.legend()
     plt.show()
 
 
@@ -296,11 +320,12 @@ if __name__ == '__main__':
     plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
     plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
     """
-    drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
-    dropsM10 = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 15)
-    cDrops = getCumulativeDrop(drops)
+    # drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
+    # dropsM10 = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 15)
+    # cDrops = getCumulativeDrop(drops)
     gameDrops = getGameExpectedScoreDrops(dfGM, (expectedScore, 0.007851))
     cGameDrops = getCumulativeDrop(gameDrops)
+    # print(sorted(cGameDrops.items()))
     # print(sorted(cGameDrops.items()))
     # print(sorted(cDrops.items()))
     # plotAccuracies([cDrops])
