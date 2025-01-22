@@ -208,6 +208,9 @@ def getExpectedScoreDrop(df: pd.DataFrame, function: tuple, minMove: int = 0) ->
 
 
 def getGameExpectedScoreDrops(df: pd.DataFrame, function: tuple, minMove: int = 0) -> dict:
+    """
+    This fucntion calculates the average expected score drops for each game.
+    """
     f, k = function
     drops = dict()
     lastGameID = None
@@ -258,6 +261,28 @@ def getCumulativeDrop(drops: dict):
     for key in drops.keys():
         cumulative[key] = sum([v for k,v in drops.items() if k >= key])
     return cumulative
+
+
+def filterDataByGameMoves(df: pd.DataFrame, minMove: int, maxMove: int) -> pd.DataFrame:
+    """
+    This function returns a dataframe where only moves of games in the specified move range are considered
+    """
+    allowedIDs = list()
+    lastGameID = None
+    move = 0
+    for i, row in df.iterrows():
+        cGameID = row["GameID"]
+        if lastGameID is None:
+            lastGameID = cGameID
+        if lastGameID != cGameID:
+            if minMove <= move <= maxMove:
+                allowedIDs.append(lastGameID)
+            lastGameID = cGameID
+        else:
+            move = row["MoveNr"]
+    newDf = df[df["GameID"].isin(allowedIDs)]
+    newDf = newDf.reset_index()
+    return newDf
 
 
 def accuracyLichess(winPB: float, winPA: float, start: float, k: float) -> float:
@@ -358,8 +383,18 @@ if __name__ == '__main__':
     dDrops = getCumulativeDrop(getGameExpectedScoreDrops(dfDraws, (expectedScore, 0.007851)))
     dfDecisive = dfGM[(dfGM["Result"] == "1-0") | (dfGM["Result"] == "0-1")]
     decisive = getCumulativeDrop(getGameExpectedScoreDrops(dfDecisive, (expectedScore, 0.007851)))
+    # print(dfMoves)
     # print(sorted(cGameDrops.items()))
     # print(sorted(cGameDrops.items()))
     # print(sorted(cDrops.items()))
     # plotAccuracies([cDrops])
     plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"])
+    moveData = [cGameDrops]
+    for minMove in [0, 20, 40, 60]:
+        if minMove == 60:
+            maxMove = 10000
+        else:
+            maxMove = minMove + 20
+        dfMoves = filterDataByGameMoves(dfGM, minMove, maxMove)
+        moveData.append(getCumulativeDrop(getGameExpectedScoreDrops(dfMoves, (expectedScore, 0.007851))))
+    plotAccuracies(moveData, ["All games", "0-20", "20-40", "40-60", "60+"])
