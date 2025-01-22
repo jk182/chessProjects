@@ -277,30 +277,59 @@ def logistic(a, x):
     return 1 / (1+np.exp((-a*x)))
 
 
-def plotAccuracies(dropList: list):
+def getDerivative(data: dict) -> dict:
+    """
+    This calculates the slopes between datapoints in the dictionary
+    """
+    lists = sorted(data.items())
+    keys, values = zip(*lists)
+    derivative = dict()
+    for i in range(len(keys)-1):
+        derivative[keys[i]] = (values[i+1]-values[i])/(keys[i+1]-keys[i])
+    return derivative
+
+
+def plotAccuracies(dropList: list, labels: list, filename: str = None):
     fig, ax = plt.subplots(figsize=(10, 6))
+    colors = ['#689bf2', '#C3B1E1', '#f8a978', '#fa5a5a', '#5afa8d']
+    ax.set_facecolor('#e6f7f2')
     # ax.set_yscale("log")
     ax.yaxis.set_major_formatter(mtick.ScalarFormatter())
     ax.yaxis.get_major_formatter().set_scientific(False)
-    for drops in dropList:
+    for i, drops in enumerate(dropList):
         lists = sorted(drops.items())
         x, y = zip(*lists)
-        plt.plot(x, y)
+        plt.plot(x, y, color=colors[i], label=labels[i])
     mu = 1.965
     sigma = 0.9
     xr = [c/100 for c in range(0, 800)]
     # plt.plot(xr, [1-(1/2*(1+math.erf((x-mu)/(sigma*math.sqrt(2))))) for x in xr])
 
     a = 1.5
-    lmb = 1.75
+    lmb = 1.5
     npRange = np.arange(0, 8, 0.1)
     contPoisson = [1-scipy.special.gammaincc(x, lmb) for x in npRange]
+    # plt.plot(npRange, contPoisson)
+    """
     for a in [1.5, 1.7, 2, 2.2]:
         plt.plot(npRange, [1-logistic(a, x-mu) for x in npRange], label=a)
-    # plt.plot(npRange, contPoisson)
+    """
+
+    derivative = getDerivative(dropList[0])
+    lists = sorted(derivative.items())
+    x, y = zip(*lists)
+    # plt.plot(x, y)
     # plt.plot(range(0, 50), [accuracyLichess(x, 0, 103.1668, 0.04354)/100 for x in range(0, 50)])
+
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.legend()
-    plt.show()
+    ax.set_xlabel('Avg Expected Score loss per move')
+    ax.set_ylabel('Percentage of games')
+    plt.title('Accuracy')
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -309,9 +338,9 @@ if __name__ == '__main__':
     # df.to_pickle('../out/gameDF')
     df = pd.read_pickle('../out/gameDF')
     dfGM = filterGamesByRating(df, (2500, 2900), 100)
-    df27 = filterGamesByRating(df, (2700, 2900), 100)
-    points = list()
+    # df27 = filterGamesByRating(df, (2700, 2900), 100)
     """
+    points = list()
     for cp in [50, 100, 150, 200, 250, 300, 500]:
         prob = getExpectedScore(dfGM, cp)
         print(prob)
@@ -325,8 +354,12 @@ if __name__ == '__main__':
     # cDrops = getCumulativeDrop(drops)
     gameDrops = getGameExpectedScoreDrops(dfGM, (expectedScore, 0.007851))
     cGameDrops = getCumulativeDrop(gameDrops)
+    dfDraws = dfGM[dfGM["Result"] == "1/2-1/2"]
+    dDrops = getCumulativeDrop(getGameExpectedScoreDrops(dfDraws, (expectedScore, 0.007851)))
+    dfDecisive = dfGM[(dfGM["Result"] == "1-0") | (dfGM["Result"] == "0-1")]
+    decisive = getCumulativeDrop(getGameExpectedScoreDrops(dfDecisive, (expectedScore, 0.007851)))
     # print(sorted(cGameDrops.items()))
     # print(sorted(cGameDrops.items()))
     # print(sorted(cDrops.items()))
     # plotAccuracies([cDrops])
-    plotAccuracies([cGameDrops])
+    plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"])
