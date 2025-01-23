@@ -256,6 +256,34 @@ def getGameExpectedScoreDrops(df: pd.DataFrame, function: tuple, minMove: int = 
     return gameDrops
 
 
+def plotAccuracyDistribution(gameDrops: dict, filename: str = None):
+    """
+    This function plots the data from getGameExpectedScoreDrops as a distribution
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+    colors = ['#689bf2', '#C3B1E1', '#f8a978', '#fa5a5a', '#5afa8d']
+    ax.set_facecolor('#e6f7f2')
+    lists = sorted(gameDrops.items())
+    keys, values = zip(*lists)
+    width = (max(keys)-min(keys))/len(keys)
+    # print([keys[i] for i in range(len(keys)) if values[i] == max(values)])
+    data = list()
+    for k, v in gameDrops.items():
+        for i in range(int(v*1000)):
+            data.append(k)
+    print(scipy.stats.normaltest(data))
+    plt.bar(keys, values, alpha=1, width=width)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.set_xlabel('Avg Expected Score loss per move')
+    ax.set_ylabel('Relative number of games')
+    plt.title('Distribution of avg expected score loss per move')
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+    
+
+
 def getCumulativeDrop(drops: dict):
     cumulative = dict()
     for key in drops.keys():
@@ -330,8 +358,7 @@ def plotAccuracies(dropList: list, labels: list, filename: str = None):
     xr = [c/100 for c in range(0, 800)]
     # plt.plot(xr, [1-(1/2*(1+math.erf((x-mu)/(sigma*math.sqrt(2))))) for x in xr])
 
-    a = 1.5
-    lmb = 1.5
+    lmb = 1.65
     npRange = np.arange(0, 8, 0.1)
     contPoisson = [1-scipy.special.gammaincc(x, lmb) for x in npRange]
     # plt.plot(npRange, contPoisson)
@@ -358,7 +385,7 @@ def plotAccuracies(dropList: list, labels: list, filename: str = None):
 
 
 if __name__ == '__main__':
-    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn']
+    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn']
     # df = readMoveData(pgns)
     # df.to_pickle('../out/gameDF')
     df = pd.read_pickle('../out/gameDF')
@@ -387,8 +414,9 @@ if __name__ == '__main__':
     # print(sorted(cGameDrops.items()))
     # print(sorted(cGameDrops.items()))
     # print(sorted(cDrops.items()))
-    # plotAccuracies([cDrops])
-    plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"])
+    # plotAccuracies([cGameDrops], ["Game drops"])
+    # plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"])
+    """
     moveData = [cGameDrops]
     for minMove in [0, 20, 40, 60]:
         if minMove == 60:
@@ -398,3 +426,5 @@ if __name__ == '__main__':
         dfMoves = filterDataByGameMoves(dfGM, minMove, maxMove)
         moveData.append(getCumulativeDrop(getGameExpectedScoreDrops(dfMoves, (expectedScore, 0.007851))))
     plotAccuracies(moveData, ["All games", "0-20", "20-40", "40-60", "60+"])
+    """
+    plotAccuracyDistribution(gameDrops, '../out/gmAccuracyDistribution.png')
