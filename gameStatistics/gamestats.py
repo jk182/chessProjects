@@ -68,7 +68,7 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
     return df
 
 
-def filterGamesByRating(df: pd.DataFrame, ratingRange: tuple, ratingDifference: int) -> pd.DataFrame:
+def filterGamesByRating(df: pd.DataFrame, ratingRange: tuple, ratingDifference: int, bothPlayers: bool = False) -> pd.DataFrame:
     """
     This filters a dataframe to only include games with the specified rating.
     df: pd.DataFrame
@@ -77,11 +77,16 @@ def filterGamesByRating(df: pd.DataFrame, ratingRange: tuple, ratingDifference: 
         Minimum and maximum rating for one of these players
     ratingDifference: int
         The maximal difference in rating between these players
+    bothPlayers: bool
+        If set, both players will be in the rating range, without considering the difference
     return -> pd.DataFrame
         Dataframe with only the games where players are in the rating range
     """
     minElo, maxElo = ratingRange
-    filtered = df[(abs(df["WhiteElo"]-df["BlackElo"]) <= ratingDifference) & (((minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo)) | ((minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)))]
+    if not bothPlayers:
+        filtered = df[(abs(df["WhiteElo"]-df["BlackElo"]) <= ratingDifference) & (((minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo)) | ((minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)))]
+    else:
+        filtered = df[(minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo) & (minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)]
     filtered = filtered.reset_index()
     return filtered
 
@@ -266,22 +271,16 @@ def plotAccuracyDistribution(gameDrops: dict, filename: str = None):
     lists = sorted(gameDrops.items())
     keys, values = zip(*lists)
     width = (max(keys)-min(keys))/len(keys)
-    # print([keys[i] for i in range(len(keys)) if values[i] == max(values)])
-    data = list()
-    for k, v in gameDrops.items():
-        for i in range(int(v*1000)):
-            data.append(k)
-    print(scipy.stats.normaltest(data))
-    plt.bar(keys, values, alpha=1, width=width)
+    plt.bar(keys, values, alpha=1, width=width, color=colors[0])
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     ax.set_xlabel('Avg Expected Score loss per move')
     ax.set_ylabel('Relative number of games')
+    ax.set_xlim(0, max(keys)*1.02)
     plt.title('Distribution of avg expected score loss per move')
     if filename:
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
-    
 
 
 def getCumulativeDrop(drops: dict):
@@ -342,25 +341,25 @@ def getDerivative(data: dict) -> dict:
     return derivative
 
 
-def plotAccuracies(dropList: list, labels: list, filename: str = None):
+def plotAccuracies(dropList: list, labels: list, title: str, axisLabels: tuple, filename: str = None):
     fig, ax = plt.subplots(figsize=(10, 6))
-    colors = ['#689bf2', '#C3B1E1', '#f8a978', '#fa5a5a', '#5afa8d']
+    colors = [ '#f8a978', '#689bf2', '#fa5a5a', '#C3B1E1', '#5afa8d']
     ax.set_facecolor('#e6f7f2')
     # ax.set_yscale("log")
-    ax.yaxis.set_major_formatter(mtick.ScalarFormatter())
-    ax.yaxis.get_major_formatter().set_scientific(False)
+    maxX = 0
     for i, drops in enumerate(dropList):
         lists = sorted(drops.items())
         x, y = zip(*lists)
-        plt.plot(x, y, color=colors[i], label=labels[i])
+        maxX = max(max(x), maxX)
+        plt.plot(x, [100*i for i in y], color=colors[i], label=labels[i])
     mu = 1.965
     sigma = 0.9
     xr = [c/100 for c in range(0, 800)]
     # plt.plot(xr, [1-(1/2*(1+math.erf((x-mu)/(sigma*math.sqrt(2))))) for x in xr])
 
-    lmb = 1.65
+    lmb = 1.5
     npRange = np.arange(0, 8, 0.1)
-    contPoisson = [1-scipy.special.gammaincc(x, lmb) for x in npRange]
+    contPoisson = [1-scipy.special.gammaincc(x-0.4, lmb) for x in npRange]
     # plt.plot(npRange, contPoisson)
     """
     for a in [1.5, 1.7, 2, 2.2]:
@@ -372,12 +371,20 @@ def plotAccuracies(dropList: list, labels: list, filename: str = None):
     x, y = zip(*lists)
     # plt.plot(x, y)
     # plt.plot(range(0, 50), [accuracyLichess(x, 0, 103.1668, 0.04354)/100 for x in range(0, 50)])
+    
+    sigma = 1.55
+    offset = 0.25
+    ray = [100*np.exp(-(x-offset)**2/(2*sigma**2)) if x > offset else 100 for x in npRange]
+    plt.plot(npRange, ray, color=colors[1], label='Accuracy score')
 
+    ax.set_xlim(0, maxX)
+    ax.set_ylim(-0.2, 100.5)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.legend()
-    ax.set_xlabel('Avg Expected Score loss per move')
-    ax.set_ylabel('Percentage of games')
-    plt.title('Accuracy')
+    ax.set_xlabel(axisLabels[0])
+    ax.set_ylabel(axisLabels[1])
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    plt.title(title)
     if filename:
         plt.savefig(filename, dpi=400)
     else:
@@ -385,11 +392,11 @@ def plotAccuracies(dropList: list, labels: list, filename: str = None):
 
 
 if __name__ == '__main__':
-    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn']
+    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn']
     # df = readMoveData(pgns)
     # df.to_pickle('../out/gameDF')
     df = pd.read_pickle('../out/gameDF')
-    dfGM = filterGamesByRating(df, (2500, 2900), 100)
+    dfGM = filterGamesByRating(df, (2500, 2900), 100, True)
     # df27 = filterGamesByRating(df, (2700, 2900), 100)
     """
     points = list()
@@ -401,30 +408,29 @@ if __name__ == '__main__':
     plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
     plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
     """
-    # drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
+    drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
     # dropsM10 = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 15)
-    # cDrops = getCumulativeDrop(drops)
+    cDrops = getCumulativeDrop(drops)
     gameDrops = getGameExpectedScoreDrops(dfGM, (expectedScore, 0.007851))
     cGameDrops = getCumulativeDrop(gameDrops)
     dfDraws = dfGM[dfGM["Result"] == "1/2-1/2"]
     dDrops = getCumulativeDrop(getGameExpectedScoreDrops(dfDraws, (expectedScore, 0.007851)))
     dfDecisive = dfGM[(dfGM["Result"] == "1-0") | (dfGM["Result"] == "0-1")]
     decisive = getCumulativeDrop(getGameExpectedScoreDrops(dfDecisive, (expectedScore, 0.007851)))
-    # print(dfMoves)
-    # print(sorted(cGameDrops.items()))
-    # print(sorted(cGameDrops.items()))
-    # print(sorted(cDrops.items()))
-    # plotAccuracies([cGameDrops], ["Game drops"])
-    # plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"])
+    # plotAccuracies([cDrops], ["Expected score loss"], 'Move Accuracy', ('Expected score loss', 'Percentage of moves'), filename='../out/moveAccuracy.png')
+    plotAccuracies([cGameDrops], ["CDF of AXSL"], 'Fitting a cuve to the AXSL', ("Average expected score loss per move", "Percentile of games"), filename='../out/fittedCurveAXSL.png')
+    # plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"], 'AXSL for different game results', ('Average expected score loss per move', 'Percentile of games'), filename='../out/gameResultAXSL.png')
     """
     moveData = [cGameDrops]
-    for minMove in [0, 20, 40, 60]:
-        if minMove == 60:
-            maxMove = 10000
+    moveNumbers = [0, 30, 40, 55, 10000]
+    for i, minMove in enumerate(moveNumbers):
+        if i < len(moveNumbers)-1:
+            maxMove = moveNumbers[i+1]
         else:
-            maxMove = minMove + 20
+            break
         dfMoves = filterDataByGameMoves(dfGM, minMove, maxMove)
+        print(len(dfMoves))
         moveData.append(getCumulativeDrop(getGameExpectedScoreDrops(dfMoves, (expectedScore, 0.007851))))
-    plotAccuracies(moveData, ["All games", "0-20", "20-40", "40-60", "60+"])
+    plotAccuracies(moveData, ["All games", "0-30", "30-40", "40-55", "55+"], 'AXSL for different game lengths', ('Average expected score loss per move', 'Percentile of games'), filename='../out/lengthAXSL.png')
     """
-    plotAccuracyDistribution(gameDrops, '../out/gmAccuracyDistribution.png')
+    # plotAccuracyDistribution(gameDrops, filename='../out/axsDistribution.png')
