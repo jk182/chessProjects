@@ -98,6 +98,53 @@ def getMoveData(pgnPaths: list) -> pd.DataFrame:
     return df
 
 
+def getGameAccuracies(pgnPath: str) -> dict:
+    """
+    This function calculates the accuracies of each player
+    pgnPath: str
+        The path to the PGN file of the tournament
+    return -> dict
+        Dictionary indexed by player names containing a list of each game accuracy
+    """
+    accuracies = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            w = game.headers["White"]
+            b = game.headers["Black"]
+            wxs = list()
+            bxs = list()
+            
+            node = game
+            cpB = None
+            while not node.is_end():
+                node = node.variations[0]
+                if not functions.readComment(node, True, True):
+                    continue
+                cpA = functions.readComment(node, True, True)[1]
+                if not cpB:
+                    cpB = cpA
+                    continue
+
+                if node.turn():
+                    esB = functions.expectedScore(cpB * -1)
+                    esA = functions.expectedScore(cpA * -1)
+                    bxs.append(max(esB-esA, 0))
+                else:
+                    esB = functions.expectedScore(cpB)
+                    esA = functions.expectedScore(cpA)
+                    wxs.append(max(esB-esA, 0))
+                cpB = cpA
+            if w not in accuracies.keys():
+                accuracies[w] = [functions.gameAccuracy(sum(wxs)/len(wxs))]
+            else:
+                accuracies[w].append(functions.gameAccuracy(sum(wxs)/len(wxs)))
+            if b not in accuracies.keys():
+                accuracies[b] = [functions.gameAccuracy(sum(bxs)/len(bxs))]
+            else:
+                accuracies[b].append(functions.gameAccuracy(sum(bxs)/len(bxs)))
+    return accuracies
+
+
 def plotAccuracyDistribution(df: pd.DataFrame) -> None:
     """
     This plots the accuracy distribution for all moves in the given PGNs
@@ -676,9 +723,10 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
 
 if __name__ == '__main__':
     wijk = '../out/games/wijk2024.pgn'
-    generateTournamentPlots(wijk)
+    print(getGameAccuracies(wijk))
+    # generateTournamentPlots(wijk)
     roundScores = getRoundByRoundScores(wijk)
-    plotRoundScores(roundScores)
+    # plotRoundScores(roundScores)
     # Ding games
     """
     preCovid = '../out/games/dingPreCovid-out.pgn'

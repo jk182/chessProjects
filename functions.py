@@ -3,6 +3,7 @@ import chess
 import numpy as np
 import subprocess
 import re
+import math
 
 
 def configureEngine(engineName: str, uci_options: dict) -> engine:
