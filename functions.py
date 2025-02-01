@@ -154,3 +154,24 @@ def getNumberOfGames(fen: str) -> int:
     print(output)
     games = re.findall(r'\d+', output)[0]
     return int(games)
+
+
+def expectedScore(cp: int) -> float:
+    """
+    This function calculates the expected score based on the Stockfish evaluation. 
+    See gameStatistics/gameStats.py
+    """
+    k = 0.007851
+    return 50 + 100/math.pi * math.atan(k*cp)
+
+
+def gameAccuracy(AXSL: float) -> float:
+    """
+    This function calculates the accuracy of a game given the average expected score loss (AXSL)
+    See gameStatistics/gameStats.py
+    """
+    sigma = 1.55
+    offset = 0.25
+    if AXSL <= offset:
+        return 100
+    return 100 * np.exp(-(AXSL-offset)**2/(2*sigma**2))
