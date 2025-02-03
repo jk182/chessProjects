@@ -597,7 +597,7 @@ def plotSharpChange(sharpChange: dict, player: str = '', short: dict = None, fil
     plt.xticks(rotation=90)
     ax.set_facecolor('#e6f7f2')
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.15, right=0.95)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
     plt.xlim(-0.5, len(x)-0.5)
     ax.bar(x,y, edgecolor='black', linewidth=0.5, color='#fa5a5a', width=0.7)
     ax.set_ylabel('Average sharpness change per move')
