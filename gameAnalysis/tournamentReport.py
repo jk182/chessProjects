@@ -588,7 +588,7 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     colors = ['#4ba35a', '#9CF196', '#F0EBE3', '#F69E7B', '#EF4B4B']
 
     fig, ax = plt.subplots(figsize=(10,6))
-    ax.set_facecolor('#CDFCF6')
+    ax.set_facecolor('#e6f7f2')
     plt.xticks(rotation=90)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 
@@ -846,9 +846,9 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
 
 
 if __name__ == '__main__':
-    wijk = '../out/games/wijkMasters2025_classical.pgn'
-    nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh'}
-    plotPath = '../out/wijkPlots/masters'
+    wijk = '../out/games/wijkChallengers2025-out.pgn'
+    nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
+    plotPath = '../out/wijkPlots/challengers'
     gameAcc = getGameAccuracies(wijk)
     avgGameAcc = dict()
     for p, v in gameAcc.items():
@@ -856,9 +856,10 @@ if __name__ == '__main__':
         oA = sum([a[1] for a in v])/len(v)
         avgGameAcc[p] = [pA, oA]
     generateTournamentPlots(wijk, nicknames=nicknames, filename=plotPath)
-    plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Game accuracy', short=nicknames, filename='{plotPath}-gameAcc.png')
+    plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Game accuracy', short=nicknames, filename=f'{plotPath}-gameAcc.png')
     roundScores = getRoundByRoundScores(wijk)
-    fightForFirst = ['Gukesh D', 'Praggnanandhaa R', 'Abdusattorov, Nodirbek']
+    # fightForFirst = ['Gukesh D', 'Praggnanandhaa R', 'Abdusattorov, Nodirbek']
+    fightForFirst = ['Nguyen, Thai Dai Van', 'Suleymanli, Aydin', "L'Ami, Erwin"]
     tb =  '../out/games/wijkMasters2025_tiebreak.pgn'
     mmxs = getMoveByMoveExpectedScore(tb)
     plotMoveByMoveExpectedScore(mmxs, nicknames=nicknames, filename=f'{plotPath}-TB.png')
