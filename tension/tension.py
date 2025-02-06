@@ -9,7 +9,8 @@ def buildGraph(board: chess.Board) -> dict():
     """
     graph = dict()
     for square in range(64):
-        if p := board.piece_at(square):
+        if board.piece_at(square):
+            # if board.is_attacked_by(chess.WHITE, square) or board.is_attacked_by(chess.BLACK, square):
             graph[square] = [s for s in list(board.attacks(square)) if board.piece_at(s)]
             """
             if attacks := [s for s in list(board.attacks(square)) if board.piece_at(s)]:
@@ -31,8 +32,7 @@ def findShortestPaths(graph: dict, start: int, end: int) -> list:
         path = paths.pop(0)
         node = path[-1]
         if node not in graph.keys():
-            continue
-        if node in path[:-1]:
+            print("Piece not found")
             continue
         neighbors = graph[node]
         if end in neighbors:
@@ -45,6 +45,8 @@ def findShortestPaths(graph: dict, start: int, end: int) -> list:
                         retPaths.append(p)
             return retPaths
         for n in neighbors:
+            if n in path:
+                continue
             newPath = path.copy()
             newPath.append(n)
             paths.append(newPath)
@@ -65,6 +67,9 @@ def calculateBC(graph: dict, piece: int) -> float:
                 if paths := findShortestPaths(graph, p, q):
                     pathsThroughPiece = len([path for path in paths if piece in path])
                     s += pathsThroughPiece/len(paths)
+                    # print(p, q, paths)
+                    # if pathsThroughPiece > 0:
+                        # print(piece, paths, s)
     return BC * s
 
 
@@ -94,11 +99,10 @@ def plotGameFragility(fragility: list()):
 
 
 if __name__ == '__main__':
-    graph = buildGraph(chess.Board('r2r2k1/1p1bb2p/p3p1p1/4p1P1/2q1P2Q/2N5/PP4BP/3R1R1K w - - 0 1'))
+    graph = buildGraph(chess.Board('1bq1r1k1/1p3pp1/1P2b1n1/p1p1p2p/P1PNP1P1/4BP1P/2Q3B1/3R1RK1 b - - 0 25'))
     print(graph)
     print(findShortestPaths(graph, 14, 28))
     print(calculateBC(graph, 14))
-    g2 = buildGraph(chess.Board('6k1/8/8/8/8/3n4/2BrP3/3Q3K w - - 0 1'))
-    print(findShortestPaths(g2, 3, 19))
-    frag = calculateGameFragility('../resources/kasparov-topalov.pgn')
+    # frag = calculateGameFragility('../resources/kasparov-topalov.pgn')
+    frag = calculateGameFragility('../resources/tension.pgn')
     plotGameFragility(frag)
