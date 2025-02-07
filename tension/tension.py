@@ -2,6 +2,9 @@ import chess
 import chess.pgn
 import matplotlib.pyplot as plt
 
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
 
 def buildGraph(board: chess.Board) -> dict():
     """
@@ -98,11 +101,38 @@ def plotGameFragility(fragility: list()):
     plt.show()
 
 
+def getEvalChange(pgnPaths: list) -> list:
+    changes = list()
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                maxSharp = 0
+                cpB = None
+                node = game
+
+                while not node.is_end():
+                    if not functions.readComment(node, True, True):
+                        node = node.variations[0]
+                        continue
+                    comment = functions.readComment(node, True, True)
+                    node = node.variations[0]
+                    if not functions.readComment(node, True, True):
+                        continue
+                    cpA = functions.readComment(node, True, True)[1]
+                    sharp = functions.sharpnessLC0(comment[0])
+                    cpB = comment[1]
+                    if sharp > maxSharp:
+                        cps = (cpB, cpA)
+                changes.append(cps)
+    return changes
+
+
 if __name__ == '__main__':
     graph = buildGraph(chess.Board('1bq1r1k1/1p3pp1/1P2b1n1/p1p1p2p/P1PNP1P1/4BP1P/2Q3B1/3R1RK1 b - - 0 25'))
     print(graph)
     print(findShortestPaths(graph, 14, 28))
     print(calculateBC(graph, 14))
     # frag = calculateGameFragility('../resources/kasparov-topalov.pgn')
-    frag = calculateGameFragility('../resources/tension.pgn')
-    plotGameFragility(frag)
+    # frag = calculateGameFragility('../resources/tension.pgn')
+    # plotGameFragility(frag)
+    print(getEvalChange(['../out/games/wijkMasters2025.pgn']))
