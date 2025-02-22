@@ -391,12 +391,111 @@ def plotAccuracies(dropList: list, labels: list, title: str, axisLabels: tuple, 
         plt.show()
 
 
+def getxScoreDropByMoves(moveData: pd.DataFrame) -> dict:
+    """
+    This calculates the expected score drop depending on the move number
+    """
+    moveDrops = dict()
+    for i, row in moveData.iterrows():
+        moveNr = row["MoveNr"]
+        if row["Color"]:
+            xs = (functions.expectedScore(row["EvalBefore"]), functions.expectedScore(row["EvalAfter"]))
+        else:
+            xs = (functions.expectedScore(-row["EvalBefore"]), functions.expectedScore(-row["EvalAfter"]))
+        score = max(0, xs[0]-xs[1])
+        if moveNr in moveDrops.keys():
+            moveDrops[moveNr].append(score)
+        else:
+            moveDrops[moveNr] = [score]
+    return moveDrops
+
+
+def getxScoreDropByEval(moveData: pd.DataFrame) -> dict:
+    evalDrops = dict()
+    for i, row in moveData.iterrows():
+        if row["Color"]:
+            xs = (functions.expectedScore(row["EvalBefore"]), functions.expectedScore(row["EvalAfter"]))
+            evalB = row["EvalBefore"]
+            # evalB = xs[0]
+        else:
+            xs = (functions.expectedScore(-row["EvalBefore"]), functions.expectedScore(-row["EvalAfter"]))
+            evalB = -row["EvalBefore"]
+            # evalB = xs[0]
+        score = max(0, xs[0]-xs[1])
+        evalB = (evalB // 10) * 10
+        if evalB in evalDrops.keys():
+            evalDrops[evalB].append(score)
+        else:
+            evalDrops[evalB] = [score]
+    return evalDrops
+
+
+def getxScoreDrops(moveData: pd.DataFrame) -> dict:
+    drops = dict()
+    total = 0
+    for i, row in moveData.iterrows():
+        if row["Color"]:
+            xs = (functions.expectedScore(row["EvalBefore"]), functions.expectedScore(row["EvalAfter"]))
+        else:
+            xs = (functions.expectedScore(-row["EvalBefore"]), functions.expectedScore(-row["EvalAfter"]))
+        score = round(max(0, xs[0]-xs[1]), 0)
+        total += 1
+        if score in drops.keys():
+            drops[score] += 1
+        else:
+            drops[score] = 1
+    for k, v in drops.items():
+        drops[k] = v/total
+    return drops
+
+
+def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, isList: bool = True, limits: list = None, filename: str = None):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    colors = ['#f8a978', '#689bf2', '#fa5a5a', '#C3B1E1', '#5afa8d']
+    ax.set_facecolor('#e6f7f2')
+    if isList:
+        nData = dict()
+        for k, v in data.items():
+            if abs(k) > 500:
+                continue
+            n = 0
+            for drop in v:
+                if drop > 10:
+                    n += 1
+            nData[k] = n/len(v)
+            # nData[k] = sum(v)/len(v)
+    else:
+        nData = data
+
+    # ax.bar(list(nData.keys()), list(nData.values()), color=colors[0], width=1, edgecolor='black')
+    ax.bar(list(nData.keys()), list(nData.values()), color=colors[0], width=10, edgecolor='black')
+
+    # ax.set_yscale('log')
+
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+    if limits:
+        ax.set_xlim(*limits)
+    plt.title(title)
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn']
     # df = readMoveData(pgns)
     # df.to_pickle('../out/gameDF')
     df = pd.read_pickle('../out/gameDF')
-    dfGM = filterGamesByRating(df, (2500, 2900), 100, True)
+    dfGM = filterGamesByRating(df, (2500, 2900), 150, True)
+    # xScoreMoves = getxScoreDropByMoves(dfGM)
+    # plotBarChart(xScoreMoves, 'Move number', 'Relative number of mistakes', 'Relative number of mistakes every move', limits=[0, 110], filename='../out/mistakesPerMove.png')
+    xScoreEvals = getxScoreDropByEval(dfGM)
+    plotBarChart(xScoreEvals, 'Evaluation', 'Relative number of mistakes', 'Mistakes depending on evaluation', limits=[-300, 520], filename='../out/mistakesEval.png')
+    # xScore = getxScoreDrops(dfGM)
+    # plotBarChart(xScore, 'Expected score drop', 'Relative number of moves', 'Distribution of expected score loss', isList=False, limits=[-0.5, 52], filename='../out/xScoreDis.png')
     # df27 = filterGamesByRating(df, (2700, 2900), 100)
     """
     points = list()
@@ -407,6 +506,7 @@ if __name__ == '__main__':
     plotExpectedScore(points, [(winPLichess, 0.00368208)], ["Lichess win probability"], "Lichess win percentage compared to GM score", filename='../out/lichessWinp.png')
     plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545)], ["Lichess win probability", "k=0.007545"], "Updated expected score compared to GM score", filename='../out/newK.png')
     plotExpectedScore(points, [(winPLichess, 0.00368208), (winPLichess, 0.007545), (expectedScore, 0.007851)], ["Lichess win probability", "k=0.007545", "arctan"], "arctan approximation compared to GM score", filename='../out/arctan.png')
+    """
     """
     drops = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 0)
     # dropsM10 = getExpectedScoreDrop(dfGM, (expectedScore, 0.007851), 15)
@@ -420,6 +520,7 @@ if __name__ == '__main__':
     # plotAccuracies([cDrops], ["Expected score loss"], 'Move Accuracy', ('Expected score loss', 'Percentage of moves'), filename='../out/moveAccuracy.png')
     plotAccuracies([cGameDrops], ["CDF of AXSL"], 'Fitting a cuve to the AXSL', ("Average expected score loss per move", "Percentile of games"), filename='../out/fittedCurveAXSL.png')
     # plotAccuracies([cGameDrops, dDrops, decisive], ["All games", "Draws", "Decisive games"], 'AXSL for different game results', ('Average expected score loss per move', 'Percentile of games'), filename='../out/gameResultAXSL.png')
+    """
     """
     moveData = [cGameDrops]
     moveNumbers = [0, 30, 40, 55, 10000]
