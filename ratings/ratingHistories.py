@@ -71,24 +71,34 @@ def combineRatingData(obData: dict, fideData: dict) -> dict:
     return rData
 
 
-def plotRatingData(ratingData: dict):
+def plotRatingData(ratingData: dict, title: str, filename: str = None):
     fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    colors = [('#93BFCF', '#6096B4'), ('#b9e6d3', '#7ed3b2'), ('#FFC4E1', '#FF87CA'), ('#DFCCFB', '#BEADFA'), ('#EBCE95', '#F8A978'), ('#FF9F9F', '#E97777'), ('#6E7C7C', '#435560')] 
 
-    for player, data in ratingData.items():
-        ax.plot([d[0] for d in data], [d[1] for d in data], label=player)
+    for i, (player, data) in enumerate(ratingData.items()):
+        ax.plot([d[0] for d in data], [d[1] for d in data], label=player, color=colors[i%len(colors)][1])
 
+    ax.set_xlabel('Age')
+    ax.set_ylabel('FIDE rating')
     ax.legend()
-    plt.show()
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.title(title)
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
+    """
     fideIDs = {'Polgar': (700070, 1976+6/12), 'Anand': (5000017, 1969+11/12)}
     fideData = getFideRatingData(fideIDs)
     names = ['Kasparov,%20Garry', 'Polgar,%20Judit', 'Anand,%20Viswanathan', 'Dreev,%20Alexey', 'Ivanchuk,%20Vassily']
     birthdays = [('Apr', 1963), ('Jul', 1976), ('Dec', 1969), ('Jan', 1969), ('Mar', 1969)]
     names = ['Bu,%20Xiangzhi']
     birthdays = [('Dec', 1985)]
-    nineties = {'Carlsen': (1503014, 1990+10/12), 'Karjakin': (14109603, 1990+0/12), 'Bu': (8601445, 1985+11/12)}
+    'Bu': (8601445, 1985+11/12)
     nData = getFideRatingData(nineties)
     ratingData = getRatingData(names, birthdays)
     print(ratingData)
@@ -96,3 +106,14 @@ if __name__ == '__main__':
     compData = combineRatingData(ratingData, nData)
     print(compData)
     plotRatingData(compData)
+    """
+    gen1 = {'Carlsen': (1503014, 1990+10/12), 'Karjakin': (14109603, 1990+0/12), 'Caruana': (2020009, 1992+6/12), 'Nepo': (4168119, 1990+6/12), 'Giri': (24116068, 1994+5/12), 'Ding': (8603677, 1992+9/12), 'So': (5202213, 1993+9/12)}
+    gen1RatingData = getFideRatingData(gen1)
+    plotRatingData(gen1RatingData, '1990-1994 Generation', filename='../out/rating90Gen.png')
+    gen2 = {'Firouzja': (12573981, 2003+5/12), 'Gukesh': (46616543, 2006+4/12), 'Abdusattorov': (14204118, 2004+8/12), 'Pragg': (25059530, 2005+7/12), 'Arjun': (35009192, 2003+8/12), 'Keymer': (12940690, 2004+10/12)}
+    # 'Wei Yi': (8603405, 1999+5/12)
+    gen2RatingData = getFideRatingData(gen2)
+    plotRatingData(gen2RatingData, '2003-2006 Generation', filename='../out/rating00Gen.png')
+    gen3 = {'Gurel': (44507356, 2008+11/12), 'Erdogmus': (44599790, 2011+5/12), 'Mishra': (30920019, 2009+1/12), 'Zemlyanskii': (24249971, 2010+7/12), 'Samunenkov': (14187086, 2009+5/12), 'Oro': (20000197, 2013+9/12), 'Lu Miaoyi': (8618020, 2010+1/12)}
+    gen3RatingData = getFideRatingData(gen3)
+    plotRatingData(gen3RatingData, '2008-2013 Generation', filename='../out/rating10Gen.png')
