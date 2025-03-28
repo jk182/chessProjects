@@ -16,6 +16,7 @@ def getPositionScore(client, position: str, ratings: list) -> float:
         The score from White's perspective
     """
     info = client.opening_explorer.get_lichess_games(position=position, ratings=ratings)
+    print(info['white']+info['draws']+info['black'])
     return (info['white']+0.5*info['draws']) / (info['white']+info['draws']+info['black'])
 
 
@@ -38,6 +39,7 @@ def plotOpeningScores(client, openings: dict, title: str, filename: str = None):
     ratings = ['400', '1000', '1200', '1400', '1600', '1800', '2000', '2200', '2500']
 
     for i, (name, position) in enumerate(openings.items()):
+        print(name)
         scores = [getPositionScore(client, position, [rating]) for rating in ratings if time.sleep(0.7) is None]
         plt.plot(scores, label=name, color=colors[i%len(openings)])
 
@@ -67,15 +69,23 @@ if __name__ == '__main__':
                   '1.c4': 'rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1',
                   '1.Nf3': 'rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1',
                   '1.b3': 'rnbqkbnr/pppppppp/8/8/8/1P6/P1PPPPPP/RNBQKBNR b KQkq - 0 1',
-                  '1.g4': 'rnbqkbnr/pppppppp/8/8/6P1/8/PPPPPP1P/RNBQKBNR b KQkq - 0 1',
+                  # '1.f4': 'rnbqkbnr/pppppppp/8/8/5P2/8/PPPPP1PP/RNBQKBNR b KQkq - 0 1',
                   '1.g3': 'rnbqkbnr/pppppppp/8/8/8/6P1/PPPPPP1P/RNBQKBNR b KQkq - 0 1'}
-    blackMoves = {'1.e4 e5': 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+    e4Openings = {'1.e4 e5': 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
                   '1.e4 c5': 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
                   '1.e4 e6': 'rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
                   '1.e4 c6': 'rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
                   '1.e4 g6': 'rnbqkbnr/pppppp1p/6p1/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
                   '1.e4 d5': 'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2'}
                   # '1.e4 Nf6': 'rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2'}
+    d4Openings = {'QGD': 'rnbqkbnr/ppp2ppp/4p3/3p4/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3',
+                  'QGA': 'rnbqkbnr/ppp1pppp/8/8/2pP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3',
+                  'Slav': 'rnbqkbnr/pp2pppp/2p5/3p4/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3',
+                  'KID': 'rnbqk2r/ppppppbp/5np1/8/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4',
+                  'Grünfeld': 'rnbqkb1r/ppp1pp1p/5np1/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 4',
+                  'Nimzo-Indian': 'rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4',
+                  'Dutch': 'rnbqkbnr/ppppp1pp/8/5p2/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2'}
+
     openings = {'Najdorf': 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6',
                 'Kings Gambit': 'rnbqkbnr/pppp1ppp/8/4p3/4PP2/8/PPPP2PP/RNBQKBNR b KQkq - 0 2',
                 'Kings Indian': 'rnbqk2r/ppp1ppbp/3p1np1/8/2PPP3/2N5/PP3PPP/R1BQKBNR w KQkq - 0 5',
@@ -90,5 +100,14 @@ if __name__ == '__main__':
                  'KID': 'rnbqk2r/ppppppbp/5np1/8/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4',
                  'Grünfeld': 'rnbqkb1r/ppp1pp1p/5np1/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 4',
                  'Nimzo-Indian': 'rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4'}
-    # plotOpeningScores(client, blackMoves, 'Scores for different responses to 1.e4', filename='../out/lichessOpeningsvse4.png')
-    plotOpeningScores(client, mainLines, 'Scores in different openings')
+    gambits = {"King's Gambit": 'rnbqkbnr/pppp1ppp/8/4p3/4PP2/8/PPPP2PP/RNBQKBNR b KQkq - 0 2',
+               'Smith-Morra Gambit': 'rnbqkbnr/pp1ppppp/8/2p5/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2',
+               'Marshall Attack': 'r1bq1rk1/2p1bppp/p1n2n2/1p1pp3/4P3/1BP2N2/PP1P1PPP/RNBQR1K1 w - - 0 9',
+               'Budapest Gambit': 'rnbqkb1r/pppp1ppp/5n2/4p3/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3',
+               'Englund Gambit': 'rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2',
+               'Benko Gambit': 'rnbqkb1r/p2ppppp/5n2/1ppP4/2P5/8/PP2PPPP/RNBQKBNR w KQkq - 0 4'}
+    plotOpeningScores(client, e4Openings, 'Scores of responses to 1.e4')
+    # plotOpeningScores(client, mainLines, 'Scores in different openings')
+    # plotOpeningScores(client, d4Openings, 'Scores of d4 openings', filename='../out/lichessOpeningsd4.png')
+    # plotOpeningScores(client, startMoves, 'Scores of different first moves', filename='../out/lichessOpeningsFirst.png')
+    # plotOpeningScores(client, gambits, 'Scores of different gambits', filename='../out/lichessOpeningsGambits.png')
