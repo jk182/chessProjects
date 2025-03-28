@@ -16,7 +16,6 @@ def getPositionScore(client, position: str, ratings: list) -> float:
         The score from White's perspective
     """
     info = client.opening_explorer.get_lichess_games(position=position, ratings=ratings)
-    print(info['white']+info['draws']+info['black'])
     return (info['white']+0.5*info['draws']) / (info['white']+info['draws']+info['black'])
 
 
@@ -39,7 +38,6 @@ def plotOpeningScores(client, openings: dict, title: str, filename: str = None):
     ratings = ['400', '1000', '1200', '1400', '1600', '1800', '2000', '2200', '2500']
 
     for i, (name, position) in enumerate(openings.items()):
-        print(name)
         scores = [getPositionScore(client, position, [rating]) for rating in ratings if time.sleep(0.7) is None]
         plt.plot(scores, label=name, color=colors[i%len(openings)])
 
@@ -106,8 +104,8 @@ if __name__ == '__main__':
                'Budapest Gambit': 'rnbqkb1r/pppp1ppp/5n2/4p3/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3',
                'Englund Gambit': 'rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2',
                'Benko Gambit': 'rnbqkb1r/p2ppppp/5n2/1ppP4/2P5/8/PP2PPPP/RNBQKBNR w KQkq - 0 4'}
-    plotOpeningScores(client, e4Openings, 'Scores of responses to 1.e4')
+    # plotOpeningScores(client, e4Openings, 'Scores of responses to 1.e4')
     # plotOpeningScores(client, mainLines, 'Scores in different openings')
     # plotOpeningScores(client, d4Openings, 'Scores of d4 openings', filename='../out/lichessOpeningsd4.png')
-    # plotOpeningScores(client, startMoves, 'Scores of different first moves', filename='../out/lichessOpeningsFirst.png')
+    plotOpeningScores(client, startMoves, 'Scores of different first moves')
     # plotOpeningScores(client, gambits, 'Scores of different gambits', filename='../out/lichessOpeningsGambits.png')
