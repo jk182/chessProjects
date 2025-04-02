@@ -104,8 +104,10 @@ if __name__ == '__main__':
                'Budapest Gambit': 'rnbqkb1r/pppp1ppp/5n2/4p3/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3',
                'Englund Gambit': 'rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2',
                'Benko Gambit': 'rnbqkb1r/p2ppppp/5n2/1ppP4/2P5/8/PP2PPPP/RNBQKBNR w KQkq - 0 4'}
+    test = {'English Defense': 'rnbqk1nr/p1pp1ppp/1p2p3/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4'}
     # plotOpeningScores(client, e4Openings, 'Scores of responses to 1.e4')
     # plotOpeningScores(client, mainLines, 'Scores in different openings')
     # plotOpeningScores(client, d4Openings, 'Scores of d4 openings', filename='../out/lichessOpeningsd4.png')
-    plotOpeningScores(client, startMoves, 'Scores of different first moves')
+    # plotOpeningScores(client, startMoves, 'Scores of different first moves')
     # plotOpeningScores(client, gambits, 'Scores of different gambits', filename='../out/lichessOpeningsGambits.png')
+    plotOpeningScores(client, test, 'English Defense')
