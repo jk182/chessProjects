@@ -1,4 +1,5 @@
 import chess
+import numpy as np
 from chess import pgn
 import matplotlib.pyplot as plt
 
@@ -23,7 +24,6 @@ def countAttackedSquares(board: chess.Board, color: chess.Color) -> float:
 
 
 def findBatteries(board: chess.Board, color: chess.Color):
-    # TODO: batteries are needed for multiple attacks
     pieceMap = board.piece_map()
     for square, piece in pieceMap.items():
         if piece.piece_type == chess.BISHOP:
@@ -40,7 +40,7 @@ def getSquareAttackCounts(board: chess.Board) -> dict:
     board: chess.Board
         The position
     return -> dict
-        Indexed by squares, having tuples as values with the attack count from Whtie and Black
+        Indexed by squares, having tuples as values with the attack count from White and Black
     """
     attackedSquares = dict()
     for square in chess.SQUARES:
@@ -61,8 +61,8 @@ def getSquareControl(board: chess.Board) -> dict:
             1 -> full white control
     """
     control = dict()
+    pieceValues = [1, 3, 3, 5, 9, 12]
     for square in chess.SQUARES:
-        c = 0
         wAttackers = [piece for piece in board.attackers(chess.WHITE, square) if not board.is_pinned(chess.WHITE, piece)]
         bAttackers = [piece for piece in board.attackers(chess.BLACK, square) if not board.is_pinned(chess.BLACK, piece)]
 
@@ -103,30 +103,84 @@ def getSquareControl(board: chess.Board) -> dict:
             bAttackerTypes.append(bBatteryPiece)
 
         # compare the attackers of both sides to see who controls the square
+        c = 0
+
         for i in range(max(len(wAttackerTypes), len(bAttackerTypes))):
             if i == len(wAttackerTypes)-1 and i == len(bAttackerTypes)-1:
                 break
             if i < len(wAttackerTypes) and i < len(bAttackerTypes):
-                wa = wAttackerTypes[i]
-                ba = bAttackerTypes[i]
+                wa = pieceValues[wAttackerTypes[i]-1]
+                ba = pieceValues[bAttackerTypes[i]-1]
 
-                if wa < ba and i >= len(wAttackerTypes):
+                if wa == ba:
+                    # pieces of the same value neutralise each other
+                    continue
+
+                if wa < ba and len(wAttackerTypes) > i+1:
                     # white has the less valuable piece and has another piece to recapture
-                    c += 1  # TODO: change score depending on the pieces involved
-                    break   # since white should have won the exchange, sum up the remaining pieces somehow
-                if ba < wa and i >= len(bAttackerTypes):
-                    c -= 1
+                    for j in range(i, len(wAttackerTypes)):
+                        wVal = pieceValues[wAttackerTypes[j]-1]
+                        if j < len(bAttackerTypes):
+                            bVal = pieceValues[bAttackerTypes[j]-1]
+                            if wVal <= bVal:
+                                c += 1/wVal - 1/bVal
+                            else:
+                                break
+                        else:
+                            c += 1/wVal
+                    break
+                if ba < wa and len(bAttackerTypes) > i+1:
+                    for j in range(i, len(bAttackerTypes)):
+                        bVal = pieceValues[bAttackerTypes[j]-1]
+                        if j < len(wAttackerTypes):
+                            wVal = pieceValues[wAttackerTypes[j]-1]
+                            if bVal <= wVal:
+                                c += 1/wVal - 1/bVal
+                            else:
+                                break
+                        else:
+                            c -= 1/bVal
                     break
             elif i < len(wAttackerTypes):
                 # white has more attackers than black
-                c += 1  # TODO: sum them up
-                break
+                wa = pieceValues[wAttackerTypes[i]-1]
+                c += 1/wa
             elif i < len(bAttackerTypes):
-                c -= 1
-                break
+                ba = pieceValues[bAttackerTypes[i]-1]
+                c -= 1/ba
 
-        control[square] = c
+        control[square] = min(max(c, -1), 1)
     return control
+
+
+def plotHeatmap(squareControl: dict, filename: str = None):
+    """
+    This fucntion plots a heatmap of the square control
+    """
+    files = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    ranks = [8, 7, 6, 5, 4, 3, 2, 1]
+
+    # reversing to get the squares to line up correctly
+    data = np.reshape(list(reversed(squareControl.values())), (8, 8))
+    data = [list(reversed(l)) for l in data]
+    fig, ax = plt.subplots(figsize=(6, 6))
+    im = ax.imshow(data, cmap='plasma')
+    plt.title('Square control')
+
+    ax.set_xticks(np.arange(8), labels=files)
+    ax.set_yticks(np.arange(8), labels=ranks)
+    # add minor ticks for the grid
+    ax.set_xticks(np.arange(9)-.5, minor=True)
+    ax.set_yticks(np.arange(9)-.5, minor=True)
+    ax.grid(which='minor', color='black', linestyle='-', linewidth=1)
+    # ax.figure.colorbar(im)
+    plt.colorbar(im, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+
+    if filename:
+        plt.savefig(filename, dpi=500)
+    else:
+        plt.show()
 
 
 def countDefendedSquares(board: chess.Board, attackedSquares: dict) -> tuple:
@@ -240,7 +294,12 @@ if __name__ == '__main__':
     # print(countAttackedSquares(board, board.turn))
     # findBatteries(dragon, chess.WHITE)
     # print(calculatePieceCoordination(dragon))
-    attackedSqs = getSquareAttackCounts(dragon)
-    print(getSquareControl(dragon))
+    # attackedSqs = getSquareAttackCounts(dragon)
+    pos = chess.Board('r4rk1/pp1bqpp1/2p4p/P1b1p3/8/2PPP1P1/3N1PBP/R2Q1RK1 w - - 1 17')
+    study = chess.Board('1k5n/1p6/1K6/7B/8/P7/8/8 b - - 3 2')
+    study2 = chess.Board('8/8/3b2k1/8/2B1K3/6P1/2N3n1/8 w - - 1 1')
+    sqc = getSquareControl(dragon)
+    print(sqc)
+    plotHeatmap(sqc)
     # print(countOffensiveAttackedSquares(dragon, attackedSqs))
     # plotGameCoordination('../resources/karpov-spassky-1974.pgn')
