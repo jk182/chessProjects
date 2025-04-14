@@ -670,8 +670,9 @@ if __name__ == '__main__':
     # analyseGames('../resources/gukesh2019.pgn', '../out/games/gukesh2019-out.pgn', sf, leela, 4, 10000)
     # analyseGames('../resources/gukesh2020.pgn', '../out/games/gukesh2020-out.pgn', sf, leela, 4, 10000)
     # analyseGames('../resources/olympiad2024_R10.pgn', '../out/games/olympiad2024-out.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/wijkMasters2025.pgn', '../out/games/wijkMasters2025-out.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/wijkChallengers2025.pgn', '../out/games/wijkChallengers2025-out.pgn', sf, leela, 4, 10000)
+    # analyseGames('../resources/wijkMasters2025.pgn', '../out/games/wijkMasters2025-out.pgn', sf, leela, 4, 10000)
+    # analyseGames('../resources/wijkChallengers2025.pgn', '../out/games/wijkChallengers2025-out.pgn', sf, leela, 4, 10000)
+    analyseGames('../resources/womenWCC2025.pgn', '../out/games/womensWCC2025-out.pgn', sf, leela, 4, 10000)
     sf.quit()
     leela.quit()
     """

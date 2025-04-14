@@ -6,7 +6,7 @@ import pandas as pd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions import configureEngine
 import pickle
-
+import matplotlib.pyplot as plt
 
 def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
     totalGames = 0
@@ -153,6 +153,13 @@ def getPlayerScoreByYear(df: pd.DataFrame, playerName: str) -> dict:
     for year in yearlyData.keys():
         yearlyData[year][2] /= yearlyData[year][1]
     return dict(sorted(yearlyData.items()))
+
+
+def plotEndgamePerformance(players: list, data: pd.DataFrame):
+    fig, ax = plt.subplots(figsize = (10, 6))
+
+    colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+    ax.set_facecolor('#e6f7f2')
 
 
 if __name__ == '__main__':
