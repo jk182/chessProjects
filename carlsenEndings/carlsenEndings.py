@@ -164,5 +164,5 @@ if __name__ == '__main__':
     # getEqualEndgameData(otherGames, cachePath=cacheP)
     # getEqualEndgameData('../resources/2650games2022.pgn', cachePath=cacheP)
     # for path in ['../resources/nakaGames.pgn', '../resources/adamsGames.pgn', '../resources/rubinsteinGames.pgn', '../resources/capablancaGames.pgn']:
-    # for path in ['../resources/mvlGames.pgn', '../resources/nepoGames1.pgn']:
-    #     getEqualEndgameData(path, cacheP)
+    for path in ['../resources/nepoGames.pgn']:
+        getEqualEndgameData(path, cacheP)
