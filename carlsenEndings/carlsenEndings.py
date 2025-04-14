@@ -23,7 +23,7 @@ def getEqualEndgameScore(pgnPath: str, cachePath: str = None):
             cache = pickle.load(pick)
 
     stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
-    with open(pgnPath, 'r', encoding='windows-1252') as pgn:
+    with open(pgnPath, 'r', encoding='utf8') as pgn:
         while game := chess.pgn.read_game(pgn):
             totalGames += 1
             event = game.headers['Event']
@@ -122,5 +122,6 @@ if __name__ == '__main__':
     # getEqualEndgameScore(otherGames, cachePath='../resources/carslenEndingsCache.pickle')
     # getEqualEndgameScore(otherGames, cachePath=cacheP)
     # getEqualEndgameScore('../resources/2650games2022.pgn', cachePath=cacheP)
-    for path in ['../resources/nakaGames.pgn', '../resources/adamsGames.pgn', '../resources/rubinsteinGames.pgn', '../resources/capablancaGames.pgn']:
+    # for path in ['../resources/nakaGames.pgn', '../resources/adamsGames.pgn', '../resources/rubinsteinGames.pgn', '../resources/capablancaGames.pgn']:
+    for path in ['../resources/mvlGames.pgn', '../resources/nepoGames1.pgn']:
         getEqualEndgameScore(path, cacheP)
