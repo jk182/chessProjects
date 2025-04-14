@@ -1,13 +1,14 @@
 import chess
 from chess import pgn
 import os, sys
+import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions import configureEngine
 import pickle
 
 
-def getEqualEndgameScore(pgnPath: str, cachePath: str = None):
+def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
     totalGames = 0
     blitzGames = 0
     rapidGames = 0
@@ -17,6 +18,7 @@ def getEqualEndgameScore(pgnPath: str, cachePath: str = None):
     cache = dict()
 
     players = dict()
+    data = {'Player': list(), 'FEN': list(), 'Evaluation': list(), 'Opponent Rating': list(), 'Result': list(), 'Date': list()}
 
     if cachePath:
         with open(cachePath, 'rb') as pick:
@@ -62,6 +64,7 @@ def getEqualEndgameScore(pgnPath: str, cachePath: str = None):
                             result = game.headers['Result']
                             white = game.headers['White']
                             black = game.headers['Black']
+                            """
                             for player in [white, black]:
                                 if player not in players.keys():
                                     players[player] = [0, 0]
@@ -70,6 +73,23 @@ def getEqualEndgameScore(pgnPath: str, cachePath: str = None):
                                     players[player][0] += 0.5
                                 elif (result == '1-0' and player == white) or (result == '0-1' and player == black):
                                     players[player][0] += 1
+                            """
+                            if result == '1-0':
+                                results = [1, 0]
+                            elif result == '0-1':
+                                results = [0, 1]
+                            else:
+                                results = [0.5, 0.5]
+                            for i in range(2):
+                                data['Player'].append([white, black][i])
+                                data['FEN'].append(fen)
+                                data['Evaluation'].append(score)
+                                if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
+                                    data['Opponent Rating'].append([int(game.headers['BlackElo']), int(game.headers['WhiteElo'])][i])
+                                else:
+                                    data['Opponent Rating'].append(0)
+                                data['Result'].append(results[i])
+                                data['Date'].append(game.headers['Date'])
                             """
                             if ('Carlsen' in white and result == '1-0') or ('Carlsen' in black and result == '0-1'):
                                 gameScore[0] += 1
@@ -93,14 +113,8 @@ def getEqualEndgameScore(pgnPath: str, cachePath: str = None):
     if cachePath:
         with open(cachePath, 'wb') as pick:
             pickle.dump(cache, pick)
-    print(totalGames)
-    print(blitzGames)
-    print(rapidGames)
-    print(chess960Games)
-    print(endings)
-    for name, s in players.items():
-        print(f'{name}: {s[0]/s[1]}')
     stockfish.quit()
+    return pd.DataFrame(data)
 
 
 def isEndgame(position: chess.Board) -> bool:
@@ -115,13 +129,40 @@ def isEndgame(position: chess.Board) -> bool:
     return pieceCount <= 6
 
 
+def getPlayerScoreByYear(df: pd.DataFrame, playerName: str) -> dict:
+    """
+    This calculates the score and rating performance for a player broken down by year
+    df: pd.DataFrame
+        Endgame data from getEqualEndgameData
+    playerName: str
+        The name of the player (only checked with in)
+    return -> dict
+        Dictionary indexed by years containing a list with [totalPoints, totalGames, perfRating]
+    """
+    yearlyData = dict()
+    for i, row in df.iterrows():
+        if playerName in row['Player']:
+            year = int(row['Date'][:4])
+            if year not in yearlyData.keys():
+                yearlyData[year] = [0, 0, 0]
+            yearlyData[year][0] += row['Result']
+            yearlyData[year][1] += 1
+            yearlyData[year][2] += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
+
+    # Normalizing the performance rating
+    for year in yearlyData.keys():
+        yearlyData[year][2] /= yearlyData[year][1]
+    return dict(sorted(yearlyData.items()))
+
+
 if __name__ == '__main__':
     carlsenGames = '../resources/carlsenGames.pgn'
     otherGames = '../out/2700games2023-out.pgn'
     cacheP = '../resources/endingsCache.pickle'
-    # getEqualEndgameScore(otherGames, cachePath='../resources/carslenEndingsCache.pickle')
-    # getEqualEndgameScore(otherGames, cachePath=cacheP)
-    # getEqualEndgameScore('../resources/2650games2022.pgn', cachePath=cacheP)
+    data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
+    print(getPlayerScoreByYear(data, 'Carlsen, M'))
+    # getEqualEndgameData(otherGames, cachePath=cacheP)
+    # getEqualEndgameData('../resources/2650games2022.pgn', cachePath=cacheP)
     # for path in ['../resources/nakaGames.pgn', '../resources/adamsGames.pgn', '../resources/rubinsteinGames.pgn', '../resources/capablancaGames.pgn']:
-    for path in ['../resources/mvlGames.pgn', '../resources/nepoGames1.pgn']:
-        getEqualEndgameScore(path, cacheP)
+    # for path in ['../resources/mvlGames.pgn', '../resources/nepoGames1.pgn']:
+    #     getEqualEndgameData(path, cacheP)
