@@ -304,6 +304,50 @@ def getAccuracies(pgnPath: str) -> list:
     return accuracies
 
 
+def getMoveByMoveExpectedScore(pgnPath: str, addScore: bool = True) -> dict:
+    """
+    This calculates the expected score for each player after each move. 
+    pgnPath: str
+        Path to the analysed PGN file
+    return -> dict
+        Indexted by player names and having a list of lists for the expected scores after each move of each game
+    """
+    xs = dict()
+    scores = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            w = game.headers["White"]
+            b = game.headers["Black"]
+            for p in w, b:
+                if p not in xs.keys():
+                    xs[p] = list()
+                    scores[p] = 0
+            wxs = list()
+            bxs = list()
+
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+                if not functions.readComment(node, True, True):
+                    continue
+                cp = functions.readComment(node, True, True)[1]
+                wxs.append(float(functions.expectedScore(cp))/100)
+            bxs = [1-w for w in wxs]
+            xs[w].append([s+scores[w] for s in wxs])
+            xs[b].append([s+scores[b] for s in bxs])
+            if addScore:
+                if "1/2" in (r := game.headers["Result"]):
+                    scores[w] += 0.5
+                    scores[b] += 0.5
+                elif r == "1-0":
+                    scores[w] += 1
+                elif r == "0-1":
+                    scores[b] += 1
+                else:
+                    print('Result not detected')
+    return xs
+
+
 def plotAccuracyDistribution(data: list, players: list, filename: str = None):
     """
     This method plots the accuracy distribution given the accuracy data
@@ -496,12 +540,103 @@ def plotOpeningDiagram(openings: list):
     fig.show()
     
 
+def plotMoveByMoveExpectedScore(xsData: dict, nicknames: dict = None, normalise: bool = False, filename: str = None):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    gameLengths = list()
+    colors = ['#f8a978', '#8D77AB', '#689bf2', '#ff87ca', '#beadfa']
+    index = 0
+    
+    for p, data in xsData.items():
+        gameLength = 0
+        scores = list()
+        for i, d in enumerate(data):
+            if normalise:
+                scores.extend([a-0.5*i for a in d])
+            else:
+                scores.extend(d)
+            gameLength += len(d)
+            gameLengths.append(len(d))
+            plt.vlines(gameLength-1, 0, len(data), color='grey', linewidth=1, zorder=0)
+        if nicknames and p in nicknames.keys():
+            player = nicknames[p]
+        else:
+            player = p.split(',')[0]
+        ax.plot(range(len(scores)), scores, label=player, color=colors[index%len(colors)])
+        index += 1
+
+    # plt.hlines(1.5, 0, gameLengths[0]+gameLengths[1]-1, label='Score needed to win', color='black', zorder=0)
+    # plt.hlines(2, gameLengths[0]+gameLengths[1]-1, sum(gameLengths)-1, color='black', zorder=0)
+    winScore = 7.5
+    # plt.hlines(winScore, 0, sum(gameLengths)-1, label='Score needed to win', color='black', zorder=0)
+
+    ax.legend()
+    ax.set_xlim(0, len(scores)-1)
+    if normalise:
+        ax.set_ylim(-2, 2)
+    else:
+        ax.set_ylim(0, winScore+0.7)
+    ax.set_xlabel('Move number')
+    ax.set_ylabel('Expected number of points')
+    plt.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
+    plt.title('Expected Score after each Move in the Tiebreak')
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+def generateMatchReport(analysedPGN: str, players: list, clockPGN: str = None, outFolder: str = None):
+    """
+    This fucntion generates a full match report
+    analysedPNG: str
+        PGN with Stockfish and LC0 analysis
+    players: list
+        The names of the players
+        TODO: the order my be important
+    clockPGN: str
+        PGN with the clock times after each move
+    outFolder: str
+        Path to the output folder for the graphs.
+        If no path is given, the graphs will be shown instead of saved
+    """
+    playerColors = ['#f8a978', '#689bf2']
+    moveSituation = getMoveSituation(analysedPGN)
+    imb = getInaccMistakesBlunders(analysedPGN)
+    acc = getAccuracies(analysedPGN)
+    better = getBetterGames(analysedPGN)
+    sc = getSharpChange(analysedPGN)
+    if clockPGN:
+        clocks = getClockTimes(clockPGN)
+    if outFolder:
+        plotMoveSituation(moveSituation, filename=f'{outFolder}matchMoveSituation.png')
+        plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"], filename=f'{outFolder}inaccMistakesBlunders.png')
+        plotAccuracyDistribution(acc, players, filename=f'{outFolder}matchAccuracyDistribution.png')
+        plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"], filename=f'{outFolder}matchBetter.png')
+        plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", [f"{players[0]} sharpness change", f"{players[1]} sharpness change"], colors=playerColors, filename=f'{outFolder}matchSharp.png')
+        plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", [f"{players[0]}'s time left", f"{players[1]}'s time left"], colors=playerColors, filename=f'{outFolder}matchClocks.png')
+    else:
+        plotMoveSituation(moveSituation)
+        plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
+        plotAccuracyDistribution(acc, players)
+        plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
+        plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", [f"{players[0]} sharpness change", f"{players[1]} sharpness change"], colors=playerColors)
+        plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", [f"{players[0]}'s time left", f"{players[1]}'s time left"], colors=playerColors)
+
+
+
 if __name__ == '__main__':
     pgn = '../out/games/ding-gukesh-out.pgn'
+    clockPGN = '../resources/ding-gukesh-clocks.pgn'
+    players = ["Gukesh", "Ding"]
+    # generateMatchReport(pgn, players, clockPGN)
+    expectedScore = getMoveByMoveExpectedScore(pgn, True)
+    plotMoveByMoveExpectedScore(expectedScore, normalise=True)
+    """
     moveSituation = getMoveSituation(pgn)
     folder = '../out/dingGukesh/'
     plotMoveSituation(moveSituation, filename=f'{folder}matchMoveSituation.png')
-    players = ["Gukesh", "Ding"]
     playerColors = ['#f8a978', '#689bf2']
     imb = getInaccMistakesBlunders(pgn)
     # plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
@@ -511,7 +646,8 @@ if __name__ == '__main__':
     plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"], filename=f'{folder}matchBetter.png')
     sc = getSharpChange(pgn)
     plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", ["Gukesh sharpness change", "Ding sharpness change"], colors=playerColors, filename=f'{folder}matchSharp.png')
-    clocks = getClockTimes('../resources/ding-gukesh-clocks.pgn')
+    clocks = getClockTimes(clockPGN)
     plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", ["Gukesh's time left", "Ding's time left"], colors=playerColors, filename=f'{folder}matchClocks.png')
+    """
     # openings = getOpeningMoves(pgn, maxPly = 8)
     # plotOpeningDiagram(openings[0])
