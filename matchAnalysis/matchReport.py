@@ -540,46 +540,57 @@ def plotOpeningDiagram(openings: list):
     fig.show()
     
 
-def plotMoveByMoveExpectedScore(xsData: dict, nicknames: dict = None, normalise: bool = False, filename: str = None):
+def plotMoveByMoveExpectedScore(xsData: dict, player: str, nicknames: dict = None, filename: str = None):
+    """
+    This function plots the lead by one player in the match after each move.
+    xsData: dict
+        Expected score data
+    player: str
+        The player to look at
+    """
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor('#e6f7f2')
     gameLengths = list()
     colors = ['#f8a978', '#8D77AB', '#689bf2', '#ff87ca', '#beadfa']
     index = 0
+    xTicks = [0]
+    maxScore = -100
+    minScore = 100
+    scoreLen = 0
     
     for p, data in xsData.items():
+        if player not in p:
+            continue
         gameLength = 0
         scores = list()
         for i, d in enumerate(data):
-            if normalise:
-                scores.extend([a-0.5*i for a in d])
-            else:
-                scores.extend(d)
+            scores.extend([(a-0.5*i-0.5)*2 for a in d])
             gameLength += len(d)
             gameLengths.append(len(d))
-            plt.vlines(gameLength-1, 0, len(data), color='grey', linewidth=1, zorder=0)
+            plt.vlines(gameLength-1, -10, len(data), color='grey', linewidth=1, zorder=0)
+            xTicks.append(gameLength-1)
         if nicknames and p in nicknames.keys():
             player = nicknames[p]
         else:
             player = p.split(',')[0]
         ax.plot(range(len(scores)), scores, label=player, color=colors[index%len(colors)])
         index += 1
+        minScore = min(minScore, int(min(scores)))
+        maxScore = max(maxScore, int(max(scores)))
+        scoreLen = max(scoreLen, len(scores))
 
-    # plt.hlines(1.5, 0, gameLengths[0]+gameLengths[1]-1, label='Score needed to win', color='black', zorder=0)
-    # plt.hlines(2, gameLengths[0]+gameLengths[1]-1, sum(gameLengths)-1, color='black', zorder=0)
-    winScore = 7.5
-    # plt.hlines(winScore, 0, sum(gameLengths)-1, label='Score needed to win', color='black', zorder=0)
 
-    ax.legend()
-    ax.set_xlim(0, len(scores)-1)
-    if normalise:
-        ax.set_ylim(-2, 2)
-    else:
-        ax.set_ylim(0, winScore+0.7)
-    ax.set_xlabel('Move number')
-    ax.set_ylabel('Expected number of points')
+    for height in range(minScore, maxScore+1):
+        plt.hlines(height, 0, sum(gameLengths)-1, color='black', zorder=0, linewidth=0.5)
+
+    # ax.legend()
+    ax.set_xlim(0, scoreLen-1)
+    ax.set_ylim(minScore-0.7, maxScore+0.7)
+    ax.set_xticks(xTicks, labels=[i+1 if i < len(xTicks)-1 else "" for i in range(len(xTicks))])
+    ax.set_xlabel('Game number')
+    ax.set_ylabel(f"{player}'s expected lead")
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
-    plt.title('Expected Score after each Move in the Tiebreak')
+    plt.title(f"{player}'s Expected Lead after each Move")
 
     if filename:
         plt.savefig(filename, dpi=400)
@@ -607,15 +618,20 @@ def generateMatchReport(analysedPGN: str, players: list, clockPGN: str = None, o
     acc = getAccuracies(analysedPGN)
     better = getBetterGames(analysedPGN)
     sc = getSharpChange(analysedPGN)
+    xsData = getMoveByMoveExpectedScore(analysedPGN)
     if clockPGN:
         clocks = getClockTimes(clockPGN)
     if outFolder:
+        if outFolder[-1] != '/':
+            outFolder = f'{outFolder}/'
         plotMoveSituation(moveSituation, filename=f'{outFolder}matchMoveSituation.png')
         plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"], filename=f'{outFolder}inaccMistakesBlunders.png')
         plotAccuracyDistribution(acc, players, filename=f'{outFolder}matchAccuracyDistribution.png')
         plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"], filename=f'{outFolder}matchBetter.png')
         plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", [f"{players[0]} sharpness change", f"{players[1]} sharpness change"], colors=playerColors, filename=f'{outFolder}matchSharp.png')
-        plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", [f"{players[0]}'s time left", f"{players[1]}'s time left"], colors=playerColors, filename=f'{outFolder}matchClocks.png')
+        plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", [f"{players[0]}'s time left", f"{players[1]}'s time left"], colors=playerColors, maxMoves=86, filename=f'{outFolder}matchClocks.png')
+        # TODO: better player name
+        plotMoveByMoveExpectedScore(xsData, players[0].split()[0], filename=f'{outFolder}expectedLead.png')
     else:
         plotMoveSituation(moveSituation)
         plotBarChart(imb, players, "Number of inaccuracies, mistakes, blunders", "Number of inaccuracies, mistakes and blunders", ["Inaccuracies", "Mistakes", "Blunders"])
@@ -623,16 +639,14 @@ def generateMatchReport(analysedPGN: str, players: list, clockPGN: str = None, o
         plotBarChart(better, players, "Number of games", "Number of better and won games", ["Better games", "Won games"])
         plotAvgLinePlot(sc, players, "Average sharpness change per move", "Average sharpness change per move", [f"{players[0]} sharpness change", f"{players[1]} sharpness change"], colors=playerColors)
         plotAvgLinePlot(clocks, players, "Time left in minutes", "Time usage of the players", [f"{players[0]}'s time left", f"{players[1]}'s time left"], colors=playerColors)
-
+        plotMoveByMoveExpectedScore(xsData, players[0].split()[0])
 
 
 if __name__ == '__main__':
-    pgn = '../out/games/ding-gukesh-out.pgn'
-    clockPGN = '../resources/ding-gukesh-clocks.pgn'
-    players = ["Gukesh", "Ding"]
-    # generateMatchReport(pgn, players, clockPGN)
-    expectedScore = getMoveByMoveExpectedScore(pgn, True)
-    plotMoveByMoveExpectedScore(expectedScore, normalise=True)
+    pgn = '../out/games/womensWCC2025-out.pgn'
+    clockPGN = '../resources/WWCC2025-clocks'
+    players = ["Ju Wenjun", "Tan Zhongyi"]
+    generateMatchReport(pgn, players, clockPGN, outFolder='../out/WWCC2025/')
     """
     moveSituation = getMoveSituation(pgn)
     folder = '../out/dingGukesh/'
