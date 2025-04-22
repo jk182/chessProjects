@@ -659,9 +659,6 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    # analyseGames('../resources/grandSwiss2023.pgn', '../out/grandSwiss2023-out.pgn', sf, leela, 4, 5000)
-    # analyseGames('../resources/norwayOpenR10.pgn', '../out/games/norwayChessOpen2024-out.pgn', sf, leela, 4, 5000)
-    # analyseGames('../resources/norwayWomenR10.pgn', '../out/games/norwayChessWomen-out.pgn', sf, leela, 4, 5000)
     # analyseGames(f'../resources/worldBlitz2023.pgn', f'../out/games/worldBlitz2023-out.pgn', sf, leela, 4, 5000)
     # analyseGames('../resources/grenkeOpen2024.pgn', '../out/games/grenkeOpen2024.pgn', sf, leela, 4, 5000)
     # analyseGames(f'../resources/tal1959-1962.pgn', f'../out/games/tal1959-1962-out.pgn', sf, leela, 4, 5000)
@@ -672,7 +669,8 @@ if __name__ == '__main__':
     # analyseGames('../resources/olympiad2024_R10.pgn', '../out/games/olympiad2024-out.pgn', sf, leela, 4, 10000)
     # analyseGames('../resources/wijkMasters2025.pgn', '../out/games/wijkMasters2025-out.pgn', sf, leela, 4, 10000)
     # analyseGames('../resources/wijkChallengers2025.pgn', '../out/games/wijkChallengers2025-out.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/womenWCC2025.pgn', '../out/games/womensWCC2025-out.pgn', sf, leela, 4, 10000)
+    analyseGames('../resources/grenke960.pgn', '../out/games/grenke960-analysed.pgn', sf, leela, 4, 10000)
+    analyseGames('../resources/paris960.pgn', '../out/games/paris960-analysed.pgn', sf, leela, 4, 10000)
     sf.quit()
     leela.quit()
     """
