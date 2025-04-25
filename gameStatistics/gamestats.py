@@ -13,7 +13,7 @@ import numpy as np
 import scipy
 
 
-def readMoveData(pgnPaths: list) -> pd.DataFrame:
+def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
     """
     This function reads the move data from annotated PGN files and returns a dataframe with data about each move
     """
@@ -34,8 +34,29 @@ def readMoveData(pgnPaths: list) -> pd.DataFrame:
                 wElo = int(game.headers["WhiteElo"])
                 bElo = int(game.headers["BlackElo"])
                 result = game.headers["Result"]
-                evalBefore = startEval
-                wdlBefore = startWDL
+
+                if is_chess960:
+                    board = game.board()
+                    pos = board.fen()
+                    posDB = functions.modifyFEN(pos)
+                    
+                    if evalDB.contains(posDB):
+                        evalDict = evalDB.getEval(pos)
+                        wdl = evalDict['wdl']
+                        cp = evalDict['cp']
+                        if evalDict['depth'] > 0 and evalDict['nodes'] > 0:
+                            evalBefore = cp
+                            wdlBefore = wdl
+                        else:
+                            # TODO!
+                            print('Not found in cache')
+                    else:
+                        # TODO!
+                        print('Not found in cache')
+
+                else:
+                    evalBefore = startEval
+                    wdlBefore = startWDL
 
                 node = game
                 while not node.is_end():
