@@ -64,7 +64,7 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
                         sfInfo = sf.analyse(board, chess.engine.Limit(time=4))
                         cp = sfInfo['score'].white().score()
                         print(cp)
-                        if evalDB.contains(posDB):
+                        if evalDB.contains(posDB) or type(evalBefore) is not int:
                             evalDB.update(posDB, nodes=10000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=sfInfo['depth'])
                         else:
                             evalDB.insert(posDB, nodes=10000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=sfInfo['depth'])
@@ -489,7 +489,77 @@ def getxScoreDrops(moveData: pd.DataFrame) -> dict:
     return drops
 
 
-def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, isList: bool = True, limits: list = None, filename: str = None):
+def getClockTimes(pgnPaths: list, minutes: bool = True) -> list:
+    """
+    This calculates the clock times on every move for White and Black
+    minutes: bool
+        If this is set, the time will be given in minutes
+    return -> list
+        A list of lists of lists:
+            Each color has a list which contains a list per game with the time after each move
+    """
+    times = [list(), list()]
+    
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                whiteTimes = list()
+                blackTimes = list()
+
+                node = game
+                while not node.is_end():
+                    node = node.variations[0]
+                    if not node.clock():
+                        print("No time read")
+                        if minutes:
+                            time *= 60
+                    else:
+                        time = int(node.clock())
+                    if minutes:
+                        time /= 60
+                    if not node.turn():
+                        whiteTimes.append(time)
+                    else:
+                        blackTimes.append(time)
+                times[0].append(whiteTimes)
+                times[1].append(blackTimes)
+    return times
+
+
+def plotAvgTime(clockTimes: list, title: str, startTime: int = 90, maxMoves: int = 39, filename: str = None):
+    colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    
+    yMin = 0
+    yMax = 0
+    for k, d in enumerate(clockTimes):
+        avg = [startTime]
+        for i in range(maxMoves):
+            l = [c[i] for c in d if len(c) > i]
+            if len(l) == 0:
+                break
+            avg.append(sum(l)/len(l))
+        ax.plot(range(0, maxMoves+1), avg, color=colors[k])
+        yMin = min(yMin, min(avg))
+        yMax = max(yMax, max(avg))
+    
+    plt.xlim(0, maxMoves)
+    plt.ylim(yMin*1.05, yMax*1.05)
+    ax.set_xlabel('Move Number')
+    ax.set_ylabel('Time remaining in minutes')
+    plt.title(title)
+    plt.axhline(0, color='black', linewidth=0.5)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, width: int = 1, isList: bool = True, limits: list = None, filename: str = None):
     fig, ax = plt.subplots(figsize=(10, 6))
     colors = ['#f8a978', '#689bf2', '#fa5a5a', '#C3B1E1', '#5afa8d']
     ax.set_facecolor('#e6f7f2')
@@ -507,8 +577,7 @@ def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, isList: bool 
     else:
         nData = data
 
-    # ax.bar(list(nData.keys()), list(nData.values()), color=colors[0], width=1, edgecolor='black')
-    ax.bar(list(nData.keys()), list(nData.values()), color=colors[0], width=10, edgecolor='black')
+    ax.bar(list(nData.keys()), list(nData.values()), color=colors[0], width=width, edgecolor='black')
 
     # ax.set_yscale('log')
 
@@ -527,15 +596,19 @@ def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, isList: bool 
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn']
     pgns960 = ['../out/games/grenke960-analysed.pgn', '../out/games/paris960-analysed.pgn',  '../out/games/germany960_2024-analysed.pgn',   '../out/games/germany960_2024-analysed.pgn']
-    df = readMoveData(pgns960, True)
-    print(df)
-    df.to_pickle('../out/chess960DF')
+    pgns960Clocks = ['../resources/grenke960.pgn', '../resources/paris960.pgn',  '../resources/germany960_2024.pgn',   '../resources/germany960_2024.pgn']
+    clockTimes = getClockTimes(pgns960Clocks)
+    plotAvgTime(clockTimes, 'Remaining time per move in chess 960')
+    clockTimes = getClockTimes(['../resources/sharjah_clocks.pgn'])
+    plotAvgTime(clockTimes, 'Remaining time per move in classical chess')
+    # df = readMoveData(pgns960, True)
+    # df.to_pickle('../out/chess960DF')
     df = pd.read_pickle('../out/chess960DF')
     dfGM = filterGamesByRating(df, (2500, 2900), 150, True)
-    # xScoreMoves = getxScoreDropByMoves(dfGM)
-    # plotBarChart(xScoreMoves, 'Move number', 'Relative number of mistakes', 'Relative number of mistakes every move', limits=[0, 110], filename='../out/mistakesPerMove.png')
+    xScoreMoves = getxScoreDropByMoves(dfGM)
+    plotBarChart(xScoreMoves, 'Move number', 'Relative number of mistakes', 'Relative number of mistakes every move', limits=[0.5, 85])
     xScoreEvals = getxScoreDropByEval(dfGM)
-    plotBarChart(xScoreEvals, 'Evaluation', 'Relative number of mistakes', 'Mistakes depending on evaluation', limits=[-300, 520], filename='../out/mistakesEval.png')
+    plotBarChart(xScoreEvals, 'Evaluation', 'Relative number of mistakes', 'Mistakes depending on evaluation', width=10, limits=[-350, 550])
     # xScore = getxScoreDrops(dfGM)
     # plotBarChart(xScore, 'Expected score drop', 'Relative number of moves', 'Distribution of expected score loss', isList=False, limits=[-0.5, 52], filename='../out/xScoreDis.png')
     # df27 = filterGamesByRating(df, (2700, 2900), 100)
