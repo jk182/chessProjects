@@ -5,6 +5,7 @@ import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
+import evalDB
 import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
@@ -39,9 +40,11 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
                     board = game.board()
                     pos = board.fen()
                     posDB = functions.modifyFEN(pos)
+                    evalBefore = None
+                    wdlBefore = None
                     
                     if evalDB.contains(posDB):
-                        evalDict = evalDB.getEval(pos)
+                        evalDict = evalDB.getEval(posDB)
                         wdl = evalDict['wdl']
                         cp = evalDict['cp']
                         if evalDict['depth'] > 0 and evalDict['nodes'] > 0:
@@ -50,10 +53,26 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
                         else:
                             # TODO!
                             print('Not found in cache')
-                    else:
+                    if not evalDB.contains(posDB) or evalBefore is None or wdlBefore is None or type(evalBefore) is not int:
                         # TODO!
-                        print('Not found in cache')
+                        print('Analysing position...')
+                        op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
+                        leela = functions.configureEngine('lc0', op)
+                        sf = functions.configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+                        LC0Info = leela.analyse(board, chess.engine.Limit(nodes=10000))
+                        wdl = list(chess.engine.PovWdl.white(LC0Info['wdl']))
+                        sfInfo = sf.analyse(board, chess.engine.Limit(time=4))
+                        cp = sfInfo['score'].white().score()
+                        print(cp)
+                        if evalDB.contains(posDB):
+                            evalDB.update(posDB, nodes=10000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=sfInfo['depth'])
+                        else:
+                            evalDB.insert(posDB, nodes=10000, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=sfInfo['depth'])
+                        sf.quit()
+                        leela.quit()
 
+                        evalBefore = cp
+                        wdlBefore = wdl
                 else:
                     evalBefore = startEval
                     wdlBefore = startWDL
@@ -507,9 +526,11 @@ def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, isList: bool 
 
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn']
-    # df = readMoveData(pgns)
-    # df.to_pickle('../out/gameDF')
-    df = pd.read_pickle('../out/gameDF')
+    pgns960 = ['../out/games/grenke960-analysed.pgn', '../out/games/paris960-analysed.pgn',  '../out/games/germany960_2024-analysed.pgn',   '../out/games/germany960_2024-analysed.pgn']
+    df = readMoveData(pgns960, True)
+    print(df)
+    df.to_pickle('../out/chess960DF')
+    df = pd.read_pickle('../out/chess960DF')
     dfGM = filterGamesByRating(df, (2500, 2900), 150, True)
     # xScoreMoves = getxScoreDropByMoves(dfGM)
     # plotBarChart(xScoreMoves, 'Move number', 'Relative number of mistakes', 'Relative number of mistakes every move', limits=[0, 110], filename='../out/mistakesPerMove.png')
