@@ -157,12 +157,12 @@ def getNumberOfGames(fen: str) -> int:
     return int(games)
 
 
-def expectedScore(cp: int) -> float:
+def expectedScore(cp: int, k: float = 0.007851) -> float:
     """
     This function calculates the expected score based on the Stockfish evaluation. 
     See gameStatistics/gameStats.py
     """
-    k = 0.007851
+    # k = 0.007851
     return 50 + 100/math.pi * math.atan(k*cp)
 
 
