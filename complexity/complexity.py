@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import pandas as pd
 import statistics
+import matplotlib.pyplot as plt
 
 
 def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -> pd.DataFrame:
@@ -30,11 +31,13 @@ def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -
     return df
 
 
-def findTrapMoves(board: chess.Board, engine: chess.engine, maxDepth: int, minDepth: int = 5) -> list:
+def findTrapMoves(board: chess.Board, engineOptions: tuple, maxDepth: int, minDepth: int = 5, referenceDepth: int = 25) -> list:
+    trapErrors = list()
     for move in board.legal_moves:
         newBoard = board.copy()
         newBoard.push(move)
         scores = list()
+        engine = functions.configureEngine(*engineOptions)
         for info in engine.analysis(newBoard, limit=chess.engine.Limit(depth=maxDepth)):
             if 'score' not in info.keys():
                 continue
@@ -42,9 +45,11 @@ def findTrapMoves(board: chess.Board, engine: chess.engine, maxDepth: int, minDe
                 continue
             score = info["score"].relative.score(mate_score=1000)
             scores.append(score)
-
-        print(move)
-        print((functions.expectedScore(scores[-1])-functions.expectedScore(min(scores)))/100)
+        engine.quit()
+        drop = (functions.expectedScore(scores[-1])-functions.expectedScore(min(scores)))
+        if drop >= 10:
+            trapErrors.append((str(move), drop/100))
+    return trapErrors
 
 
 def calculateComplexity(df: pd.DataFrame) -> float:
@@ -54,6 +59,40 @@ def calculateComplexity(df: pd.DataFrame) -> float:
     expScore = [functions.expectedScore(evaluation)/100 for evaluation in list(df["Evaluation"])]
     complexity = statistics.pstdev(expScore)
     return complexity
+
+
+def plotExpectedScoreChangeByDepth(posMoves: list, engineOptions: tuple, maxDepth: int, minDepth: int = 1, filename: str = None):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+
+    colors = ['#6096B4', '#7ed3b2', '#FF87CA', '#BEADFA', '#F8A978', '#E97777', '#435560'] 
+
+    for i, (pos, move) in enumerate(posMoves):
+        board = chess.Board(pos)
+        board.push(chess.Move.from_uci(move))
+        engine = functions.configureEngine(*engineOptions)
+        evaluations = list()
+        
+        for info in engine.analysis(board, limit=chess.engine.Limit(depth=maxDepth)):
+            if 'score' not in info.keys():
+                continue
+            if info["depth"] < minDepth:
+                continue
+            score = info["score"].pov(not board.turn).score(mate_score=1000)
+            evaluations.append(score)
+
+        print(evaluations)
+        plt.plot(range(minDepth, maxDepth+1), [functions.expectedScore(score) for score in evaluations], color=colors[i], label=move)
+        engine.quit()
+        
+    ax.legend()
+    ax.set_xlim(minDepth, maxDepth)
+
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -72,9 +111,17 @@ if __name__ == '__main__':
     traps = {'Before': '5r2/1p1r1k2/p2Pbpp1/2p1np2/4pN2/1P5P/P1PRBPP1/2K4R w - - 0 1',
              'After': '5r2/1p1r1k2/p2Pbpp1/2p1np2/4pN2/1P5P/P1PRBPP1/2K1R3 b - - 1 1',
              '2': '1Q5R/5qp1/6kp/8/6P1/1p3P2/1P1r2PK/8 b - - 0 1'}
-    sf = functions.configureEngine('stockfish', {'Threads': '1', 'Hash': '1'})
-    findTrapMoves(chess.Board('1Q5R/5qp1/6kp/8/6P1/1p3P2/1P1r2PK/8 b - - 0 1'), sf, 25)
-    sf.quit()
+    openingTraps = {'Sicilian': 'rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4',
+                    'Englund': 'rnbqk2r/ppp1nppp/3P4/2b5/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 1 5',
+                    'Lasker Trap': 'rnbqk1nr/ppp2ppp/8/4P3/1bP5/4p3/PP1B1PPP/RN1QKBNR w KQkq - 0 6',
+                    'Blackburne Shilling Gambit': 'r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4'}
+    sfConfig = ('stockfish', {'Threads': '1', 'Hash': '1'})
+    posMoves = [('rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4', 'f6e4')]
+    plotExpectedScoreChangeByDepth(posMoves, sfConfig, 25)
+    """
+    for name, fen in openingTraps.items():
+        print(name, findTrapMoves(chess.Board(fen), sfConfig, 23))
+    """
     """
     for name, fen in traps.items():
         sf = functions.configureEngine('stockfish', {'Threads': '1', 'Hash': '1'})
