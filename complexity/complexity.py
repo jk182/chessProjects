@@ -65,7 +65,7 @@ def plotExpectedScoreChangeByDepth(posMoves: list, engineOptions: tuple, maxDept
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor('#e6f7f2')
 
-    colors = ['#6096B4', '#7ed3b2', '#FF87CA', '#BEADFA', '#F8A978', '#E97777', '#435560'] 
+    colors = ['#fa5a5a', '#49d676', '#689bf2', '#F8A978', '#6096B4', '#FF87CA', '#7ed3b2', '#BEADFA', '#E97777', '#435560'] 
 
     for i, (pos, move) in enumerate(posMoves):
         board = chess.Board(pos)
@@ -81,12 +81,14 @@ def plotExpectedScoreChangeByDepth(posMoves: list, engineOptions: tuple, maxDept
             score = info["score"].pov(not board.turn).score(mate_score=1000)
             evaluations.append(score)
 
-        print(evaluations)
-        plt.plot(range(minDepth, maxDepth+1), [functions.expectedScore(score) for score in evaluations], color=colors[i], label=move)
+        plt.plot(range(minDepth, maxDepth+1), [functions.expectedScore(score)/100 for score in evaluations], color=colors[i], label=chess.Board(pos).san(chess.Move.from_uci(move)))
         engine.quit()
         
-    ax.legend()
+    plt.legend()
     ax.set_xlim(minDepth, maxDepth)
+    plt.title('Expected score for a given depth')
+    ax.set_xlabel('Depth')
+    ax.set_ylabel('Expected score')
 
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     if filename:
@@ -116,8 +118,20 @@ if __name__ == '__main__':
                     'Lasker Trap': 'rnbqk1nr/ppp2ppp/8/4P3/1bP5/4p3/PP1B1PPP/RN1QKBNR w KQkq - 0 6',
                     'Blackburne Shilling Gambit': 'r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4'}
     sfConfig = ('stockfish', {'Threads': '1', 'Hash': '1'})
-    posMoves = [('rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4', 'f6e4')]
-    plotExpectedScoreChangeByDepth(posMoves, sfConfig, 25)
+    posMoves = [('1Q2R3/5qpk/7p/8/6P1/1p3P2/1P1r2PK/8 b - - 3 2', 'f7f3'),
+                ('1Q2R3/5qpk/7p/8/6P1/1p3P2/1P1r2PK/8 b - - 3 2', 'd2b2'),
+                ('1Q2R3/5qpk/7p/8/6P1/1p3P2/1P1r2PK/8 b - - 3 2', 'h7g6')]
+    posMoves = [('2r3k1/5pp1/2pQr2p/p3nq2/B7/2R4P/PP3PP1/3R2K1 w - - 1 2', 'd6d8'),
+                ('2r3k1/5pp1/2pQr2p/p3nq2/B7/2R4P/PP3PP1/3R2K1 w - - 1 2', 'd6d2')]
+    posMoves = [('5nk1/1bq2ppp/r7/p3P3/1pp3P1/4pP1R/PPQ4P/1B1R2K1 b - - 3 26', 'c7e5'),
+                ('5nk1/1bq2ppp/r7/p3P3/1pp3P1/4pP1R/PPQ4P/1B1R2K1 b - - 3 26', 'c4c3'),
+                ('5nk1/1bq2ppp/r7/p3P3/1pp3P1/4pP1R/PPQ4P/1B1R2K1 b - - 3 26', 'a6g6')]
+    posMoves = [('8/p2rk3/R7/P3p3/5p2/4KP2/8/8 w - - 0 2', 'e3e4'),
+                ('8/p2rk3/R7/P3p3/5p2/4KP2/8/8 w - - 0 2', 'e3e2'),
+                ('8/p2rk3/R7/P3p3/5p2/4KP2/8/8 w - - 0 2', 'e3f2')]
+    posMoves = [('8/8/8/P1p2pp1/2P2k2/2PK1P2/r3R3/8 b - - 1 1', 'a2a5'),
+                ('8/8/8/P1p2pp1/2P2k2/2PK1P2/r3R3/8 b - - 1 1', 'a2a3')]
+    plotExpectedScoreChangeByDepth(posMoves, sfConfig, 25, filename='../out/trapStalemate.png')
     """
     for name, fen in openingTraps.items():
         print(name, findTrapMoves(chess.Board(fen), sfConfig, 23))
