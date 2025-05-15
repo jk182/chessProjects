@@ -18,17 +18,21 @@ def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
     cache = dict()
 
     players = dict()
-    data = {'Player': list(), 'FEN': list(), 'Evaluation': list(), 'Opponent Rating': list(), 'Result': list(), 'Date': list()}
+    data = {'Player': list(), 'FEN': list(), 'Evaluation': list(), 'Player Rating': list(), 'Opponent Rating': list(), 'Result': list(), 'Date': list()}
 
+    """
     if cachePath:
         with open(cachePath, 'rb') as pick:
             cache = pickle.load(pick)
+    """
 
     stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     with open(pgnPath, 'r', encoding='utf8') as pgn:
         while game := chess.pgn.read_game(pgn):
             totalGames += 1
             event = game.headers['Event']
+            if "WhiteElo" not in game.headers.keys() or "BlackElo" not in game.headers.keys():
+                continue
             if 'blitz' in event.lower():
                 blitzGames += 1
             elif 'rapid' in event.lower():
@@ -36,7 +40,7 @@ def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
             elif 'freestyle' in event.lower() or 'fischer random' in event.lower() or 'chess960' in event.lower():
                 chess960Games += 1
             else:
-                board = chess.Board()
+                board = game.board()
                 for move in game.mainline_moves():
                     if not board.is_legal(move):
                         break
@@ -86,8 +90,10 @@ def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
                                 data['Evaluation'].append(score)
                                 if 'WhiteElo' in game.headers.keys() and 'BlackElo' in game.headers.keys():
                                     data['Opponent Rating'].append([int(game.headers['BlackElo']), int(game.headers['WhiteElo'])][i])
+                                    data['Player Rating'].append([int(game.headers['WhiteElo']), int(game.headers['BlackElo'])][i])
                                 else:
                                     data['Opponent Rating'].append(0)
+                                    data['Player Rating'].append(0)
                                 data['Result'].append(results[i])
                                 data['Date'].append(game.headers['Date'])
                             """
@@ -97,6 +103,8 @@ def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
                                 gameScore[0] += 0.5
                             """
                             """
+
+
                             if result == '1/2-1/2':
                                 gameScore[0] += 0.5
                             else:
@@ -166,10 +174,12 @@ if __name__ == '__main__':
     carlsenGames = '../resources/carlsenGames.pgn'
     otherGames = '../out/2700games2023-out.pgn'
     cacheP = '../resources/endingsCache.pickle'
-    data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
-    print(getPlayerScoreByYear(data, 'Carlsen, M'))
+    games2800 = '../resources/2800Games.pgn'
+    getEqualEndgameData(games2800, cachePath='../resources/2800cache.pickle')
+    # data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
+    # print(getPlayerScoreByYear(data, 'Carlsen, M'))
     # getEqualEndgameData(otherGames, cachePath=cacheP)
     # getEqualEndgameData('../resources/2650games2022.pgn', cachePath=cacheP)
     # for path in ['../resources/nakaGames.pgn', '../resources/adamsGames.pgn', '../resources/rubinsteinGames.pgn', '../resources/capablancaGames.pgn']:
-    for path in ['../resources/nepoGames.pgn']:
-        getEqualEndgameData(path, cacheP)
+    # for path in ['../resources/nepoGames.pgn']:
+        # getEqualEndgameData(path, cacheP)
