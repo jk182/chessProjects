@@ -32,9 +32,9 @@ def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
             event = game.headers['Event']
             if "WhiteElo" not in game.headers.keys() or "BlackElo" not in game.headers.keys():
                 continue
-            if 'blitz' in event.lower():
+            if 'blitz' in event.lower() or 'armageddon' in event.lower() or 'FIDE World Bl' in event:
                 blitzGames += 1
-            elif 'rapid' in event.lower():
+            elif 'rapid' in event.lower() or 'cct' in event.lower() or 'speedchess' in event.lower() or 'gcl' in event.lower() or 'FTX Crypto Cup 2022' in event or 'Oslo Esports Cup 2022' in event:
                 rapidGames += 1
             elif 'freestyle' in event.lower() or 'fischer random' in event.lower() or 'chess960' in event.lower():
                 chess960Games += 1
@@ -204,6 +204,7 @@ def getPlayerScore(df: pd.DataFrame, playerName: str) -> tuple:
             perfRating += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
 
     perfRating /= len(scores)
+    print(perfRating)
     wins = [s for s in scores if s == 1]
     losses = [s for s in scores if s == 0]
     return (sum(scores)/len(scores), len(wins)/len(scores), len(losses)/len(scores))
@@ -224,6 +225,7 @@ def getRatingScore(df: pd.DataFrame) -> tuple:
             perfRating += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
 
     perfRating /= len(scores)
+    print(perfRating)
     wins = [s for s in scores if s == 1]
     losses = [s for s in scores if s == 0]
     return (sum(scores)/len(scores), len(wins)/len(scores), len(losses)/len(scores))
@@ -236,7 +238,7 @@ def plotEndgamePerformance(players: list, data: pd.DataFrame):
     ax.set_facecolor('#e6f7f2')
 
 
-def plotWinLossData(data: list, labels: list):
+def plotWinLossData(data: list, labels: list, filename: str = None):
     """
     This plots the relative number of wins and losses
     data: list
@@ -249,8 +251,21 @@ def plotWinLossData(data: list, labels: list):
     ratingScore = getRatingScore(data[1])
     plotData = [[playerScore[1], playerScore[2]], 
                 [ratingScore[1], ratingScore[2]]]
-    plotting_helper.plotPlayerBarChart(plotData, labels, 'Relative number of wins/losses', 'Relative number of wins and losses', ['Win%', 'Loss%'], colors=plotting_helper.getColors(['green', 'red']))
+    plotting_helper.plotPlayerBarChart(plotData, labels, 'Relative number of wins/losses', 'Relative number of wins and losses in equal endings', ['Win%', 'Loss%'], colors=plotting_helper.getColors(['green', 'red']), filename=filename)
 
+
+def plotYearlyWinLossData(yearlyData: dict, title: str, filename: str = None):
+    """
+    This plots the relative number of wins and losses for the yearly data.
+    Each year (or group of years) is plotted separately 
+    """
+    data = list()
+    for year, d in yearlyData.items():
+        winP = d[0]/d[2]
+        # get losses by taking totalGames-wins-draws (with draws = (totalScore-wins)*2)
+        lossP = (d[2]-d[0]-(d[1]-d[0])*2)/d[2]
+        data.append([winP, lossP])
+    plotting_helper.plotPlayerBarChart(data, yearlyData.keys(), 'Relative number of wins/losses', title, ['Win%', 'Loss%'], colors=plotting_helper.getColors(['green', 'red']), filename=filename)
 
 
 if __name__ == '__main__':
@@ -258,12 +273,16 @@ if __name__ == '__main__':
     otherGames = '../out/2700games2023-out.pgn'
     cacheP = '../resources/endingsCache.pickle'
     games2800 = '../resources/2800Games.pgn'
-    # df2800 = getEqualEndgameData(games2800, cachePath='../resources/2800cache.pickle')
-    # print(getRatingScore(df2800))
+    df2800 = getEqualEndgameData(games2800, cachePath='../resources/2800cache.pickle')
+    print(getRatingScore(df2800))
     data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
-    # plotWinLossData([data, df2800], ['Carlsen', '2800 players'])
-    yearlyData = getPlayerScoreByYear(data, 'Carlsen, M')
-    print(chunkYearlyData(yearlyData, 3))
+    print(getRatingScore(data))
+    # plotWinLossData([data, df2800], ['Carlsen', '2800 players'], filename='../out/endgames/carlsenV2800.png')
+    yearlyData = getPlayerScoreByYear(data, 'Carlsen')
+    chunks = chunkYearlyData(yearlyData, 3)
+    print(chunks)
+    plotYearlyWinLossData(chunks, 'Carlsens relative number of wins and losses in equal endings over the years', filename='../out/endgames/carlsenYearly.png')
+
     # print(getPlayerScore(data, 'Carlsen, M'))
     # getEqualEndgameData(otherGames, cachePath=cacheP)
     # getEqualEndgameData('../resources/2650games2022.pgn', cachePath=cacheP)
