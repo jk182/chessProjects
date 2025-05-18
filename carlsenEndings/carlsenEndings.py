@@ -5,6 +5,7 @@ import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions import configureEngine
+import plotting_helper
 import pickle
 import matplotlib.pyplot as plt
 
@@ -20,11 +21,9 @@ def getEqualEndgameData(pgnPath: str, cachePath: str = None) -> pd.DataFrame:
     players = dict()
     data = {'Player': list(), 'FEN': list(), 'Evaluation': list(), 'Player Rating': list(), 'Opponent Rating': list(), 'Result': list(), 'Date': list()}
 
-    """
     if cachePath:
         with open(cachePath, 'rb') as pick:
             cache = pickle.load(pick)
-    """
 
     stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
     with open(pgnPath, 'r', encoding='utf8') as pgn:
@@ -145,22 +144,89 @@ def getPlayerScoreByYear(df: pd.DataFrame, playerName: str) -> dict:
     playerName: str
         The name of the player (only checked with in)
     return -> dict
-        Dictionary indexed by years containing a list with [totalPoints, totalGames, perfRating]
+        Dictionary indexed by years containing a list with [totalWins, totalPoints, totalGames, perfRating]
     """
     yearlyData = dict()
     for i, row in df.iterrows():
         if playerName in row['Player']:
             year = int(row['Date'][:4])
             if year not in yearlyData.keys():
-                yearlyData[year] = [0, 0, 0]
-            yearlyData[year][0] += row['Result']
-            yearlyData[year][1] += 1
-            yearlyData[year][2] += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
+                yearlyData[year] = [0, 0, 0, 0]
+            if row['Result'] == 1:
+                yearlyData[year][0] += 1
+            yearlyData[year][1] += row['Result']
+            yearlyData[year][2] += 1
+            yearlyData[year][3] += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
 
     # Normalizing the performance rating
     for year in yearlyData.keys():
-        yearlyData[year][2] /= yearlyData[year][1]
+        yearlyData[year][3] /= yearlyData[year][2]
     return dict(sorted(yearlyData.items()))
+
+
+def chunkYearlyData(yearlyData: dict, chunkSize: int) -> dict:
+    """
+    This groups the yearly data into bigger chunks
+    yearlyData: dict
+        Dictionary from getPlayerScoreByYear
+    chunkSize: int
+        The number of years which should be grouped together
+    return -> dict
+        Dictionary indexed by year range (startYear-endYear) containing a list with [totalWins, totalPoints, totalGames, perfRating]
+    """
+    data = dict()
+    startYear = 0
+    currentData = [0, 0, 0, 0]
+    for i, (year, d) in enumerate(yearlyData.items()):
+        if i % chunkSize == 0:
+            startYear = year
+            currentData = [0, 0, 0, 0]
+        for j in range(len(d)-1):
+            currentData[j] += d[j]
+        currentData[3] += d[3]*d[2]
+        if i % chunkSize == chunkSize-1:
+            currentData[3] /= currentData[2]
+            data[f'{startYear}-{year}'] = currentData
+    return data
+
+
+def getPlayerScore(df: pd.DataFrame, playerName: str) -> tuple:
+    """
+    This claculates the score for one given player
+    return -> tuple
+        (score, relWins, relLosses)
+    """
+    scores = list()
+    perfRating = 0
+    for i, row in df.iterrows():
+        if playerName in row['Player']:
+            scores.append(row['Result'])
+            perfRating += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
+
+    perfRating /= len(scores)
+    wins = [s for s in scores if s == 1]
+    losses = [s for s in scores if s == 0]
+    return (sum(scores)/len(scores), len(wins)/len(scores), len(losses)/len(scores))
+
+
+def getRatingScore(df: pd.DataFrame) -> tuple:
+    """
+    This calculates the score for 2800 rated players
+    return -> tuple
+        (score, relWins, relLosses)
+    """
+    rating = 2800
+    scores = list()
+    perfRating = 0
+    for i, row in df.iterrows():
+        if row['Player Rating'] >= rating and row['Opponent Rating'] < 2800:
+            scores.append(row['Result'])
+            perfRating += row['Opponent Rating'] + (row['Result'] - 0.5) * 800
+
+    perfRating /= len(scores)
+    wins = [s for s in scores if s == 1]
+    losses = [s for s in scores if s == 0]
+    return (sum(scores)/len(scores), len(wins)/len(scores), len(losses)/len(scores))
 
 
 def plotEndgamePerformance(players: list, data: pd.DataFrame):
@@ -170,14 +236,35 @@ def plotEndgamePerformance(players: list, data: pd.DataFrame):
     ax.set_facecolor('#e6f7f2')
 
 
+def plotWinLossData(data: list, labels: list):
+    """
+    This plots the relative number of wins and losses
+    data: list
+        List of DataFrames to get the win and loss data
+    labels: list
+        The labels for the data
+    """
+    # Assume that the first data entry is for Carlsen and the second one for rating
+    playerScore = getPlayerScore(data[0], 'Carlsen, M')
+    ratingScore = getRatingScore(data[1])
+    plotData = [[playerScore[1], playerScore[2]], 
+                [ratingScore[1], ratingScore[2]]]
+    plotting_helper.plotPlayerBarChart(plotData, labels, 'Relative number of wins/losses', 'Relative number of wins and losses', ['Win%', 'Loss%'], colors=plotting_helper.getColors(['green', 'red']))
+
+
+
 if __name__ == '__main__':
     carlsenGames = '../resources/carlsenGames.pgn'
     otherGames = '../out/2700games2023-out.pgn'
     cacheP = '../resources/endingsCache.pickle'
     games2800 = '../resources/2800Games.pgn'
-    getEqualEndgameData(games2800, cachePath='../resources/2800cache.pickle')
-    # data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
-    # print(getPlayerScoreByYear(data, 'Carlsen, M'))
+    # df2800 = getEqualEndgameData(games2800, cachePath='../resources/2800cache.pickle')
+    # print(getRatingScore(df2800))
+    data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
+    # plotWinLossData([data, df2800], ['Carlsen', '2800 players'])
+    yearlyData = getPlayerScoreByYear(data, 'Carlsen, M')
+    print(chunkYearlyData(yearlyData, 3))
+    # print(getPlayerScore(data, 'Carlsen, M'))
     # getEqualEndgameData(otherGames, cachePath=cacheP)
     # getEqualEndgameData('../resources/2650games2022.pgn', cachePath=cacheP)
     # for path in ['../resources/nakaGames.pgn', '../resources/adamsGames.pgn', '../resources/rubinsteinGames.pgn', '../resources/capablancaGames.pgn']:
