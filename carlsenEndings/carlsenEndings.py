@@ -247,7 +247,8 @@ def plotWinLossData(data: list, labels: list, filename: str = None):
         The labels for the data
     """
     # Assume that the first data entry is for Carlsen and the second one for rating
-    playerScore = getPlayerScore(data[0], 'Carlsen, M')
+    playerScore = getPlayerScore(data[0], 'Carlsen')
+    print(playerScore)
     ratingScore = getRatingScore(data[1])
     plotData = [[playerScore[1], playerScore[2]], 
                 [ratingScore[1], ratingScore[2]]]
@@ -276,8 +277,8 @@ if __name__ == '__main__':
     df2800 = getEqualEndgameData(games2800, cachePath='../resources/2800cache.pickle')
     print(getRatingScore(df2800))
     data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
-    print(getRatingScore(data))
-    # plotWinLossData([data, df2800], ['Carlsen', '2800 players'], filename='../out/endgames/carlsenV2800.png')
+    print(getPlayerScore(data, 'Carlsen'))
+    plotWinLossData([data, df2800], ['Carlsen', '2800 players'], filename='../out/endgames/carlsenV2800.png')
     yearlyData = getPlayerScoreByYear(data, 'Carlsen')
     chunks = chunkYearlyData(yearlyData, 3)
     print(chunks)
