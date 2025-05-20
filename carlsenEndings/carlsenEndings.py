@@ -278,10 +278,11 @@ if __name__ == '__main__':
     print(getRatingScore(df2800))
     data = getEqualEndgameData(carlsenGames, cachePath='../resources/carslenEndingsCache.pickle')
     print(getPlayerScore(data, 'Carlsen'))
+    print(df2800)
+    print(data)
     plotWinLossData([data, df2800], ['Carlsen', '2800 players'], filename='../out/endgames/carlsenV2800.png')
     yearlyData = getPlayerScoreByYear(data, 'Carlsen')
     chunks = chunkYearlyData(yearlyData, 3)
-    print(chunks)
     plotYearlyWinLossData(chunks, 'Carlsens relative number of wins and losses in equal endings over the years', filename='../out/endgames/carlsenYearly.png')
 
     # print(getPlayerScore(data, 'Carlsen, M'))
