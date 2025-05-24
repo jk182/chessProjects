@@ -12,7 +12,10 @@ import functions
 from functions import configureEngine, sharpnessLC0
 import logging
 import evalDB
+import argparse
 
+from tqdm import tqdm
+import time
 
 def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit: int, nodeLimit: int) -> None:
     """
@@ -32,9 +35,15 @@ def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit:
         Node limit for the LC0 analysis
     """
     gameNr = 1
+    totalGames = 0
     with open(pgnPath, 'r') as pgn:
-        while (game := chess.pgn.read_game(pgn)):
-            print(f'Starting to analyse game {gameNr}')
+        while chess.pgn.read_game(pgn):
+            totalGames += 1
+
+    with open(pgnPath, 'r') as pgn:
+        for i in tqdm(range(totalGames), leave=True):
+            game = chess.pgn.read_game(pgn)
+            # print(f'Starting to analyse game {gameNr}')
             gameNr += 1
 
             board = game.board()
@@ -43,8 +52,8 @@ def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit:
             newGame.headers = game.headers
             node = newGame
 
-            for move in game.mainline_moves():
-                print(move)
+            for j in tqdm(range(len(list(game.mainline_moves()))), leave=False):
+                move = list(game.mainline_moves())[j]
                 node = node.add_variation(move)
                 board.push(move)
 
@@ -63,18 +72,13 @@ def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit:
                     if evalDict['nodes'] <= 0:
                         info = analysisWDL(board, lc0, nodeLimit)
                         wdl = list(chess.engine.PovWdl.white(info['wdl']))
-                        print(wdl)
                         evalDB.update(position=posDB, nodes=nodeLimit, w=wdl[0], d=wdl[1], l=wdl[2])
-                        print(f'WDL calculated: {wdl}')
-                    print('Cache hit!')
-                    print(wdl, cp)
                     node.comment = f'{str(wdl)};{cp}'
                 else:
                     iSF = analysisCP(board, sf, timeLimit)
                     iLC0 = analysisWDL(board, lc0, nodeLimit)
                     if iSF and iLC0:
                         ana = formatInfo(iLC0, iSF)
-                        print(ana)
                         node.comment = ana
                         cp = int(ana.split(';')[1])
                         wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
@@ -639,10 +643,29 @@ def maiaMoves(positions: list, maiaFolder: str) -> dict:
     return ret
 
 
-if __name__ == '__main__':
+def commandLine():
     op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
     leela = configureEngine('lc0', op)
     sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
+    
+    parser = argparse.ArgumentParser(
+            prog='Game analysis',
+            description='This program analyses all games in a PGN file with Stockfish and LC0 and saves the analysis in an output file')
+    parser.add_argument('input_filename', help="Path to the PGN file to analyse")
+    parser.add_argument('-o', '--out-file', help="Path to the output PGN file")
+    parser.add_argument('-t', '--time', default=4, help="Analysis time of Stockfish in seconds")
+    parser.add_argument('-n', '--nodes', default=10000, help="Number of nodes LC0 analyses")
+
+    args = parser.parse_args()
+
+    analyseGames(args.input_filename, args.out_file, sf, leela, args.time, args.nodes)
+
+    sf.quit()
+    leela.quit()
+
+
+if __name__ == '__main__':
+    commandLine()
     """
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
@@ -659,52 +682,10 @@ if __name__ == '__main__':
         makeComments(f'../resources/{t}', f'../out/{t[:-4]}-5000-30.pgn', analysisCPnWDL, 5000, leela, True)
     """
 
-    # analyseGames(f'../resources/worldBlitz2023.pgn', f'../out/games/worldBlitz2023-out.pgn', sf, leela, 4, 5000)
-    # analyseGames('../resources/grenkeOpen2024.pgn', '../out/games/grenkeOpen2024.pgn', sf, leela, 4, 5000)
-    # analyseGames(f'../resources/tal1959-1962.pgn', f'../out/games/tal1959-1962-out.pgn', sf, leela, 4, 5000)
-    # analyseGames(f'../resources/botvinnik1959-1962.pgn', f'../out/games/botvinnik1959-1962-out.pgn', sf, leela, 4, 5000)
-    # analyseGames('../resources/sacGames.pgn', '../out/games/sacs-out.pgn', sf, leela, 4, 5000)
-    # analyseGames('../resources/gukesh2019.pgn', '../out/games/gukesh2019-out.pgn', sf, leela, 4, 10000)
-    # analyseGames('../resources/gukesh2020.pgn', '../out/games/gukesh2020-out.pgn', sf, leela, 4, 10000)
-    # analyseGames('../resources/olympiad2024_R10.pgn', '../out/games/olympiad2024-out.pgn', sf, leela, 4, 10000)
-    # analyseGames('../resources/wijkMasters2025.pgn', '../out/games/wijkMasters2025-out.pgn', sf, leela, 4, 10000)
-    # analyseGames('../resources/wijkChallengers2025.pgn', '../out/games/wijkChallengers2025-out.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/germany960_2024.pgn', '../out/games/germany960_2024-analysed.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/germany960_2025.pgn', '../out/games/germany960_2025-analysed.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/grenke960.pgn', '../out/games/grenke960-analysed.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/paris960.pgn', '../out/games/paris960-analysed.pgn', sf, leela, 4, 10000)
-    sf.quit()
-    leela.quit()
-    """
-    playerSharp = sharpnessChangePerPlayer(candidates, startSharp)
-    for k,v in playerSharp.items():
-        print(k, sum(v)/len(v))
-    """
-    # stockfish = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
-    dub = '../resources/dubov.pgn'
-    of = '../out/dubov-wdl.pgn'
     # makeComments('../resources/carlsen2019-2.pgn', '../out/carlsen2019-5000.pgn', analysisWDL, 5000, leela)
     # for k,v in sharpnessChangePerPlayer('../out/tal-botvinnik-1960-5000.pgn', 0.468).items():
     #     print(k, sum(v)/len(v))
-    carlsen = ['../out/carlsen2014-5000.pgn', '../out/carlsen2019-5000.pgn']
-    """
-    for c in carlsen:
-        for k,v in sharpnessChangePerPlayer(c, 0.468).items():
-            if 'Carlsen' in k:
-                nv = [val for val in v if not np.isinf(val)]
-                print(k, sum(nv)/len(nv))
-    """
-    candidates = '../resources/candidates_out.pgn'
     # plotSharpChange(sharpnessChangePerPlayer(candidates))
-    pgn = '../resources/naka-nepo.pgn'
-    outf = '../out/naka-nepo-30000.pgn'
-    # plotWDL(outf)
-    pgns = ['../resources/Tal-Koblents-1957.pgn',
-            '../resources/Ding-Nepo-G12.pgn',
-            '../resources/Ponomariov-Carlsen-2010.pgn',
-            '../resources/Vidit-Carlsen-2023.pgn']
-    adventOpen = '../resources/Advent-Open.pgn'
-    myGames = '../resources/Austria-Open.pgn'
     # plotCPLDistribution('../out/Firouzja-Gukesh-sf.pgn')
     # plotCPLDistributionPlayer('../out/myGames-sf.pgn', 'Kern, Julian')
     # plotCPLDistribution('../out/Vidit-Caruana-sf.pgn')
@@ -743,10 +724,10 @@ if __name__ == '__main__':
     plotWDL(outf3)
     """
     # Testing for Maia mistake analysis
-    logging.basicConfig(level=logging.WARNING)
-    pgn = '../resources/jkGames50.pgn'
-    fen = 'rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4'
-    maiaFolder = '/Users/julian/chess/maiaNets'
+    # logging.basicConfig(level=logging.WARNING)
+    # pgn = '../resources/jkGames50.pgn'
+    # fen = 'rnbqkb1r/pp2pppp/3p1n2/2p5/4P3/2P2N2/PP1PBPPP/RNBQK2R b KQkq - 2 4'
+    # maiaFolder = '/Users/julian/chess/maiaNets'
     # print(maiaMoves([fen], maiaFolder))
     """
     # print(findMistakes('../out/Ponomariov-Carlsen-2010-15000.pgn'))
