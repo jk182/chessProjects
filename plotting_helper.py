@@ -59,7 +59,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     """
     A general function to create bar charts, where each player (or group of players) gets multiple bars.
     data: list
-        A list of listss. The n-th list is the data for the n-th player
+        A list of lists. The n-th list is the data for the n-th player
     xTickLabels: list
         The labels for the x-ticks. Usually the player names
     ylabel: str
@@ -76,7 +76,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         If no name is given, the plot will be shown instead of saved.
     """
     if not colors:
-        colors = getDefaultColors
+        colors = getDefaultColors()
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
@@ -100,3 +100,42 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     else:
         plt.show()
 
+def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, hlineHeight: float = None, filename: str = None):
+    """
+    A general function to create line charts.
+    data: list
+        A list of lists, containing the data to be plotted
+    xLabel, yLabel:
+        Labels for the axes
+    title: str
+        Title of the plot
+    legend: list
+        Legend for each of the data lists
+    colors: list
+        Colors to be used of the lines.
+        If no value is given, a default color palette will be chosen.
+    filename: str
+        Then path to save the plot.
+        If no name is given, the plot will be shown instead of saved.
+    """
+    if not colors:
+        colors = getDefaultColors()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+
+    for i, d in enumerate(data):
+        ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
+
+    ax.legend()
+    plt.title(title)
+    if hlineHeight is not None:
+        plt.axhline(hlineHeight, color='black', linewidth=0.5)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()

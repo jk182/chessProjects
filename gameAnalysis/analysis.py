@@ -41,10 +41,14 @@ def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit:
             totalGames += 1
 
     with open(pgnPath, 'r') as pgn:
-        for i in tqdm(range(totalGames), leave=True):
+        for i in tqdm(range(totalGames), leave=True, desc='Number of games'):
             game = chess.pgn.read_game(pgn)
             # print(f'Starting to analyse game {gameNr}')
             gameNr += 1
+
+            whitePlayer = game.headers["White"].split(',')[0]
+            blackPlayer = game.headers["Black"].split(',')[0]
+            date = game.headers["Date"][:4]
 
             board = game.board()
 
@@ -52,7 +56,7 @@ def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit:
             newGame.headers = game.headers
             node = newGame
 
-            for j in tqdm(range(len(list(game.mainline_moves()))), leave=False):
+            for j in tqdm(range(len(list(game.mainline_moves()))), leave=False, desc=f'{whitePlayer}-{blackPlayer}, {date}'):
                 move = list(game.mainline_moves())[j]
                 node = node.add_variation(move)
                 board.push(move)
