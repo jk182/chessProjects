@@ -100,6 +100,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     else:
         plt.show()
 
+
 def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, hlineHeight: float = None, filename: str = None):
     """
     A general function to create line charts.
@@ -126,10 +127,20 @@ def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
 
+    xMin = 0
+    xMax = 0
+    yMin = 100
+    yMax = -100
+
     for i, d in enumerate(data):
-        ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
+        ax.plot([(j+1)/2 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
+        xMax = max(xMax, len(d)//2)
+        yMin = min(yMin, min(d))
+        yMax = max(yMax, max(d))
 
     ax.legend()
+    ax.set_xlim(xMin, xMax)
+    ax.set_ylim(yMin-0.5, yMax+0.5)
     plt.title(title)
     if hlineHeight is not None:
         plt.axhline(hlineHeight, color='black', linewidth=0.5)
