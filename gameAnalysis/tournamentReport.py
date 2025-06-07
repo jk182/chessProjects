@@ -182,6 +182,48 @@ def plotMoveByMoveExpectedScore(xsData: dict, nicknames: dict = None, filename: 
         plt.show()
 
 
+def getPlayerVolatilities(pgnPaths: list) -> dict:
+    """
+    This calculates the volatility of the games for each player
+    """
+    a = 2
+    vol = dict()
+    avgVol = dict()
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                white = game.headers["White"].split(',')[0]
+                black = game.headers["Black"].split(',')[0]
+
+                gameVol = list()
+                lastXS = functions.expectedScore(20)
+                node = game
+                while not node.is_end():
+                    node = node.variations[0]
+                    if node.comment:
+                        cp = functions.readComment(node, True, True)[1]
+                        XS = functions.expectedScore(cp)
+                        gameVol.append(abs(XS-lastXS)**a)
+                        lastXS = XS
+                if node.comment:
+                    cp = functions.readComment(node, True, True)[1]
+                    XS = functions.expectedScore(cp)
+                    gameVol.append(abs(XS-lastXS)**a)
+                    lastXS = XS
+                gVol = (sum(gameVol)/len(gameVol))**(1/a)
+                for player in [white, black]:
+                    if player in vol.keys():
+                        vol[player].append(gVol)
+                    else:
+                        vol[player] = [gVol]
+        for player, v in vol.items():
+            if player not in avgVol.keys():
+                avgVol[player] = list()
+            avgVol[player].append(sum(v)/len(v))
+            vol[player] = list()
+    return avgVol
+
+
 def getGameAccuracies(pgnPath: str) -> dict:
     """
     This function calculates the accuracies of each player
@@ -929,7 +971,7 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1, colors=worseColors)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
         plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0)
-        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy (classical)', short=nicknames, filename=f'{filename}-gameAcc.png')
+        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy', short=nicknames, filename=f'{filename}-gameAcc.png', colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
     else:
         createMovePlot(moveSit, nicknames)
         analysis.plotSharpChange(sharpChange, short=nicknames)
@@ -937,7 +979,7 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, sortIndex=1, colors=worseColors)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, sortIndex=1)
         plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0)
-        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy (classical)', short=nicknames)
+        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy', short=nicknames, colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
 
 
 def commandLine():
@@ -957,9 +999,13 @@ if __name__ == '__main__':
     armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
     print(armScores)
     nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
-    plotScoresArmageddon(armScores, short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-armScores.png')
+    # plotScoresArmageddon(armScores, short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-armScores.png')
     times = getClockTimesByColor('../resources/norwayChess2025Arm.pgn')
-    plotting_helper.plotAvgLinePlot(times, ['White', 'Black'], 'Time remaining', 'Average time remaining after each move in armageddon', ["White's time", "Black's time"], colors=['#f8a978', '#111111'], maxMoves=50, filename='../out/norwayChess2025Plots/norwayChess2025-clockTimes.png')
+    # plotting_helper.plotAvgLinePlot(times, ['White', 'Black'], 'Time remaining', 'Average time remaining after each move in armageddon', ["White's time", "Black's time"], colors=['#f8a978', '#111111'], maxMoves=50, filename='../out/norwayChess2025Plots/norwayChess2025-clockTimes.png')
+
+    volatilities = getPlayerVolatilities(['../out/games/norwayChess2025-out.pgn'])# ,  '../out/games/norwayChessArm2025-out.pgn'])
+    print(volatilities)
+    plotBarChart(volatilities, ['Classical games', 'Armageddon games'], 'Expected score volatility', 'Average volatility of the expected score', short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-volatility.png')
     # wijk = '../out/games/wijkChallengers2025-out.pgn'
     # generateTournamentPlots(wijk, nicknames=nicknames, filename=plotPath)
     # roundScores = getRoundByRoundScores(wijk)
@@ -1008,21 +1054,6 @@ if __name__ == '__main__':
     # worse = worseGames(t)
     # plotWorseGames(worse, nicknames)
     # plotWorseGames(betterGames(t), nicknames)
-
-    scores = {'Carlsen': [9, 6, 1.5, 1], 
-              'Nakamura': [7, 7, 1, 0.5],
-              'Pragg': [9, 4, 1.5, 0],
-              'Firouzja': [7, 4, 1.5, 1],
-              'Caruana': [6, 4, 0.5, 1],
-              'Ding': [4, 2, 0.5, 0.5]}
-    # plotScoresArmageddon(scores, '../out/NorwayChessOpenArmScores.png')
-    scoresW = {'Ju Wenjun': [9, 7, 1.5, 1.5],
-               'Muzychuk': [7, 7, 1, 1],
-               'Lei Tingjie': [9, 4, 0.5, 1],
-               'Vaishali': [6, 5, 1, 0.5],
-               'Humpy Koneru': [6, 3, 0.5, 0.5],
-               'Cramling': [4, 3, 0, 1]}
-    plotScoresArmageddon(scoresW, '../out/NorwayChessWomenArmScores.png')
     """
 
     """
