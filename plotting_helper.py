@@ -150,3 +150,40 @@ def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+
+
+def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, maxMoves: int = 39, filename: str = None):
+    """
+    This function plots the average values of move data
+    """
+    if not colors:
+        colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    
+    yMin = 0
+    yMax = 0
+    for k, d in enumerate(data):
+        avg = list()
+        for i in range(maxMoves):
+            l = [c[i] for c in d if len(c) > i]
+            avg.append(sum(l)/len(l))
+        ax.plot(range(1, maxMoves+1), avg, color=colors[k], label=legend[k])
+        yMin = min(yMin, min(avg))
+        yMax = max(yMax, max(avg))
+    
+    plt.xlim(1, maxMoves)
+    plt.ylim(yMin*1.05, yMax*1.05)
+    ax.set_xlabel('Move Number')
+    ax.set_ylabel(ylabel)
+    ax.legend()
+    plt.title(title)
+    plt.axhline(0, color='black', linewidth=0.5)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+

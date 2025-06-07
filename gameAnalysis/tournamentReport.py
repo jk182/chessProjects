@@ -14,6 +14,9 @@ import collections
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
+import plotting_helper
+
+import argparse
 
 
 def getPlayers(pgnPath: str, whiteList: list = None) -> list:
@@ -217,7 +220,6 @@ def getGameAccuracies(pgnPath: str) -> dict:
                 cpB = cpA
             wA = float(functions.gameAccuracy(sum(wxs)/len(wxs)))
             bA = float(functions.gameAccuracy(sum(bxs)/len(bxs)))
-            print(f'{w}-{b}: {wA} - {bA}')
             if w not in accuracies.keys():
                 accuracies[w] = [[wA, bA]]
             else:
@@ -524,12 +526,18 @@ def sortPlayers(d: dict, index: int) -> list:
     players = list()
     for i in range(len(d.keys())):
         maximum = -1
+        maxItem = None
         for k, v in d.items():
             if k in players:
                 continue
+            if v[index] == maximum:
+                if v > maxItem:
+                    p = k
+                    maxItem = v
             if v[index] > maximum:
                 p = k
                 maximum = v[index]
+                maxItem = v
         players.append(p)
     return players
 
@@ -618,7 +626,49 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
         plt.show()
 
 
-def plotScoresArmageddon(scores: dict, filename: str = None) -> None:
+def getArmageddonScores(classicalGameFile: str, armageddonGameFile: str, scoring: tuple) -> dict:
+    """
+    This gets the scores from classical and armageddong games for tournaments like Norway Chess
+    classicalGameFile: str
+        The path to the PGN file with the classical games
+    armageddonGameFile: str
+        The path to the PGN file with the armageddon games
+    scoring: tuple
+        The scoring for the differnt game types: (classWin, classDraw, armWin)
+    """
+    scores = dict()
+    with open(classicalGameFile, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"].split(',')[0]
+            black = game.headers["Black"].split(',')[0]
+            for p in [white, black]:
+                if p not in scores.keys():
+                    scores[p] = [0, 0, 0, 0]
+            result = game.headers["Result"]
+            if result == '1-0':
+                scores[white][0] += scoring[0]
+            elif result == '0-1':
+                scores[black][1] += scoring[0]
+            else:
+                scores[white][0] += scoring[1]
+                scores[black][1] += scoring[1]
+
+    with open(armageddonGameFile, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"].split(',')[0]
+            black = game.headers["Black"].split(',')[0]
+            for p in [white, black]:
+                if p not in scores.keys():
+                    scores[p] = [0, 0, 0, 0]
+            result = game.headers["Result"]
+            if result == '1-0':
+                scores[white][2] += scoring[2]
+            else:
+                scores[black][3] += scoring[2]
+    return dict(sorted(scores.items(), key=lambda x: sum(x[1]), reverse=True))
+
+
+def plotScoresArmageddon(scores: dict, short: dict = None, filename: str = None) -> None:
     """
     Plotting scores with armageddon games (like in Norway chess)
     scores: dict
@@ -635,9 +685,13 @@ def plotScoresArmageddon(scores: dict, filename: str = None) -> None:
     plt.xticks(rotation=90)
     
     for player in scores.keys():
+        p = player.split(',')[0]
+        if short:
+            if p in short.keys():
+                p = short[p]
         bottom = 0
         for i, s in enumerate(scores[player]):
-            ax.bar(player, s, bottom=bottom, color=colors[i%2], edgecolor='grey', linewidth=0.7, hatch=patterns[i])
+            ax.bar(p, s, bottom=bottom, color=colors[i%2], edgecolor='grey', linewidth=0.7, hatch=patterns[i])
             bottom += s
 
     ax.set_facecolor('#e6f7f2')
@@ -650,6 +704,39 @@ def plotScoresArmageddon(scores: dict, filename: str = None) -> None:
         plt.savefig(filename, dpi=500)
     else:
         plt.show()
+
+
+def getClockTimesByColor(pgnPath: str, minutes: bool = True) -> list:
+    """
+    This function reads the times from a PGN file with time stamps
+    minutes: bool
+        If this is set, the time will be calculated in minutes
+    return -> list
+        A list of two lists (for white and black) of lists, containing the clock times after each move
+    """
+    times = [list(), list()]
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            node = game
+            c = [list(), list()]
+            while not node.is_end():
+                node = node.variations[0]
+                if node.clock() is None:
+                    continue
+                time = int(node.clock())
+                if minutes:
+                    time /= 60
+                if not time:
+                    break
+                if not node.turn():
+                    c[0].append(time)
+                else:
+                    c[1].append(time)
+            
+            times[0].append(c[0])
+            times[1].append(c[1])
+    return times
 
 
 def plotScores(scores: dict, short: dict = None, filename: str = None):
@@ -818,6 +905,7 @@ def plotMultAccDistributions(pgnPaths: list, playerNames: list, labels: list, fi
 
 
 def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str = None) -> None:
+    nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
     players = getPlayers(pgnPath)
     # generateAccDistributionGraphs(pgnPath, players)
     scores = getPlayerScores(pgnPath)
@@ -827,6 +915,12 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
     better = betterGames(pgnPath)
     sharpChange = analysis.sharpnessChangePerPlayer(pgnPath)
     IMB = getInaccMistakesBlunders(pgnPath)
+    gameAcc = getGameAccuracies(pgnPath)
+    avgGameAcc = dict()
+    for p, v in gameAcc.items():
+        pA = sum([a[0] for a in v])/len(v)
+        oA = sum([a[1] for a in v])/len(v)
+        avgGameAcc[p] = [pA, oA]
 
     if filename:
         createMovePlot(moveSit, nicknames, f'{filename}-movePlot.png')
@@ -835,6 +929,7 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1, colors=worseColors)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
         plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0)
+        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy (classical)', short=nicknames, filename=f'{filename}-gameAcc.png')
     else:
         createMovePlot(moveSit, nicknames)
         analysis.plotSharpChange(sharpChange, short=nicknames)
@@ -842,28 +937,38 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str 
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, sortIndex=1, colors=worseColors)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, sortIndex=1)
         plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0)
+        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy (classical)', short=nicknames)
 
+
+def commandLine():
+    parser = argparse.ArgumentParser(
+            prog='Tournament report',
+            description='This program generates plots for a tournament')
+
+    parser.add_argument('filename', help='Path to the analysed PGN file')
+    parser.add_argument('-o', '--out-path', default=None, help='The output path for the generated plots')
+
+    args = parser.parse_args()
+    generateTournamentPlots(args.filename, filename=args.out_path)
 
 
 if __name__ == '__main__':
-    wijk = '../out/games/wijkChallengers2025-out.pgn'
+    commandLine()
+    armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
+    print(armScores)
     nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
-    plotPath = '../out/wijkPlots/challengers'
-    gameAcc = getGameAccuracies(wijk)
-    avgGameAcc = dict()
-    for p, v in gameAcc.items():
-        pA = sum([a[0] for a in v])/len(v)
-        oA = sum([a[1] for a in v])/len(v)
-        avgGameAcc[p] = [pA, oA]
-    generateTournamentPlots(wijk, nicknames=nicknames, filename=plotPath)
-    plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Game accuracy', short=nicknames, filename=f'{plotPath}-gameAcc.png')
-    roundScores = getRoundByRoundScores(wijk)
+    plotScoresArmageddon(armScores, short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-armScores.png')
+    times = getClockTimesByColor('../resources/norwayChess2025Arm.pgn')
+    plotting_helper.plotAvgLinePlot(times, ['White', 'Black'], 'Time remaining', 'Average time remaining after each move in armageddon', ["White's time", "Black's time"], colors=['#f8a978', '#111111'], maxMoves=50, filename='../out/norwayChess2025Plots/norwayChess2025-clockTimes.png')
+    # wijk = '../out/games/wijkChallengers2025-out.pgn'
+    # generateTournamentPlots(wijk, nicknames=nicknames, filename=plotPath)
+    # roundScores = getRoundByRoundScores(wijk)
     # fightForFirst = ['Gukesh D', 'Praggnanandhaa R', 'Abdusattorov, Nodirbek']
-    fightForFirst = ['Nguyen, Thai Dai Van', 'Suleymanli, Aydin', "L'Ami, Erwin"]
-    tb =  '../out/games/wijkMasters2025_tiebreak.pgn'
-    mmxs = getMoveByMoveExpectedScore(tb)
-    plotMoveByMoveExpectedScore(mmxs, nicknames=nicknames, filename=f'{plotPath}-TB.png')
-    plotRoundScores(roundScores, players=fightForFirst, title='Fight for 1st place', nicknames=nicknames, filename=f'{plotPath}-roundScores.png')
+    # fightForFirst = ['Nguyen, Thai Dai Van', 'Suleymanli, Aydin', "L'Ami, Erwin"]
+    # tb =  '../out/games/wijkMasters2025_tiebreak.pgn'
+    # mmxs = getMoveByMoveExpectedScore(tb)
+    # plotMoveByMoveExpectedScore(mmxs, nicknames=nicknames, filename=f'{plotPath}-TB.png')
+    # plotRoundScores(roundScores, players=fightForFirst, title='Fight for 1st place', nicknames=nicknames, filename=f'{plotPath}-roundScores.png')
     # Ding games
     """
     preCovid = '../out/games/dingPreCovid-out.pgn'
