@@ -12,9 +12,9 @@ def getGameData(pgnPath: str) -> pd.DataFrame:
             event = game.headers['Event']
             if "WhiteElo" not in game.headers.keys() or "BlackElo" not in game.headers.keys():
                 continue
-            if 'blitz' in event.lower() or 'armageddon' in event.lower() or 'FIDE World Bl' in event:
+            if 'blitz' in event.lower() or 'armageddon' in event.lower() or 'FIDE World Bl' in event or 'ICC' in event or 'TB' in event or 'Carlsen-Ding Showdown' in event:
                 timeControl = 'blitz'
-            elif 'rapid' in event.lower() or 'cct' in event.lower() or 'speedchess' in event.lower() or 'gcl' in event.lower() or 'FTX Crypto Cup 2022' in event or 'Oslo Esports Cup 2022' in event:
+            elif 'rapid' in event.lower() or 'cct' in event.lower() or 'speedchess' in event.lower() or 'gcl' in event.lower() or 'FTX Crypto Cup 2022' in event or 'Oslo Esports Cup 2022' in event or 'Global Chess League' in event or 'Cuadrangular UNAM 2012' in event or 'Uva Four player KO 2014' in event:
                 timeControl = 'rapid'
             elif 'freestyle' in event.lower() or 'fischer random' in event.lower() or 'chess960' in event.lower():
                 continue
@@ -38,9 +38,14 @@ def getScoreByPrevResult(df: pd.DataFrame) -> list:
     lastEvent = None
     lastRound = None
     lastResult = None
+
+    events = set()
     for i, row in df.iterrows():
         event = row['Event']
         result = row['Result']
+
+        if event == 'GRENKE Chess Classic 2024':
+            print(row)
         if '.' in row['Round']:
             r = int(row['Round'].split('.')[0])
         else:
@@ -51,10 +56,12 @@ def getScoreByPrevResult(df: pd.DataFrame) -> list:
             lastResult = result
             continue
 
-        if event == lastEvent and r == lastRound + 1:
-            print(row)
+        if event == lastEvent and r != lastRound + 1 and row['TimeControl'] == 'classical':
+            # print(row)
+            events.add(event)
         lastEvent = event
         lastRound = r
+    print(events)
 
 
 if __name__ == '__main__':
