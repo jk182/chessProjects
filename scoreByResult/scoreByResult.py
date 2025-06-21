@@ -1,6 +1,10 @@
 import chess
 import pandas as pd
 from chess import pgn
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import plotting_helper
 
 
 def getGameData(pgnPath: str) -> pd.DataFrame:
@@ -19,6 +23,10 @@ def getGameData(pgnPath: str) -> pd.DataFrame:
                 timeControl = 'rapid'
             elif 'freestyle' in event.lower() or 'fischer random' in event.lower() or 'chess960' in event.lower() or 'Play Live Challenge 2016' in event:
                 continue
+            elif 'World Cup' in event and int(game.headers['Round'].split('.')[1]) > 4:
+                timeControl = 'blitz'
+            elif 'World Cup' in event and int(game.headers['Round'].split('.')[1]) > 2:
+                timeControl = 'rapid'
             else:
                 totalGames += 1
                 timeControl = 'classical'
@@ -31,9 +39,10 @@ def getGameData(pgnPath: str) -> pd.DataFrame:
             data['Date'].append(game.headers['Date'])
             data['TimeControl'].append(timeControl)
             data['Event'].append(event)
-            data['Round'].append(game.headers['Round'])
-    print(totalGames)
-    return pd.DataFrame(data)
+            data['Round'].append(float(game.headers['Round']))
+    df = pd.DataFrame(data)
+    df = df.sort_values(by=['Date', 'Round'])
+    return df
 
 
 def getScoreByPrevResult(df: pd.DataFrame, player: str) -> list:
@@ -41,13 +50,12 @@ def getScoreByPrevResult(df: pd.DataFrame, player: str) -> list:
     lastEvent = None
     lastRound = None
     lastResult = None
+    lastTC = None
 
-    scoreByResult = {'Win': [0, 0, 0], 'Draw': [0, 0, 0], 'Loss': [0, 0, 0]}
+    scoreByResult = {'Win': [[0, 0, 0], [0, 0, 0], [0, 0, 0]], 'Draw': [[0, 0, 0], [0, 0, 0], [0, 0, 0]], 'Loss': [[0, 0, 0], [0, 0, 0], [0, 0, 0]]}
 
     for i, row in df.iterrows():
         event = row['Event']
-        if 'World Cup' in event and int(row['Round'].split('.')[1]) > 2:
-            continue
 
         if (res := row['Result']) == '1/2-1/2':
             result = res
@@ -64,17 +72,23 @@ def getScoreByPrevResult(df: pd.DataFrame, player: str) -> list:
         else:
             oppRating = int(row['WhiteElo'])
 
+        """
         if '.' in row['Round']:
             roundNr = int(row['Round'].split('.')[0])
         else:
             roundNr = int(row['Round'])
+        """
+        roundNr = int(row['Round'])
+        tc = row['TimeControl']
         if lastEvent is None:
             lastEvent = event
             lastRound = roundNr
             lastResult = result
+            lastTC = tc
             continue
 
-        if event == lastEvent and row['TimeControl'] == 'classical':
+        if event == lastEvent and tc == lastTC:
+            tcindex = ['classical', 'rapid', 'blitz'].index(tc)
             if result == '1-0':
                 points = 1
             elif result == '1/2-1/2':
@@ -82,27 +96,36 @@ def getScoreByPrevResult(df: pd.DataFrame, player: str) -> list:
             else:
                 points = 0
             if lastResult == '1-0':
-                scoreByResult['Win'][0] += points
-                scoreByResult['Win'][1] += 1
-                scoreByResult['Win'][2] += oppRating
+                scoreByResult['Win'][tcindex][0] += points
+                scoreByResult['Win'][tcindex][1] += 1
+                scoreByResult['Win'][tcindex][2] += oppRating
             elif lastResult == '1/2-1/2':
-                scoreByResult['Draw'][0] += points
-                scoreByResult['Draw'][1] += 1
-                scoreByResult['Draw'][2] += oppRating
+                scoreByResult['Draw'][tcindex][0] += points
+                scoreByResult['Draw'][tcindex][1] += 1
+                scoreByResult['Draw'][tcindex][2] += oppRating
             else:
-                scoreByResult['Loss'][0] += points
-                scoreByResult['Loss'][1] += 1
-                scoreByResult['Loss'][2] += oppRating
+                scoreByResult['Loss'][tcindex][0] += points
+                scoreByResult['Loss'][tcindex][1] += 1
+                scoreByResult['Loss'][tcindex][2] += oppRating
         lastEvent = event
         lastRound = roundNr
         lastResult = result
+        lastTC = tc
     print(scoreByResult)
-    for k, v in scoreByResult.items():
-        score = v[0]/v[1]
-        perfRating = v[2]/v[1] + (score-0.5) * 800
-        print(f'{k}: {score}, {perfRating}')
+    scoreList = []
+    for k, val in scoreByResult.items():
+        l = list()
+        for v in val:
+            score = v[0]/v[1]
+            l.append(score)
+            perfRating = v[2]/v[1] + (score-0.5) * 800
+            print(f'{k}: {score}, {perfRating}')
+        scoreList.append(l)
+    return scoreList
+
 
 if __name__ == '__main__':
     carlsenGames = '../resources/carlsenGames.pgn'
     df = getGameData(carlsenGames)
-    getScoreByPrevResult(df, 'Carlsen')
+    sl = getScoreByPrevResult(df, 'Carlsen')
+    plotting_helper.plotPlayerBarChart(sl, ['Classical', 'Rapid', 'Blitz'], 'Score', "Carlsen's score based on previous result", ['After a win', 'After a draw', 'After a loss'], colors=plotting_helper.getColors(['green', 'blue', 'orange']))
