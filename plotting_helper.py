@@ -93,6 +93,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         ax.bar([i+1+offset+(width*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=width, label=legend[j])
 
     ax.legend()
+    ax.set_ylim(0, 0.79)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)

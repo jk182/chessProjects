@@ -73,20 +73,26 @@ def analyseGames(pgnPath: str, outfile: str, sf: engine, lc0: engine, timeLimit:
                         cp = info['score']
                         depth = info['depth']
                         evalDB.update(position=posDB, cp=cp, depth=depth)
-                    if evalDict['nodes'] <= 0:
+                    if evalDict['nodes'] < nodeLimit:
                         info = analysisWDL(board, lc0, nodeLimit)
                         wdl = list(chess.engine.PovWdl.white(info['wdl']))
                         evalDB.update(position=posDB, nodes=nodeLimit, w=wdl[0], d=wdl[1], l=wdl[2])
                     node.comment = f'{str(wdl)};{cp}'
                 else:
                     iSF = analysisCP(board, sf, timeLimit)
-                    iLC0 = analysisWDL(board, lc0, nodeLimit)
-                    if iSF and iLC0:
-                        ana = formatInfo(iLC0, iSF)
-                        node.comment = ana
-                        cp = int(ana.split(';')[1])
-                        wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
-                        evalDB.insert(posDB, nodes=nodeLimit, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
+                    if iSF:
+                        if nodeLimit > 0:
+                            iLC0 = analysisWDL(board, lc0, nodeLimit)
+                            ana = formatInfo(iLC0, iSF)
+                            node.comment = ana
+                            cp = int(ana.split(';')[1])
+                            wdl = [ int(w) for w in ana.split(';')[0].replace('[', '').replace(']', '').strip().split(',') ]
+                            evalDB.insert(posDB, nodes=nodeLimit, cp=cp, w=wdl[0], d=wdl[1], l=wdl[2], depth=iSF['depth'])
+                        else:
+                            ana = formatInfo(infoSF = iSF)
+                            node.comment = ana
+                            cp = int(ana)
+                            evalDB.insert(posDB, nodes=nodeLimit, cp=cp, w=0, d=0, l=0, depth=iSF['depth'])
             print(newGame, file=open(outfile, 'a+'), end='\n\n')
 
 
@@ -662,7 +668,7 @@ def commandLine():
 
     args = parser.parse_args()
 
-    analyseGames(args.input_filename, args.out_file, sf, leela, args.time, args.nodes)
+    analyseGames(args.input_filename, args.out_file, sf, leela, int(args.time), int(args.nodes))
 
     sf.quit()
     leela.quit()

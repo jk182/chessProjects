@@ -45,12 +45,14 @@ def getGameData(pgnPath: str) -> pd.DataFrame:
     return df
 
 
-def getScoreByPrevResult(df: pd.DataFrame, player: str) -> list:
+def getScoreByPrevResult(df: pd.DataFrame, player: str) -> tuple:
     df = df.sort_values(by=['Date', 'Round'])
     lastEvent = None
     lastRound = None
     lastResult = None
     lastTC = None
+
+    colorScore = [[[0, 0], [0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0]]]
 
     scoreByResult = {'Win': [[0, 0, 0], [0, 0, 0], [0, 0, 0]], 'Draw': [[0, 0, 0], [0, 0, 0], [0, 0, 0]], 'Loss': [[0, 0, 0], [0, 0, 0], [0, 0, 0]]}
 
@@ -107,25 +109,37 @@ def getScoreByPrevResult(df: pd.DataFrame, player: str) -> list:
                 scoreByResult['Loss'][tcindex][0] += points
                 scoreByResult['Loss'][tcindex][1] += 1
                 scoreByResult['Loss'][tcindex][2] += oppRating
+                if player in row['White']:
+                    colorScore[tcindex][0][0] += points
+                    colorScore[tcindex][0][1] += 1
+                else:
+                    colorScore[tcindex][1][0] += points
+                    colorScore[tcindex][1][1] += 1
         lastEvent = event
         lastRound = roundNr
         lastResult = result
         lastTC = tc
-    print(scoreByResult)
-    scoreList = []
+    # print(scoreByResult)
+    for w, b in colorScore:
+        print(w[0]/w[1], b[0]/b[1])
+        print(w[1]/(w[1]+b[1]))
+    scoreList = [list(), list(), list()]
+    perfRatings = [list(), list(), list()]
     for k, val in scoreByResult.items():
-        l = list()
-        for v in val:
+        for i, v in enumerate(val):
             score = v[0]/v[1]
-            l.append(score)
+            scoreList[i].append(score)
             perfRating = v[2]/v[1] + (score-0.5) * 800
-            print(f'{k}: {score}, {perfRating}')
-        scoreList.append(l)
-    return scoreList
+            perfRatings[i].append(perfRating)
+            # print(f'{k}: {score}, {perfRating}')
+    # print(scoreList)
+    return (scoreList, perfRatings)
 
 
 if __name__ == '__main__':
     carlsenGames = '../resources/carlsenGames.pgn'
     df = getGameData(carlsenGames)
-    sl = getScoreByPrevResult(df, 'Carlsen')
-    plotting_helper.plotPlayerBarChart(sl, ['Classical', 'Rapid', 'Blitz'], 'Score', "Carlsen's score based on previous result", ['After a win', 'After a draw', 'After a loss'], colors=plotting_helper.getColors(['green', 'blue', 'orange']))
+    sl, pr = getScoreByPrevResult(df, 'Carlsen')
+    print(pr)
+    # plotting_helper.plotPlayerBarChart(sl, ['Classical', 'Rapid', 'Blitz'], 'Score', "Carlsen's score based on the previous result", ['After a win', 'After a draw', 'After a loss'], colors=plotting_helper.getColors(['green', 'blue', 'orange']), filename='../out/scoreBasedOnResult.png')
+    # plotting_helper.plotPlayerBarChart(pr, ['Classical', 'Rapid', 'Blitz'], 'Performance rating', "Carlsen's performance rating based on the previous result", ['After a win', 'After a draw', 'After a loss'], colors=plotting_helper.getColors(['green', 'blue', 'orange']), filename='../out/perfRatingBasedOnResult.png')
