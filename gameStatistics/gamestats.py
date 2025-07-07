@@ -14,7 +14,7 @@ import numpy as np
 import scipy
 
 
-def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
+def readMoveData(pgnPaths: list, is_chess960: bool = False, lichessAnalysis: bool = False) -> pd.DataFrame:
     """
     This function reads the move data from annotated PGN files and returns a dataframe with data about each move
     """
@@ -83,9 +83,16 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
                     node = node.variations[0]
                     ply += 1
                     if node.comment:
+                        if lichessAnalysis:
+                            if not node.eval():
+                                break
+                            cp = int(node.eval().white().score(mate_score=10000))
+                            wdl = [0, 0, 0]
+                        else:
+                            wdl, cp = functions.readComment(node, True, True)
+                        move = node.move
                         data["GameID"].append(gameID)
                         data["Color"].append(board.turn)
-                        move = node.move
                         data["WhiteElo"].append(wElo)
                         data["BlackElo"].append(bElo)
                         data["Result"].append(result)
@@ -94,7 +101,6 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False) -> pd.DataFrame:
                         data["WinPBefore"].append(wdlBefore[0])
                         data["DrawPBefore"].append(wdlBefore[1])
                         data["LossPBefore"].append(wdlBefore[2])
-                        wdl, cp = functions.readComment(node, True, True)
                         data["EvalAfter"].append(cp)
                         data["WinPAfter"].append(wdl[0])
                         data["DrawPAfter"].append(wdl[1])
@@ -611,6 +617,22 @@ if __name__ == '__main__':
     """
     # df = readMoveData(pgns960, True)
     # df.to_pickle('../out/chess960DF')
+    
+    # Blitz games post
+    blitz = ['../resources/worldBlitz2023.pgn']
+    blitzDF = readMoveData(blitz, lichessAnalysis=True)
+    drops = getGameExpectedScoreDrops(blitzDF, (expectedScore, 0.007851))
+    cDrops = getCumulativeDrop(drops)
+
+    df = pd.read_pickle('../out/chess960DF')
+    dfGM = filterGamesByRating(df, (2500, 2900), 150, True)
+    dropsClassical = getGameExpectedScoreDrops(dfGM, (expectedScore, 0.007851))
+    cdc = getCumulativeDrop(dropsClassical)
+    plotAccuracies([cDrops, cdc], ["Blitz", "Classical"], 'Move Accuracy', ('Expected score loss', 'Percentage of moves'))
+    bxs = getxScoreDrops(blitzDF)
+    plotBarChart(bxs, 'Expected score drop', 'Relative number of moves', 'Distribution of expected score loss', isList=False, y_log=True)
+    """
+    GM mistakes post
     df = pd.read_pickle('../out/chess960DF')
     dfGM = filterGamesByRating(df, (2500, 2900), 150, True)
     xScoreMoves = getxScoreDropByMoves(dfGM)
@@ -625,6 +647,7 @@ if __name__ == '__main__':
     # plotBarChart(xScore2, 'Expected score drop', 'Relative number of moves', 'Distribution of expected score loss', isList=False, data2=xScore, limits=[-0.5, 52], y_log=True)
     # plotBarChart(xScore, 'Expected score drop', 'Relative number of moves', 'Distribution of expected score loss', isList=False, limits=[-0.5, 52], y_log=True, filename='../out/normalAcc.png')
     # df27 = filterGamesByRating(df, (2700, 2900), 100)
+    """
     """
     points = list()
     for cp in [50, 100, 150, 200, 250, 300, 500]:
