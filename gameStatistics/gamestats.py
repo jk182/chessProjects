@@ -12,6 +12,7 @@ import matplotlib.ticker as mtick
 from scipy import integrate
 import numpy as np
 import scipy
+import plotting_helper
 
 
 def readMoveData(pgnPaths: list, is_chess960: bool = False, lichessAnalysis: bool = False) -> pd.DataFrame:
@@ -421,9 +422,9 @@ def plotAccuracies(dropList: list, labels: list, title: str, axisLabels: tuple, 
     sigma = 1.55
     offset = 0.25
     ray = [100*np.exp(-(x-offset)**2/(2*sigma**2)) if x > offset else 100 for x in npRange]
-    plt.plot(npRange, ray, color=colors[1], label='Accuracy score')
+    # plt.plot(npRange, ray, color=colors[1], label='Accuracy score')
 
-    ax.set_xlim(0, maxX)
+    ax.set_xlim(0, 7.5)
     ax.set_ylim(-0.2, 100.5)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.legend()
@@ -605,6 +606,29 @@ def plotBarChart(data: dict, xLabel: str, yLabel: str, title: str, width: int = 
         plt.show()
 
 
+def getInaccMistakesBlunders(drops: list, imbValues: list = [5, 10, 15]) -> list:
+    """
+    This calculates the relative number of inaccuracies, mistakes and blunders given the drops in expected score
+    drops: list
+        A list of lists containing the drops
+    imb: list
+        The cutoff points for inaccuracies, mistakes and blunders
+    return -> list
+        A list with the relative number of inaccuracies, mistakes and blunders for each of the drops
+    """
+    imb = list()
+    for d in drops:
+        current = [0, 0, 0]
+        for drop, relAmount in d.items():
+            for i, v in enumerate(imbValues):
+                if drop > v:
+                    current[i] += relAmount
+                else:
+                    continue
+        imb.append(current)
+    return imb
+
+
 if __name__ == '__main__':
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn']
     pgns960 = ['../out/games/grenke960-analysed.pgn', '../out/games/paris960-analysed.pgn',  '../out/games/germany960_2024-analysed.pgn',   '../out/games/germany960_2024-analysed.pgn']
@@ -618,19 +642,59 @@ if __name__ == '__main__':
     # df = readMoveData(pgns960, True)
     # df.to_pickle('../out/chess960DF')
     
+    classical = ['../resources/germanBundesliga2025.pgn', '../resources/candidatesL.pgn', '../resources/olympiad2024.pgn', '../resources/wijk2025.pgn', '../resources/grandSwiss2023.pgn', '../resources/sharjah2024.pgn', '../resources/sharjah2024.pgn']
+    classicalDF = readMoveData(classical, lichessAnalysis=True)
+    classicalDF.to_pickle('../out/classicalDF')
+    print(classicalDF)
+    
+    c2700 = filterGamesByRating(classicalDF, (2700, 2900), 100, False)
+    c2600 = filterGamesByRating(classicalDF, (2600, 2700), 100, False)
+    c2500 = filterGamesByRating(classicalDF, (2500, 2600), 100, False)
+
+    drops2700 = getGameExpectedScoreDrops(c2700, (expectedScore, 0.007851))
+    cDrops2700 = getCumulativeDrop(drops2700)
+    drops2600 = getGameExpectedScoreDrops(c2600, (expectedScore, 0.007851))
+    cDrops2600 = getCumulativeDrop(drops2600)
+    drops2500 = getGameExpectedScoreDrops(c2500, (expectedScore, 0.007851))
+    cDrops2500 = getCumulativeDrop(drops2500)
+
+    blitzDF = pd.read_pickle('../out/blitzDF')
+    blitzDF = filterGamesByRating(blitzDF, (2700, 3000), 100, False)
+    bDrops = getGameExpectedScoreDrops(blitzDF, (expectedScore, 0.007851))
+    cbDrops = getCumulativeDrop(bDrops)
+    rapidDF = pd.read_pickle('../out/rapidDF')
+    rapidDF = filterGamesByRating(rapidDF, (2700, 3000), 100, False)
+    rDrops = getGameExpectedScoreDrops(rapidDF, (expectedScore, 0.007851))
+    crDrops = getCumulativeDrop(rDrops)
+
+    plotAccuracies([cDrops2700, cDrops2600, cDrops2500, cbDrops, crDrops], ['2700', '2600', '2500', 'Blitz', 'Rapid'], 'Move accuracy', ('Expected score loss', 'Percentage of moves'))
+
+
+    """
     # Blitz games post
-    blitz = ['../resources/worldBlitz2023.pgn']
-    blitzDF = readMoveData(blitz, lichessAnalysis=True)
-    drops = getGameExpectedScoreDrops(blitzDF, (expectedScore, 0.007851))
+    blitz = ['../resources/worldBlitz2023.pgn', '../resources/worldBlitz2024.pgn']
+    # blitzDF = readMoveData(blitz, lichessAnalysis=True)
+    # blitzDF.to_pickle('../out/blitzDF')
+    blitzDF = pd.read_pickle('../out/blitzDF')
+    drops = getxScoreDrops(blitzDF)
     cDrops = getCumulativeDrop(drops)
 
-    df = pd.read_pickle('../out/chess960DF')
+    rapid = ['../resources/worldRapid2023.pgn', '../resources/worldRapid2024.pgn']
+    # rapidDF = readMoveData(rapid, lichessAnalysis=True)
+    # rapidDF.to_pickle('../out/rapidDF')
+    rapidDF = pd.read_pickle('../out/rapidDF')
+    rDrops = getxScoreDrops(rapidDF)
+    crDrops = getCumulativeDrop(rDrops)
+
+    df = pd.read_pickle('../out/gameDF')
     dfGM = filterGamesByRating(df, (2500, 2900), 150, True)
-    dropsClassical = getGameExpectedScoreDrops(dfGM, (expectedScore, 0.007851))
+    dropsClassical = getxScoreDrops(dfGM)
     cdc = getCumulativeDrop(dropsClassical)
-    plotAccuracies([cDrops, cdc], ["Blitz", "Classical"], 'Move Accuracy', ('Expected score loss', 'Percentage of moves'))
-    bxs = getxScoreDrops(blitzDF)
-    plotBarChart(bxs, 'Expected score drop', 'Relative number of moves', 'Distribution of expected score loss', isList=False, y_log=True)
+    imb = getInaccMistakesBlunders([drops, rDrops, dropsClassical])
+    plotting_helper.plotPlayerBarChart(imb, ['Blitz', 'Rapid', 'Classical'], 'Relative number of moves', 'Relative number of inaccuracies, mistakes and blunders in different time controls', ['Inaccuracies', 'Mistakes', 'Blunders'])
+    # plotAccuracies([cDrops, crDrops, cdc], ["Blitz", "Rapid", "Classical"], 'Move Accuracy', ('Expected score loss', 'Percentage of moves'))
+    """
+
     """
     GM mistakes post
     df = pd.read_pickle('../out/chess960DF')
