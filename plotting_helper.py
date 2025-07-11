@@ -16,6 +16,7 @@ def getAllColors() -> dict:
     colors['purple'] = '#beadfa'
     colors['lightred'] = '#FD8A8A'
     colors['violet'] = '#85586F'
+    colors['yellow'] = '#f7cf77'
 
     colors['much better'] = '#4ba35a'
     colors['slightly better'] = '#9cf196'
