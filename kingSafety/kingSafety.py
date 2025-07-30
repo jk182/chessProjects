@@ -99,9 +99,26 @@ def attackingPieces(board: chess.Board) -> list:
     return ks
 
 
+def kingSafety(fen: str) -> list:
+    """
+    This calculates the kign safety of a position
+    fen: str
+        FEN of the position
+    return -> list
+        King safety for both colors
+    """
+    board = chess.Board(fen)
+    ks = [0, 0]
+    pawnCover = evaluatePawnCover(board)
+    ap = attackingPieces(board)
+    for i in range(len(ks)):
+        ks[i] += pawnCover[i]
+        ks[i] += ap[i]
+    return ks
+
+
 if __name__ == '__main__':
     fen = 'rn1qk2r/1p2bpp1/p2pbn2/4p2p/4P3/1NN1BP2/PPPQ2PP/2KR1B1R b kq - 1 10'
     fen2 = 'rnbqkbnr/pppp1p1p/8/8/2B1Pp2/5p2/PPPP2PP/RNBQ1RK1 w kq - 0 6'
     board = chess.Board(fen2)
-    print(evaluatePawnCover(board))
-    # print(attackingPieces(board))
+    print(kingSafety(fen2))
