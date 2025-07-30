@@ -1,5 +1,10 @@
 import chess
 from chess import pgn
+import pickle
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def getPlayerData(pgnPath: str, playerName: str) -> dict:
@@ -7,12 +12,13 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
     This function gets data from the games for a specific player
     """
     perGameData = [
-            'movesPerGame', 'kingsideCastling', 'queensideCastling', 'noCastling', 'oppositeSidesCastling']
+            'movesPerGame', 'kingsideCastling', 'queensideCastling', 'noCastling', 'oppositeSidesCastling', 'promotions']
     perMoveData = [
             'captures', 'centralMoves', 'flankMoves', 'movesInOppHalf', 'checks', 'inCheck', 
             'pawnMoves', 'aPawnMoves', 'bPawnMoves', 'cPawnMoves', 'dPawnMoves', 'ePawnMoves', 'fPawnMoves', 'gPawnMoves', 'hPawnMoves', 
-            'pawnToRank5', 'pawnToRank6', 'pawnToRank7', 'promotions', 'pawnCaptures',
-            'pieceMoves', 'knightMoves', 'bishopMoves', 'rookMoves', 'queenMoves', 'kingMoves', 'pieceCaptures', 'forwardPieceMoves', 'backwardPieceMoves'
+            'pawnToRank5', 'pawnToRank6', 'pawnToRank7', 'pawnCaptures',
+            'pieceMoves', 'knightMoves', 'bishopMoves', 'rookMoves', 'queenMoves', 'kingMoves', 'pieceCaptures', 'forwardPieceMoves', 'backwardPieceMoves', 
+            'movesToEnemyKing', 'movesToEnemyKingMan', 'opponentKingMoves'
             ]
     data = dict()
     for d in perGameData:
@@ -34,7 +40,7 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
             elif playerName in game.headers["Black"]:
                 playerColor = chess.BLACK
             else:
-                print('Player not found')
+                print(f'Player not found: {game.headers["White"]}-{game.headers["Black"]}')
                 continue
 
             totalGames += 1
@@ -46,6 +52,7 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                 endSq = move.to_square
                 isCapture = board.is_capture(move)
                 rank = chess.square_rank(endSq) + 1
+                oppKing = board.king(not playerColor)
 
                 if board.turn == playerColor:
                     totalMoves += 1
@@ -56,6 +63,11 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                         data['centralMoves'] += 1
                     if endSq in edgeSquares:
                         data['flankMoves'] += 1
+
+                    if chess.square_distance(startSq, oppKing) > chess.square_distance(endSq, oppKing):
+                        data['movesToEnemyKing'] += 1
+                    if chess.square_manhattan_distance(startSq, oppKing) > chess.square_manhattan_distance(endSq, oppKing):
+                        data['movesToEnemyKingMan'] += 1
                     
                     if board.gives_check(move):
                         data['checks'] += 1
@@ -84,8 +96,8 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                         data['pawnMoves'] += 1
                         if isCapture:
                             data['pawnCaptures'] += 1
-                        file = files[chess.square_file(endSq)]
-                        data[f'{file}PawnMoves'] += 1
+                        pFile = files[chess.square_file(endSq)]
+                        data[f'{pFile}PawnMoves'] += 1
                         if playerColor == chess.WHITE:
                             if 5 <= rank <= 7:
                                 data[f'pawnToRank{rank}'] += 1
@@ -110,27 +122,72 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                     if board.gives_check(move):
                         data['inCheck'] += 1
                     if board.is_kingside_castling(move):
-                        castling[0] = 'k'
+                        castling[1] = 'k'
                     if board.is_queenside_castling(move):
-                        castling[0] = 'q'
-
-
+                        castling[1] = 'q'
+                    if board.piece_at(startSq).piece_type == chess.KING:
+                        data['opponentKingMoves'] += 1
+                
                 board.push(move)
-        if castling[0] is None:
-            data['noCastling'] += 1
-        elif castling[1] is not None and castling[0] != castling[1]:
-            data['oppositeSidesCastling'] += 1
+            if castling[0] is None:
+                data['noCastling'] += 1
+            elif castling[1] is not None and castling[0] != castling[1]:
+                data['oppositeSidesCastling'] += 1
 
     for d in perGameData:
-        data[d] = round(data[d]/totalGames, 3)
+        data[d] = data[d]/totalGames
     for d in perMoveData:
-        data[d] = round(data[d]/totalMoves, 3)
+        data[d] = data[d]/totalMoves
 
     return data
+
+
+def analyseData(pickleFiles: list):
+    gData = list()
+    for pf in pickleFiles:
+        with open(pf, 'rb') as f:
+            d = pickle.load(f)
+            print(d)
+            gData.append(list(d.values()))
+    x = StandardScaler().fit_transform(gData)
+    print(x.shape)
+    pca = PCA(n_components=5)
+    xPCA = pca.fit_transform(x)
+    print(xPCA)
+    print(pca.explained_variance_ratio_)
+    fig, ax = plt.subplots(figsize=(10, 10))
+    for i, s in enumerate(xPCA):
+        plt.scatter(s[0], s[1], label=pickleFiles[i].split('/')[-1][:-7])
+    plt.legend()
+    plt.show()
 
 
 if __name__ == '__main__':
     capa = '../out/games/capablancaFiltered2.pgn'
     alekhine = '../out/games/alekhine27-40.pgn'
-    print(getPlayerData(capa, 'Capablanca'))
-    print(getPlayerData(alekhine, 'Alekhine'))
+    tal = '../out/games/tal.pgn'
+    smyslov = '../out/games/smyslov.pgn'
+    karpov = '../out/games/karpov.pgn'
+    kasparov = '../out/games/kasparov.pgn'
+    botvinnik = '../out/games/botvinnik.pgn'
+    bronstein = '../out/games/bronstein.pgn'
+    """
+    with open('../out/categories/capablanca.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(capa, 'Capablanca'), f)
+    with open('../out/categories/alekhine.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(alekhine, 'Alekhine'), f)
+    with open('../out/categories/tal.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(tal, 'Tal, M'), f)
+    with open('../out/categories/smyslov.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(smyslov, 'Smyslov'), f)
+    with open('../out/categories/karpov.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(karpov, 'Karpov'), f)
+    with open('../out/categories/kasparov.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(kasparov, 'Kasparov'), f)
+    """
+    with open('../out/categories/botvinnik.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(botvinnik, 'Botvinnik'), f)
+    with open('../out/categories/bronstein.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(bronstein, 'Bronstein'), f)
+    pickleFiles = ['../out/categories/capablanca.pickle', '../out/categories/alekhine.pickle', '../out/categories/smyslov.pickle', '../out/categories/tal.pickle', '../out/categories/karpov.pickle', '../out/categories/kasparov.pickle', '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle'] 
+    analyseData(pickleFiles)
