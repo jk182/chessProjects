@@ -193,9 +193,11 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
 
 def analyseData(pickleFiles: list):
     gData = list()
+    labels = list()
     for pf in pickleFiles:
-        with open(pf, 'rb') as f:
+       with open(pf, 'rb') as f:
             d = pickle.load(f)
+            labels = list(d.keys())
             print(pf, d)
             gData.append(list(d.values()))
     x = StandardScaler().fit_transform(gData)
@@ -204,10 +206,26 @@ def analyseData(pickleFiles: list):
     xPCA = pca.fit_transform(x)
     print(xPCA)
     print(pca.explained_variance_ratio_)
+    
+    correlationMatrix = [list()]
+    for i in range(len(gData[0])):
+        for k in range(len(xPCA[0])):
+            correlationMatrix[-1].append(float(np.corrcoef([gData[j][i] for j in range(len(gData))], [xPCA[j][k] for j in range(len(xPCA))])[0,1]))
+        print(labels[i], correlationMatrix[-1])
+        correlationMatrix.append([])
+
     fig, ax = plt.subplots(figsize=(10, 10))
     for i, s in enumerate(xPCA):
         ax.scatter(s[0], s[1], label=pickleFiles[i].split('/')[-1][:-7])
         ax.annotate(pickleFiles[i].split('/')[-1][:-7], (s[0], s[1]))
+    ax.legend()
+    plt.show()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    for i, s in enumerate(xPCA):
+        ax.scatter(s[0], s[1], s[2], label=pickleFiles[i].split('/')[-1][:-7])
     ax.legend()
     plt.show()
 
@@ -224,11 +242,14 @@ if __name__ == '__main__':
     andersson = '../out/games/andersson.pgn'
     polgar = '../out/games/polgar.pgn'
     morphy = '../out/games/morphy.pgn'
+    adams = '../out/games/adams.pgn'
+    shirov = '../out/games/shirov.pgn'
+    topalov = '../out/games/topalov.pgn'
+    """
     with open('../out/categories/capablanca.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(capa, 'Capablanca'), f)
     with open('../out/categories/alekhine.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(alekhine, 'Alekhine'), f)
-    """
     with open('../out/categories/tal.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(tal, 'Tal, M'), f)
     with open('../out/categories/smyslov.pickle', 'wb+') as f:
@@ -247,8 +268,14 @@ if __name__ == '__main__':
         pickle.dump(getPlayerData(polgar, 'Polgar'), f)
     with open('../out/categories/morphy.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(morphy, 'Morphy'), f)
+    with open('../out/categories/adams.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(adams, 'Adams'), f)
+    with open('../out/categories/shirov.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(shirov, 'Shirov'), f)
+    with open('../out/categories/topalov.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(topalov, 'Topalov'), f)
     """
     # Morphy is a complete outlier
     pickleFiles = ['../out/categories/capablanca.pickle', '../out/categories/alekhine.pickle', '../out/categories/smyslov.pickle', '../out/categories/tal.pickle', '../out/categories/karpov.pickle', '../out/categories/kasparov.pickle', 
-            '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle', '../out/categories/andersson.pickle', '../out/categories/polgar.pickle']
+            '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle', '../out/categories/andersson.pickle', '../out/categories/polgar.pickle', '../out/categories/adams.pickle', '../out/categories/shirov.pickle', '../out/categories/topalov.pickle']
     analyseData(pickleFiles)
