@@ -7,6 +7,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def countMaterial(board: chess.Board) -> list:
+    """
+    This function counts the material on the board for both sides
+    """
+    material = [0, 0]
+    pieceValues = [1, 3, 3, 5, 9, 0]
+    for color in [chess.WHITE, chess.BLACK]:
+        if color == chess.WHITE:
+            index = 0
+        else:
+            index = 1
+        for pieceType in range(1, 6):
+            material[index] += pieceValues[pieceType-1] * len(board.pieces(pieceType, color))
+    return material
+
+
+def isMaterialImbalance(board: chess.Board) -> bool:
+    """
+    This function checks if both sides have different material on the board.
+    It can also return true if the material values is balanced, but the pieces are different (bishop vs knight or rook vs bishop+2 pawns)
+    """
+    for pieceType in range(1, 6):
+        if len(board.pieces(pieceType, chess.WHITE)) != len(board.pieces(pieceType, chess.BLACK)):
+            return True
+    return False
+
+
 def getPlayerData(pgnPath: str, playerName: str) -> dict:
     """
     This function gets data from the games for a specific player
@@ -18,7 +45,8 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
             'pawnMoves', 'aPawnMoves', 'bPawnMoves', 'cPawnMoves', 'dPawnMoves', 'ePawnMoves', 'fPawnMoves', 'gPawnMoves', 'hPawnMoves', 
             'pawnToRank5', 'pawnToRank6', 'pawnToRank7', 'pawnCaptures',
             'pieceMoves', 'knightMoves', 'bishopMoves', 'rookMoves', 'queenMoves', 'kingMoves', 'pieceCaptures', 'forwardPieceMoves', 'backwardPieceMoves', 
-            'movesToEnemyKing', 'movesToEnemyKingMan', 'opponentKingMoves'
+            'movesToEnemyKing', 'movesToEnemyKingMan', 'opponentKingMoves', 
+            'materialUp', 'materialDown', 'avgMaterial', 'materialImbalance'
             ]
     data = dict()
     for d in perGameData:
@@ -37,14 +65,18 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
         while game := chess.pgn.read_game(pgn):
             if playerName in game.headers["White"]:
                 playerColor = chess.WHITE
+                materialIndex = 0
             elif playerName in game.headers["Black"]:
                 playerColor = chess.BLACK
+                materialIndex = 1
             else:
                 print(f'Player not found: {game.headers["White"]}-{game.headers["Black"]}')
                 continue
 
             totalGames += 1
             castling = [None, None]
+            material = [39, 39]
+            possibleImbalance = False
 
             board = game.board()
             for move in game.mainline_moves():
@@ -57,6 +89,7 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                 if board.turn == playerColor:
                     totalMoves += 1
                     data['movesPerGame'] += 1
+                    data['avgMaterial'] += material[materialIndex]
                     piece = board.piece_at(startSq).piece_type
 
                     if endSq in centralSquares:
@@ -129,6 +162,22 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                         data['opponentKingMoves'] += 1
                 
                 board.push(move)
+                if isCapture:
+                    material = countMaterial(board)
+
+                if board.turn != playerColor:
+                    if material[materialIndex] < material[(materialIndex+1)%2]:
+                        data['materialDown'] += 1
+                    if isMaterialImbalance(board):
+                        possibleImbalance = True
+                else:
+                    if material[materialIndex] > material[(materialIndex+1)%2]:
+                        data['materialUp'] += 1
+                    if possibleImbalance:
+                        possibleImbalance = False
+                        if isMaterialImbalance(board):
+                            data['materialImbalance'] += 1
+                
             if castling[0] is None:
                 data['noCastling'] += 1
             elif castling[1] is not None and castling[0] != castling[1]:
@@ -147,7 +196,7 @@ def analyseData(pickleFiles: list):
     for pf in pickleFiles:
         with open(pf, 'rb') as f:
             d = pickle.load(f)
-            print(d)
+            print(pf, d)
             gData.append(list(d.values()))
     x = StandardScaler().fit_transform(gData)
     print(x.shape)
@@ -157,25 +206,29 @@ def analyseData(pickleFiles: list):
     print(pca.explained_variance_ratio_)
     fig, ax = plt.subplots(figsize=(10, 10))
     for i, s in enumerate(xPCA):
-        plt.scatter(s[0], s[1], label=pickleFiles[i].split('/')[-1][:-7])
-    plt.legend()
+        ax.scatter(s[0], s[1], label=pickleFiles[i].split('/')[-1][:-7])
+        ax.annotate(pickleFiles[i].split('/')[-1][:-7], (s[0], s[1]))
+    ax.legend()
     plt.show()
 
 
 if __name__ == '__main__':
-    capa = '../out/games/capablancaFiltered2.pgn'
-    alekhine = '../out/games/alekhine27-40.pgn'
+    capa = '../out/games/capablanca.pgn'
+    alekhine = '../out/games/alekhine.pgn'
     tal = '../out/games/tal.pgn'
     smyslov = '../out/games/smyslov.pgn'
     karpov = '../out/games/karpov.pgn'
     kasparov = '../out/games/kasparov.pgn'
     botvinnik = '../out/games/botvinnik.pgn'
     bronstein = '../out/games/bronstein.pgn'
-    """
+    andersson = '../out/games/andersson.pgn'
+    polgar = '../out/games/polgar.pgn'
+    morphy = '../out/games/morphy.pgn'
     with open('../out/categories/capablanca.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(capa, 'Capablanca'), f)
     with open('../out/categories/alekhine.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(alekhine, 'Alekhine'), f)
+    """
     with open('../out/categories/tal.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(tal, 'Tal, M'), f)
     with open('../out/categories/smyslov.pickle', 'wb+') as f:
@@ -184,10 +237,18 @@ if __name__ == '__main__':
         pickle.dump(getPlayerData(karpov, 'Karpov'), f)
     with open('../out/categories/kasparov.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(kasparov, 'Kasparov'), f)
-    """
     with open('../out/categories/botvinnik.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(botvinnik, 'Botvinnik'), f)
     with open('../out/categories/bronstein.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(bronstein, 'Bronstein'), f)
-    pickleFiles = ['../out/categories/capablanca.pickle', '../out/categories/alekhine.pickle', '../out/categories/smyslov.pickle', '../out/categories/tal.pickle', '../out/categories/karpov.pickle', '../out/categories/kasparov.pickle', '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle'] 
+    with open('../out/categories/andersson.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(andersson, 'Andersson'), f)
+    with open('../out/categories/polgar.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(polgar, 'Polgar'), f)
+    with open('../out/categories/morphy.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(morphy, 'Morphy'), f)
+    """
+    # Morphy is a complete outlier
+    pickleFiles = ['../out/categories/capablanca.pickle', '../out/categories/alekhine.pickle', '../out/categories/smyslov.pickle', '../out/categories/tal.pickle', '../out/categories/karpov.pickle', '../out/categories/kasparov.pickle', 
+            '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle', '../out/categories/andersson.pickle', '../out/categories/polgar.pickle']
     analyseData(pickleFiles)
