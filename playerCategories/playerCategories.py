@@ -5,6 +5,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import numpy as np
 import matplotlib.pyplot as plt
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import plotting_helper
 
 
 def countMaterial(board: chess.Board) -> list:
@@ -41,7 +45,7 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
     perGameData = [
             'movesPerGame', 'kingsideCastling', 'queensideCastling', 'noCastling', 'oppositeSidesCastling', 'promotions']
     perMoveData = [
-            'captures', 'centralMoves', 'flankMoves', 'movesInOppHalf', 'checks', 'inCheck', 
+            'captures', 'recaptures', 'trades', 'centralMoves', 'flankMoves', 'movesInOppHalf', 'checks', 'inCheck', 
             'pawnMoves', 'aPawnMoves', 'bPawnMoves', 'cPawnMoves', 'dPawnMoves', 'ePawnMoves', 'fPawnMoves', 'gPawnMoves', 'hPawnMoves', 
             'pawnToRank5', 'pawnToRank6', 'pawnToRank7', 'pawnCaptures',
             'pieceMoves', 'knightMoves', 'bishopMoves', 'rookMoves', 'queenMoves', 'kingMoves', 'pieceCaptures', 'forwardPieceMoves', 'backwardPieceMoves', 
@@ -77,6 +81,8 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
             castling = [None, None]
             material = [39, 39]
             possibleImbalance = False
+            wasCapture = False
+            wasTrade = False
 
             board = game.board()
             for move in game.mainline_moves():
@@ -106,6 +112,10 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                         data['checks'] += 1
                     if isCapture:
                         data['captures'] += 1
+                        if wasCapture:
+                            data['recaptures'] += 1
+                    else:
+                        wasCapture = False
 
                     if board.is_kingside_castling(move):
                         data['kingsideCastling'] += 1
@@ -160,10 +170,19 @@ def getPlayerData(pgnPath: str, playerName: str) -> dict:
                         castling[1] = 'q'
                     if board.piece_at(startSq).piece_type == chess.KING:
                         data['opponentKingMoves'] += 1
+                    if isCapture:
+                        if wasCapture:
+                            wasTrade = True
+                        wasCapture = True
+                    else:
+                        wasCapture = False
                 
                 board.push(move)
                 if isCapture:
                     material = countMaterial(board)
+                    if wasTrade and material[0] == material[1]:
+                        data['trades'] += 1
+                wasTrade = False
 
                 if board.turn != playerColor:
                     if material[materialIndex] < material[(materialIndex+1)%2]:
@@ -202,7 +221,7 @@ def analyseData(pickleFiles: list):
             gData.append(list(d.values()))
     x = StandardScaler().fit_transform(gData)
     print(x.shape)
-    pca = PCA(n_components=5)
+    pca = PCA(n_components=3)
     xPCA = pca.fit_transform(x)
     print(xPCA)
     print(pca.explained_variance_ratio_)
@@ -214,13 +233,51 @@ def analyseData(pickleFiles: list):
         print(labels[i], correlationMatrix[-1])
         correlationMatrix.append([])
 
-    fig, ax = plt.subplots(figsize=(10, 10))
+    """
+    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+    for (a, b, x, y) in [(0, 0, 0, 1), (0, 1, 2, 1), (1, 0, 0, 2)]:
+        for i, s in enumerate(xPCA):
+            ax[a, b].scatter(s[x], s[y], label=pickleFiles[i].split('/')[-1][:-7])
+            ax[a, b].annotate(pickleFiles[i].split('/')[-1][:-7], (s[x], s[y]))
+            ax[a, b].axhline(y=0, color='black', linewidth=0.5)
+            ax[a, b].axvline(x=0, color='black', linewidth=0.5)
+            ax[a, b].set_facecolor(plotting_helper.getColor('background'))
+            ax[a, b].set(xlabel=x, ylabel=y)
+    """
+    universal = ['Fischer', 'Botvinnik']
+    attacking = ['Polgar', 'Shirov', 'Topalov', 'Kasparov', 'Tal', 'Spassky', 'Bronstein']
+    usedLabels = list()
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.set_facecolor(plotting_helper.getColor('background'))
     for i, s in enumerate(xPCA):
-        ax.scatter(s[0], s[1], label=pickleFiles[i].split('/')[-1][:-7])
-        ax.annotate(pickleFiles[i].split('/')[-1][:-7], (s[0], s[1]))
+        name = pickleFiles[i].split('/')[-1][:-7].capitalize()
+        if name in universal:
+            color = plotting_helper.getColor('purple')
+            label = 'universal'
+        elif name in attacking:
+            color = plotting_helper.getColor('orange')
+            label = 'attacking'
+        else:
+            color = plotting_helper.getColor('blue')
+            label = 'positional'
+        if label in usedLabels:
+            label = ''
+        else:
+            usedLabels.append(label)
+        ax.scatter(s[0], s[1], color=color, label=label)
+        ax.annotate(name, (s[0]-0.075 * len(name), s[1]-0.3))
+    ax.axhline(y=0, color='black', linewidth=0.5)
+    ax.axvline(x=0, color='black', linewidth=0.5)
+    ax.set_xlabel('Component 1')
+    ax.set_ylabel('Component 2')
+    plt.title('Categorisation of different players')
     ax.legend()
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.9)
+    plt.savefig('../out/categories.png', dpi=400)
     plt.show()
 
+    """
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
@@ -228,6 +285,7 @@ def analyseData(pickleFiles: list):
         ax.scatter(s[0], s[1], s[2], label=pickleFiles[i].split('/')[-1][:-7])
     ax.legend()
     plt.show()
+    """
 
 
 if __name__ == '__main__':
@@ -245,6 +303,12 @@ if __name__ == '__main__':
     adams = '../out/games/adams.pgn'
     shirov = '../out/games/shirov.pgn'
     topalov = '../out/games/topalov.pgn'
+    spassky = '../out/games/spassky.pgn'
+    fischer = '../out/games/fischer.pgn'
+    petrosian = '../out/games/petrosian.pgn'
+    carlsen2013 = '../out/games/carlsen2013.pgn'
+    carlsen2019 = '../out/games/carlsen2019.pgn'
+    
     """
     with open('../out/categories/capablanca.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(capa, 'Capablanca'), f)
@@ -274,8 +338,19 @@ if __name__ == '__main__':
         pickle.dump(getPlayerData(shirov, 'Shirov'), f)
     with open('../out/categories/topalov.pickle', 'wb+') as f:
         pickle.dump(getPlayerData(topalov, 'Topalov'), f)
+    with open('../out/categories/spassky.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(spassky, 'Spassky'), f)
+    with open('../out/categories/fischer.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(fischer, 'Fischer'), f)
+    with open('../out/categories/petrosian.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(petrosian, 'Petrosian'), f)
+    with open('../out/categories/carlsen2013.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(carlsen2013, 'Carlsen'), f)
+    with open('../out/categories/carlsen2019.pickle', 'wb+') as f:
+        pickle.dump(getPlayerData(carlsen2019, 'Carlsen'), f)
     """
     # Morphy is a complete outlier
-    pickleFiles = ['../out/categories/capablanca.pickle', '../out/categories/alekhine.pickle', '../out/categories/smyslov.pickle', '../out/categories/tal.pickle', '../out/categories/karpov.pickle', '../out/categories/kasparov.pickle', 
-            '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle', '../out/categories/andersson.pickle', '../out/categories/polgar.pickle', '../out/categories/adams.pickle', '../out/categories/shirov.pickle', '../out/categories/topalov.pickle']
+    pickleFiles = ['../out/categories/smyslov.pickle', '../out/categories/tal.pickle', '../out/categories/karpov.pickle', '../out/categories/kasparov.pickle', 
+            '../out/categories/botvinnik.pickle', '../out/categories/bronstein.pickle', '../out/categories/andersson.pickle', '../out/categories/polgar.pickle', '../out/categories/adams.pickle', '../out/categories/shirov.pickle', 
+            '../out/categories/topalov.pickle', '../out/categories/spassky.pickle', '../out/categories/fischer.pickle', '../out/categories/petrosian.pickle']
     analyseData(pickleFiles)
