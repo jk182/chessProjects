@@ -221,7 +221,7 @@ def analyseData(pickleFiles: list):
             gData.append(list(d.values()))
     x = StandardScaler().fit_transform(gData)
     print(x.shape)
-    pca = PCA(n_components=3)
+    pca = PCA(n_components=5)
     xPCA = pca.fit_transform(x)
     print(xPCA)
     print(pca.explained_variance_ratio_)

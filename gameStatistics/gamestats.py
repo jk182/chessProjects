@@ -673,27 +673,32 @@ if __name__ == '__main__':
     # plotting_helper.plotPlayerBarChart(imb, ['Blitz', 'Rapid', 'Classical'], 'Relative number of moves', 'Relative number of inaccuracies, mistakes and blunders in different time controls', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=plotting_helper.getColors(['blue', 'yellow', 'red']), filename='../out/rapidBlitz/imb.png')
 
     # Accuracy for all GMs
+    """
     blitzGameDrops = getGameExpectedScoreDrops(bGM)
     CBGD = getCumulativeDrop(blitzGameDrops)
     rapidGameDrops = getGameExpectedScoreDrops(rGM)
     CRGD = getCumulativeDrop(rapidGameDrops)
     classicalGameDrops = getGameExpectedScoreDrops(cGM)
     CCGD = getCumulativeDrop(classicalGameDrops)
+    """
 
-    print(max([k for k,v in CBGD.items() if v >= 0.5]), max([k for k,v in CRGD.items() if v >= 0.5]), max([k for k,v in CCGD.items() if v >= 0.5]))
+    # print(max([k for k,v in CBGD.items() if v >= 0.5]), max([k for k,v in CRGD.items() if v >= 0.5]), max([k for k,v in CCGD.items() if v >= 0.5]))
 
-    plotAccuracies([CBGD, CRGD, CCGD], ['Blitz', 'Rapid', 'Classical'], 'Game accuracy in different time controls', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange']), filename='../out/rapidBlitz/accuracyGM.png')
+    # plotAccuracies([CBGD, CRGD, CCGD], ['Blitz', 'Rapid', 'Classical'], 'Game accuracy in different time controls', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange']), filename='../out/rapidBlitz/accuracyGM.png')
 
     # Ratings
-    blitz2500 = filterGamesByRating(blitzDF, (2500, 2700), 100, False)
-    blitz2700 = filterGamesByRating(blitzDF, (2700, 3000), 100, False)
+    blitz2500 = filterGamesByRating(blitzDF, (2500, 2700), 150, False)
+    blitz2700 = filterGamesByRating(blitzDF, (2700, 3000), 150, False)
     bDrops25 = getGameExpectedScoreDrops(blitz2500, (expectedScore, 0.007851))
     cbd25 = getCumulativeDrop(bDrops25)
     bDrops27 = getGameExpectedScoreDrops(blitz2700, (expectedScore, 0.007851))
     cbd27 = getCumulativeDrop(bDrops27)
 
-    rapid2500 = filterGamesByRating(rapidDF, (2500, 2700), 100, False)
-    rapid2700 = filterGamesByRating(rapidDF, (2700, 3000), 100, False)
+    rapid2400 = filterGamesByRating(rapidDF, (2350, 2450), 150, False)
+    rapid2500 = filterGamesByRating(rapidDF, (2500, 2700), 150, False)
+    rapid2700 = filterGamesByRating(rapidDF, (2700, 3000), 150, False)
+    rDrops24 = getGameExpectedScoreDrops(rapid2400, (expectedScore, 0.007851))
+    crd24 = getCumulativeDrop(rDrops24)
     rDrops25 = getGameExpectedScoreDrops(rapid2500, (expectedScore, 0.007851))
     crd25 = getCumulativeDrop(rDrops25)
     rDrops27 = getGameExpectedScoreDrops(rapid2700, (expectedScore, 0.007851))
@@ -708,9 +713,10 @@ if __name__ == '__main__':
     ccd27 = getCumulativeDrop(cDrops27)
     """
 
-    plotAccuracies([cbd25, cbd27, crd25, crd27], ['2500-2700 Blitz', '2700+ Blitz', '2500-2700 Rapid', '2700+ Rapid'], 'Game accuracy in rapid and blitz for different rating ranges', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange', 'red']), filename='../out/rapidBlitz/accuracyRatings.png')
+    plotAccuracies([cbd25, cbd27, crd25, crd27, crd24], ['2500-2700 Blitz', '2700+ Blitz', '2500-2700 Rapid', '2700+ Rapid', '2400 Rapid'], 'Game accuracy in rapid and blitz for different rating ranges', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange', 'red', 'pink'])) #, filename='../out/rapidBlitz/accuracyRatings.png')
     # plotAccuracies([cDrops2700, cDrops2600, cDrops2500, cbDrops, crDrops], ['2700', '2600', '2500', 'Blitz', 'Rapid'], 'Move accuracy', ('Expected score loss', 'Percentage of moves'))
 
+    # Analysis of accuracy in different time controls
 
     """
     # Blitz games post

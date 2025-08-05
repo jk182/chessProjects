@@ -995,17 +995,17 @@ def commandLine():
 
 
 if __name__ == '__main__':
-    commandLine()
-    armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
-    print(armScores)
-    nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
+    # commandLine()
+    # armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
+    # print(armScores)
+    # nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
     # plotScoresArmageddon(armScores, short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-armScores.png')
-    times = getClockTimesByColor('../resources/norwayChess2025Arm.pgn')
+    # times = getClockTimesByColor('../resources/norwayChess2025Arm.pgn')
     # plotting_helper.plotAvgLinePlot(times, ['White', 'Black'], 'Time remaining', 'Average time remaining after each move in armageddon', ["White's time", "Black's time"], colors=['#f8a978', '#111111'], maxMoves=50, filename='../out/norwayChess2025Plots/norwayChess2025-clockTimes.png')
 
-    volatilities = getPlayerVolatilities(['../out/games/norwayChess2025-out.pgn'])# ,  '../out/games/norwayChessArm2025-out.pgn'])
-    print(volatilities)
-    plotBarChart(volatilities, ['Classical games', 'Armageddon games'], 'Expected score volatility', 'Average volatility of the expected score', short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-volatility.png')
+    # volatilities = getPlayerVolatilities(['../out/games/norwayChess2025-out.pgn'])# ,  '../out/games/norwayChessArm2025-out.pgn'])
+    # print(volatilities)
+    # plotBarChart(volatilities, ['Classical games', 'Armageddon games'], 'Expected score volatility', 'Average volatility of the expected score', short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-volatility.png')
     # wijk = '../out/games/wijkChallengers2025-out.pgn'
     # generateTournamentPlots(wijk, nicknames=nicknames, filename=plotPath)
     # roundScores = getRoundByRoundScores(wijk)
@@ -1026,12 +1026,14 @@ if __name__ == '__main__':
         print(scores['Ding Liren'])
     """
 
+    t = '../out/candidates2024-WDL+CP.pgn'
+    nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
+    sharpChange = analysis.sharpnessChangePerPlayer(t)
+    analysis.plotSharpChange(sharpChange, short=nicknames)
     """
     # Candidates data
-    t = '../out/candidates2024-WDL+CP.pgn'
     nwc = '../out/games/norwayChessClassical.pgn'
     nwcW = '../out/games/norwayChessWomenClassical.pgn'
-    nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     nicknames2 = {'Lei': 'Lei Tingjie', 'Ju': 'Ju Wenjun'}
     players = getPlayers(t)
     games = glob.glob('../out/games/*')
@@ -1048,8 +1050,6 @@ if __name__ == '__main__':
     # generateAccDistributionGraphs(t, players)
     # scores = getPlayerScores(t)
     # createMovePlot(getMoveSituation(t), nicknames)
-    # sharpChange = analysis.sharpnessChangePerPlayer(t)
-    # analysis.plotSharpChange(sharpChange, short=nicknames)
     # plotScores(scores, nicknames)
     # worse = worseGames(t)
     # plotWorseGames(worse, nicknames)

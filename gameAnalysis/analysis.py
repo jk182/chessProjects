@@ -272,6 +272,7 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
         A dictionary with the player names as keys and their sharpness changes as values
     """
     sharpPlayer = dict()
+    cpl = 40
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
             node = game
@@ -279,6 +280,7 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
             black = game.headers["Black"]
             # Sharpness of the starting position
             lastSharp = startSharp
+            lastCP = 22
 
             while not node.is_end():
                 node = node.variations[0]
@@ -286,6 +288,7 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
                 if node.comment != 'None' and node.comment:
                     if ';' in node.comment:
                         c = node.comment.split(';')[0]
+                        cp = int(float(node.comment.split(';')[1]))
                     else:
                         c = node.comment
                     wdl = [ int(w) for w in c.replace('[', '').replace(']', '').strip().split(',') ]
@@ -293,15 +296,20 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
                     diff = sharp-lastSharp
                     lastSharp = sharp
                     if not node.turn():
-                        if white in sharpPlayer.keys():
-                            sharpPlayer[white].append(diff)
-                        else:
-                            sharpPlayer[white] = [diff]
+                        cpDiff = abs(lastCP - cp)
+                        if cpDiff <= cpl:
+                            if white in sharpPlayer.keys():
+                                sharpPlayer[white].append(diff)
+                            else:
+                                sharpPlayer[white] = [diff]
                     elif node.turn():
-                        if black in sharpPlayer.keys():
-                            sharpPlayer[black].append(diff)
-                        else:
-                            sharpPlayer[black] = [diff]
+                        cpDiff = abs(cp - lastCP)
+                        if cpDiff <= cpl:
+                            if black in sharpPlayer.keys():
+                                sharpPlayer[black].append(diff)
+                            else:
+                                sharpPlayer[black] = [diff]
+                    lastCP = cp
     return sharpPlayer
 
 
