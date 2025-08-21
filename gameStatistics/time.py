@@ -5,6 +5,7 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import plotting_helper
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def getScoresForRatings(pgnPaths: list) -> dict:
@@ -123,9 +124,9 @@ def getScoreByRatingDiff(pgnPaths: list, width: int = 50, maxDiff: int = 500) ->
     return dict(sorted(scores.items()))
 
 
-def getTimeData(pgnPaths: list) -> dict:
+def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
     data = dict()
-    for key in ['WhiteElo', 'BlackElo', 'maxTimeAdW', 'maxTimeAdB', 'Result']:
+    for key in ['MoveNr', 'EloDiff', 'TimeDiff', 'Eval', 'Result']:
         data[key] = list()
 
     for pgnPath in pgnPaths:
@@ -134,85 +135,87 @@ def getTimeData(pgnPaths: list) -> dict:
                 if "WhiteElo" not in game.headers.keys() or "BlackElo" not in game.headers.keys():
                     print("No Elo")
                     continue
-                if (result := game.headers['Result']) in ['1-0', '0-1', '1/2-1/2']:
-                    data['Result'].append(result)
-                else:
+                result = game.headers['Result']
+                if result not in ['1-0', '0-1', '1/2-1/2']:
                     print(f'Result not found: {result} in file {pgnPath}')
-                    continue
-
-                data['WhiteElo'].append(int(game.headers['WhiteElo']))
-                data['BlackElo'].append(int(game.headers['BlackElo']))
-
-                maxTimeAdW = -100
-                maxTimeAdB = -100
                 
+                moveNr = 0
+                eloDiff = int(game.headers['WhiteElo']) - int(game.headers['BlackElo'])
+
                 wClock = None
                 bClock = None
+                wEval = None
+                bEval = None
                 node = game
                 while not node.is_end():
                     node = node.variations[0]
                     if not node.turn():
+                        moveNr += 1
+
+                    if result == '1-0':
+                        wScore = 1
+                        bScore = 0
+                    elif result == '0-1':
+                        wScore = 0
+                        bScore = 1
+                    else:
+                        wScore = 0.5
+                        bScore = 0.5
+                    if not node.turn():
                         if node.clock() is not None:
-                            wClock = node.clock()
+                            wClock = int(node.clock())
                         if bClock is None or wClock is None:
                             continue
-                        maxTimeAdW = max(maxTimeAdW, wClock - bClock)
+                        if node.eval() is not None:
+                            wEval = node.eval().white().score()
+                        if wEval is None:
+                            continue
+                        data['MoveNr'].append(moveNr)
+                        data['Result'].append(wScore)
+                        data['EloDiff'].append(eloDiff)
+                        data['Eval'].append(wEval)
+                        data['TimeDiff'].append(wClock - bClock)
                     else:
                         if node.clock() is not None:
-                            bClock = node.clock()
-
+                            bClock = int(node.clock())
                         if bClock is None or wClock is None:
                             continue
-                        maxTimeAdB = max(maxTimeAdB, bClock - wClock)
+                        if node.eval() is not None:
+                            bEval = node.eval().black().score()
+                        if bEval is None: 
+                            continue
+                        data['MoveNr'].append(moveNr)
+                        data['Result'].append(bScore)
+                        data['EloDiff'].append(-eloDiff)
+                        data['Eval'].append(bEval)
+                        data['TimeDiff'].append(bClock - wClock)
+    df = pd.DataFrame(data)
+    return df
 
-                data['maxTimeAdW'].append(maxTimeAdW)
-                data['maxTimeAdB'].append(maxTimeAdB)
-                if maxTimeAdW < 0 or maxTimeAdB < 0:
-                    print(pgnPath)
-                    print(game.headers)
-    return data
 
-
-def analyseTimeData(timeData: dict, timeInterval: int = 15, maxTime: int = 180):
-    wElo = timeData['WhiteElo']
-    bElo = timeData['BlackElo']
-    maxTimeAdW = timeData['maxTimeAdW']
-    maxTimeAdB = timeData['maxTimeAdB']
-    results = timeData['Result']
-
+def analyseTimeData(timeData: pd.DataFrame, timeInterval: int = 15, startMove: int = 10, maxTime: int = 180):
     resultData = dict()
 
-    for i in range(len(wElo)):
-        r = results[i]
-        if r == '1-0':
-            wScore = 1
-            bScore = 0
-        elif r == '0-1':
-            wScore = 0
-            bScore = 1
+    for i, row in timeData.iterrows():
+        time = row['TimeDiff']
+        result = row['Result']
+        ratingDiff = row['EloDiff']
+        cp = row['Eval']
+        for j in range(-maxTime//timeInterval, maxTime//timeInterval + 2):
+            if j*timeInterval <= time < (j+1)*timeInterval:
+                timeSlot = j*timeInterval
+                break
+        
+        if timeSlot in resultData.keys():
+            resultData[timeSlot][0] += result
+            resultData[timeSlot][1] += 1
         else:
-            wScore = 0.5
-            bScore = 0.5
-
-        wTime = max(maxTimeAdW[i], 0)
-        bTime = max(maxTimeAdB[i], 0)
-        for j in range(maxTime//timeInterval + 2):
-            if j*timeInterval <= wTime < (j+1)*timeInterval:
-                wTime = j*timeInterval
-            if j*timeInterval <= bTime < (j+1)*timeInterval:
-                bTime = j*timeInterval
-
-        for t, s in [(wTime, wScore), (bTime, bScore)]:
-            if t in resultData.keys():
-                resultData[t][0] += s
-                resultData[t][1] += 1
-            else:
-                resultData[t] = [s, 1]
+            resultData[timeSlot] = [result, 1]
 
     print(dict(sorted(resultData.items())))
     d = dict()
     for k, v in resultData.items():
-        d[k] = v[0]/v[1]
+        d[k] = float(v[0]/v[1])
     return dict(sorted(d.items()))
 
 
@@ -233,7 +236,7 @@ def plotScores(data: list, xLabel: str, yLabel: str, title:str, legend: list, fi
 
     ax.legend()
     ax.set_xlim(xMin, xMax)
-    ax.set_ylim(0.5, 1)
+    ax.set_ylim(0, 1)
     plt.title(title)
 
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
@@ -268,4 +271,8 @@ if __name__ == '__main__':
     # plotScores(data, 'Rating difference', 'Score of the higher rated player', 'Scores of the higher rated players based on rating difference', ['Blitz', 'Rapid', 'Classical'], filename='../out/scoresByRatingDiff.png')
     """
     timeData = getTimeData(blitz)
-    print(analyseTimeData(timeData))
+    print(timeData)
+    data = analyseTimeData(timeData)
+    dataList = list()
+    dataList.append([list(data.keys()), list(data.values())])
+    plotScores(dataList, 'Rating difference', 'Score of the higher rated player', 'Scores of the higher rated players based on rating difference', ['Blitz', 'Rapid', 'Classical'])
