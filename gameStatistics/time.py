@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import plotting_helper
 import matplotlib.pyplot as plt
 import pandas as pd
+import pickle
 
 
 def getScoresForRatings(pgnPaths: list) -> dict:
@@ -126,7 +127,7 @@ def getScoreByRatingDiff(pgnPaths: list, width: int = 50, maxDiff: int = 500) ->
 
 def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
     data = dict()
-    for key in ['MoveNr', 'EloDiff', 'TimeDiff', 'Eval', 'Result']:
+    for key in ['WhiteElo', 'BlackElo', 'MoveNr', 'EloDiff', 'Time', 'TimeDiff', 'Eval', 'Result']:
         data[key] = list()
 
     for pgnPath in pgnPaths:
@@ -140,7 +141,9 @@ def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
                     print(f'Result not found: {result} in file {pgnPath}')
                 
                 moveNr = 0
-                eloDiff = int(game.headers['WhiteElo']) - int(game.headers['BlackElo'])
+                wElo = int(game.headers['WhiteElo'])
+                bElo = int(game.headers['BlackElo'])
+                eloDiff = wElo - bElo
 
                 wClock = None
                 bClock = None
@@ -170,10 +173,13 @@ def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
                             wEval = node.eval().white().score()
                         if wEval is None:
                             continue
+                        data['WhiteElo'].append(wElo)
+                        data['BlackElo'].append(bElo)
                         data['MoveNr'].append(moveNr)
                         data['Result'].append(wScore)
                         data['EloDiff'].append(eloDiff)
                         data['Eval'].append(wEval)
+                        data['Time'].append(wClock)
                         data['TimeDiff'].append(wClock - bClock)
                     else:
                         if node.clock() is not None:
@@ -184,10 +190,13 @@ def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
                             bEval = node.eval().black().score()
                         if bEval is None: 
                             continue
+                        data['WhiteElo'].append(wElo)
+                        data['BlackElo'].append(bElo)
                         data['MoveNr'].append(moveNr)
                         data['Result'].append(bScore)
                         data['EloDiff'].append(-eloDiff)
                         data['Eval'].append(bEval)
+                        data['Time'].append(bClock)
                         data['TimeDiff'].append(bClock - wClock)
     df = pd.DataFrame(data)
     return df
@@ -219,7 +228,36 @@ def analyseTimeData(timeData: pd.DataFrame, timeInterval: int = 15, startMove: i
     return dict(sorted(d.items()))
 
 
-def plotScores(data: list, xLabel: str, yLabel: str, title:str, legend: list, filename: str = None):
+def filterGamesByRating(df: pd.DataFrame, ratingRange: tuple, ratingDifference: int, bothPlayers: bool = False) -> pd.DataFrame:
+    """
+    This filters a dataframe to only include games with the specified rating.
+    df: pd.DataFrame
+        The dataframe with the move data
+    ratingRange: tuple
+        Minimum and maximum rating for one of these players
+    ratingDifference: int
+        The maximal difference in rating between these players
+    bothPlayers: bool
+        If set, both players will be in the rating range, without considering the difference
+    return -> pd.DataFrame
+        Dataframe with only the games where players are in the rating range
+    """
+    minElo, maxElo = ratingRange
+    if not bothPlayers:
+        filtered = df[(abs(df["WhiteElo"]-df["BlackElo"]) <= ratingDifference) & (((minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo)) | ((minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)))]
+    else:
+        filtered = df[(minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo) & (minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)]
+    filtered = filtered.reset_index()
+    return filtered
+
+
+def filterDF(df: pd.DataFrame, colName: str, valRange: tuple):
+    filtered = df[(valRange[0] <= df[colName]) & (df[colName] <= valRange[1])]
+    filtered = filtered.reset_index()
+    return filtered
+
+
+def plotScores(data: list, xLabel: str, yLabel: str, title: str, legend: list, filename: str = None):
     colors = plotting_helper.getDefaultColors()
     
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -247,8 +285,71 @@ def plotScores(data: list, xLabel: str, yLabel: str, title:str, legend: list, fi
         plt.show()
 
 
+def plotScoresForFeature(df: pd.DataFrame, xLabel: str, title: str, featureName: str, classWidth: float = None, minMax: tuple = None, filename: str = None):
+    data = dict()
+
+    if minMax is None:
+        l = df[featureName].tolist()
+        minMax = (min(l), max(l))
+
+    keyVal = 0
+    for i, row in df.iterrows():
+        d = row[featureName]
+        if d < minMax[0]:
+            keyVal = minMax[0]
+        elif d > minMax[1]:
+            keyVal = miinMax[1]
+        elif classWidth is None:
+            keyVal = d
+        else:
+            for j in range(minMax[0]+classWidth, minMax[1], classWidth):
+                if j <= d < j+classWidth:
+                    keyVal = j
+                    break
+        if keyVal in data.keys():
+            data[keyVal][0] += row['Result']
+            data[keyVal][1] += 1
+        else:
+            data[keyVal] = [row['Result'], 1]
+
+    data = dict(sorted(data.items()))
+    newD = dict()
+    for k, v in data.items():
+        newD[k] = v[0]/v[1]
+
+    print(newD)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(plotting_helper.getColor('background'))
+    
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel('Score')
+
+    ax.plot(list(newD.keys()), list(newD.values()))
+    plt.title(title)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+def plotTwoFeatures(df: pd.DataFrame, xName: str, yName: str):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(plotting_helper.getColor('background'))
+
+    xValues = df[xName].tolist()
+    yValues = df[yName].tolist()
+    results = df['Result'].tolist()
+    colors = [plotting_helper.getColor('green') if r == 1 else plotting_helper.getColor('blue') if r == 0.5 else plotting_helper.getColor('red') for r in results]
+    ax.scatter(xValues, yValues, c=colors)
+    ax.set_xlabel(xName)
+    ax.set_ylabel(yName)
+
+    plt.show()
+
+
 if __name__ == '__main__':
-    blitz = ['../resources/worldBlitz2023.pgn', '../resources/worldBlitz2024.pgn', '../resources/worldBlitz2022.pgn', '../resources/teamBlitz2025.pgn']
+    blitz = ['../resources/worldBlitz2023.pgn', '../resources/worldBlitz2024.pgn', '../resources/worldBlitz2022.pgn', '../resources/teamBlitz2025.pgn', '../resources/worldBlitz2021.pgn']
     """
     ratingScores = getScoresForRatings(blitz)
     for k, v in ratingScores.items():
@@ -270,9 +371,18 @@ if __name__ == '__main__':
         print(d)
     # plotScores(data, 'Rating difference', 'Score of the higher rated player', 'Scores of the higher rated players based on rating difference', ['Blitz', 'Rapid', 'Classical'], filename='../out/scoresByRatingDiff.png')
     """
-    timeData = getTimeData(blitz)
+    bFile = '../out/blitzTime.pkl'
+    # timeData = getTimeData(blitz)
+    # with open(bFile, 'wb') as f:
+        # pickle.dump(timeData, f)
+    with open(bFile, 'rb') as f:
+        timeData = pickle.load(f)
     print(timeData)
-    data = analyseTimeData(timeData)
+    new = filterGamesByRating(timeData, (2500, 3000), 150, True)
+    eq = filterDF(timeData, 'Eval', (-50, 50))
+    print(eq)
+    data = analyseTimeData(eq, timeInterval = 10)
     dataList = list()
-    dataList.append([list(data.keys()), list(data.values())])
-    plotScores(dataList, 'Rating difference', 'Score of the higher rated player', 'Scores of the higher rated players based on rating difference', ['Blitz', 'Rapid', 'Classical'])
+    plotScoresForFeature(new, 'Time Difference', 'Time Difference', 'TimeDiff', 15, (-180, 180))
+    # dataList.append([list(data.keys()), list(data.values())])
+    # plotScores(dataList, 'Rating difference', 'Score of the higher rated player', 'Scores of the higher rated players based on rating difference', ['Blitz', 'Rapid', 'Classical'])
