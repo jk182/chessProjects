@@ -127,7 +127,7 @@ def getScoreByRatingDiff(pgnPaths: list, width: int = 50, maxDiff: int = 500) ->
 
 def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
     data = dict()
-    for key in ['WhiteElo', 'BlackElo', 'MoveNr', 'EloDiff', 'Time', 'TimeDiff', 'Eval', 'Result']:
+    for key in ['WhiteElo', 'BlackElo', 'MoveNr', 'EloDiff', 'Time', 'TimeDiff', 'RelTimeDiff', 'Eval', 'Result']:
         data[key] = list()
 
     for pgnPath in pgnPaths:
@@ -181,6 +181,10 @@ def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
                         data['Eval'].append(wEval)
                         data['Time'].append(wClock)
                         data['TimeDiff'].append(wClock - bClock)
+                        if bClock:
+                            data['RelTimeDiff'].append(wClock/bClock)
+                        else:
+                            data['RelTimeDiff'].append(0)
                     else:
                         if node.clock() is not None:
                             bClock = int(node.clock())
@@ -198,6 +202,10 @@ def getTimeData(pgnPaths: list, startTime: int = 180) -> pd.DataFrame:
                         data['Eval'].append(bEval)
                         data['Time'].append(bClock)
                         data['TimeDiff'].append(bClock - wClock)
+                        if wClock:
+                            data['RelTimeDiff'].append(bClock/wClock)
+                        else:
+                            data['RelTimeDiff'].append(0)
     df = pd.DataFrame(data)
     return df
 
@@ -247,13 +255,13 @@ def filterGamesByRating(df: pd.DataFrame, ratingRange: tuple, ratingDifference: 
         filtered = df[(abs(df["WhiteElo"]-df["BlackElo"]) <= ratingDifference) & (((minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo)) | ((minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)))]
     else:
         filtered = df[(minElo <= df["WhiteElo"]) & (df["WhiteElo"] <= maxElo) & (minElo <= df["BlackElo"]) & (df["BlackElo"] <= maxElo)]
-    filtered = filtered.reset_index()
+    # filtered = filtered.reset_index()
     return filtered
 
 
 def filterDF(df: pd.DataFrame, colName: str, valRange: tuple):
     filtered = df[(valRange[0] <= df[colName]) & (df[colName] <= valRange[1])]
-    filtered = filtered.reset_index()
+    # filtered.reset_index()
     return filtered
 
 
@@ -285,48 +293,57 @@ def plotScores(data: list, xLabel: str, yLabel: str, title: str, legend: list, f
         plt.show()
 
 
-def plotScoresForFeature(df: pd.DataFrame, xLabel: str, title: str, featureName: str, classWidth: float = None, minMax: tuple = None, filename: str = None):
-    data = dict()
-
-    if minMax is None:
-        l = df[featureName].tolist()
-        minMax = (min(l), max(l))
-
-    keyVal = 0
-    for i, row in df.iterrows():
-        d = row[featureName]
-        if d < minMax[0]:
-            keyVal = minMax[0]
-        elif d > minMax[1]:
-            keyVal = miinMax[1]
-        elif classWidth is None:
-            keyVal = d
-        else:
-            for j in range(minMax[0]+classWidth, minMax[1], classWidth):
-                if j <= d < j+classWidth:
-                    keyVal = j
-                    break
-        if keyVal in data.keys():
-            data[keyVal][0] += row['Result']
-            data[keyVal][1] += 1
-        else:
-            data[keyVal] = [row['Result'], 1]
-
-    data = dict(sorted(data.items()))
-    newD = dict()
-    for k, v in data.items():
-        newD[k] = v[0]/v[1]
-
-    print(newD)
+def plotScoresForFeature(dfs: list, xLabel: str, title: str, featureName: str, legend: list, classWidth: float = None, minMax: tuple = None, colors: list = None, filename: str = None):
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(plotting_helper.getColor('background'))
+
+    if colors is None:
+        colors = plotting_helper.getDefaultColors()
+
+    for a, df in enumerate(dfs):
+        if minMax is None:
+            l = df[featureName].tolist()
+            minMax = (min(l), max(l))
+
+        data = dict()
+        keyVal = 0
+        for i, row in df.iterrows():
+            d = row[featureName]
+            if d < minMax[0]:
+                keyVal = minMax[0]
+            elif d > minMax[1]:
+                keyVal = minMax[1]
+            elif classWidth is None:
+                keyVal = d
+            else:
+                for j in range(int((minMax[1]-minMax[0])//classWidth)):
+                    if minMax[0] + (j+1)*classWidth <= d < minMax[0] + (j+2)*classWidth:
+                        keyVal = minMax[0] + (j+1)*classWidth
+                        break
+            if keyVal in data.keys():
+                data[keyVal][0] += row['Result']
+                data[keyVal][1] += 1
+            else:
+                data[keyVal] = [row['Result'], 1]
+
+        data = dict(sorted(data.items()))
+        newD = dict()
+        for k, v in data.items():
+            newD[k] = v[0]/v[1]
+
+        ax.plot(list(newD.keys()), list(newD.values()), label=legend[a], color=colors[a])
     
     ax.set_xlabel(xLabel)
     ax.set_ylabel('Score')
+    ax.set_xlim(minMax[0], minMax[1])
+    ax.set_ylim(0, 1)
+    ax.grid()
 
-    ax.plot(list(newD.keys()), list(newD.values()))
+    ax.hlines(0.5, minMax[0], minMax[1], color='grey', linewidth=0.5)
+    ax.legend()
     plt.title(title)
 
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     if filename:
         plt.savefig(filename, dpi=400)
     else:
@@ -377,12 +394,18 @@ if __name__ == '__main__':
         # pickle.dump(timeData, f)
     with open(bFile, 'rb') as f:
         timeData = pickle.load(f)
-    print(timeData)
-    new = filterGamesByRating(timeData, (2500, 3000), 150, True)
-    eq = filterDF(timeData, 'Eval', (-50, 50))
+    new = filterGamesByRating(timeData, (2500, 3500), 150, False)
+    new = filterDF(new, 'MoveNr', (10, 111111))
+    print(new)
+    eq = filterDF(new, 'Eval', (-50, 50))
+    better = filterDF(new, 'Eval', (50, 150))
+    mBetter = filterDF(new, 'Eval', (150, 300))
     print(eq)
-    data = analyseTimeData(eq, timeInterval = 10)
+    # data = analyseTimeData(eq, timeInterval = 10)
     dataList = list()
-    plotScoresForFeature(new, 'Time Difference', 'Time Difference', 'TimeDiff', 15, (-180, 180))
+    plotScoresForFeature([new], 'Evaluation', 'Score in blitz games depending on the centipawn evaluation', 'Eval', [''], 25, (-700, 700), filename='../out/blitzEval.png')
+    # plotScoresForFeature([eq, better, mBetter], 'Time advantage in seconds', 'Score based on time advantage', 'TimeDiff', ['Equal positions', 'Better positions', 'Much better positions'], 15, (-120, 120), colors=plotting_helper.getColors(['blue', 'orange', 'violet']), filename='../out/timeAdBlitz.png')
+    # plotScoresForFeature([eq, better, mBetter], 'Time Difference', 'Time Difference', 'RelTimeDiff', ['Equal positions', 'Better positions', 'Much better positions'], 0.2, (0, 3))
+    # plotScoresForFeature([eq, better, mBetter], 'Time Left', 'Time Left', 'Time', ['Equal positions', 'Slightly better positions', 'Much better positions'], 10, (0, 180))
     # dataList.append([list(data.keys()), list(data.values())])
     # plotScores(dataList, 'Rating difference', 'Score of the higher rated player', 'Scores of the higher rated players based on rating difference', ['Blitz', 'Rapid', 'Classical'])
