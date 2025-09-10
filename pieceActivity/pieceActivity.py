@@ -38,6 +38,69 @@ def calculatePieceActivity(fen: str) -> list:
     return activity
 
 
+def calcGenMean(data: list, p: int = 1):
+    """
+    This calculates the generalized mean for a list of data
+    """
+    mean = sum([d**p for d in data]) * (1/len(data))
+    return mean**(1/p)
+
+
+def updatedPieceActivity(fen: str) -> list:
+    """
+    This is an updated version of the piece activity score
+    """
+    # TODO: check the correct mapping to squares
+    boardValues = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+                   0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+                   0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+                   0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+                   0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6,
+                   0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                   0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4,
+                   0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+    kingMask = [0.2, 0.2, 0.2, 
+                0.3, 0.5, 0.3, 
+                0.3, 0.3, 0.3]
+    kingMoveIndices = [-9, -8, -7, -1, 0, 1, 7, 8, 9]
+
+    boardMeanP = 2
+
+    activity = [0, 0]
+    board = chess.Board(fen)
+    for color in [chess.WHITE, chess.BLACK]:
+        pieceActivities = list()
+        king = list(board.pieces(6, not color))[0]
+        kingSquares = board.attacks(king)
+        kingSquares.add(king)
+        if color:
+            colorIndex = 0
+        else:
+            colorIndex = 1
+        for pieceType in range(2, 7):   # TODO: add toggle for kings
+            for piece in board.pieces(pieceType, color):
+                attackedSquares = board.attacks(piece)
+                attackValues = list()
+                for square in attackedSquares:
+                    kingBoost = 0
+                    if square in kingSquares:
+                        index = kingMoveIndices.index(square-king)
+                        if color:
+                            kingBoost = kingMask[index]
+                        else:
+                            kingBoost = kingMask[8-index] # TODO: is the black-white flipping correct?
+                    if color:
+                        attackValues.append(min(boardValues[63-square]+kingBoost, 1))
+                    else:
+                        attackValues.append(min(boardValues[square]+kingBoost, 1))
+
+                print(piece)
+                print(calcGenMean(attackValues, 2))
+                pieceActivities.append(calcGenMean(attackValues, 2))
+        activity[colorIndex] = calcGenMean(pieceActivities, boardMeanP)
+    return activity
+
+
 def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
     """
     This function plots the piece activity for White and Black in a given game.
@@ -106,6 +169,7 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
 if __name__ == '__main__':
     fen = 'r6r/pp1qnkpp/5p2/3p4/3N4/8/PP2QPPP/2R1R1K1 w - - 2 19'
     pgn = '../resources/steinitz-vonBardeleben.pgn'
-    plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1895', filename='../out/steinitz-vonBardeleben_activity.png')
-    plotPieceActivity('../resources/fedoseev-carlsen.pgn', title='Fedoseev-Carlsen, 2021', filename='../out/fedoseev-carlsen_activity.png')
-    plotPieceActivity('../resources/huzman-aronian.pgn', title='Huzman-Aronian, 2010', filename='../out/huzman-aronian_activity.png')
+    # plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1895', filename='../out/steinitz-vonBardeleben_activity.png')
+    # plotPieceActivity('../resources/fedoseev-carlsen.pgn', title='Fedoseev-Carlsen, 2021', filename='../out/fedoseev-carlsen_activity.png')
+    # plotPieceActivity('../resources/huzman-aronian.pgn', title='Huzman-Aronian, 2010', filename='../out/huzman-aronian_activity.png')
+    print(updatedPieceActivity(fen))
