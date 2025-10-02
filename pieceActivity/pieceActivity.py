@@ -1,6 +1,7 @@
 import chess
 from chess import pgn
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def calculatePieceActivity(fen: str) -> list:
@@ -72,9 +73,9 @@ def updatedPieceActivity(fen: str, includeKing: bool = True) -> list:
     for color in [chess.WHITE, chess.BLACK]:
         if debug:
             if color:
-                print('White')
+                colorSymbol = 'w'
             else:
-                print('Black')
+                colorSymbol = 'b'
         pieceActivities = list()
         king = list(board.pieces(6, not color))[0]
         kingSquares = board.attacks(king)
@@ -128,18 +129,20 @@ def updatedPieceActivity(fen: str, includeKing: bool = True) -> list:
                         attackValues.append(min(boardValues[square]+kingBoost, 1))
 
                 # Add all possible moves for knights and kings
-                if pieceType in [2, 6]:
-                    attackValues.extend([0]*(8-len(attackValues)))
+                maxLen = 6
+                if pieceType in [2, 6] and len(attackValues) < maxLen:
+                    attackValues.extend([0]*(maxLen-len(attackValues)))
 
                 if len(attackValues) == 0:
                     attackValues.append(0)
 
                 if debug:
-                    print(chess.piece_symbol(pieceType), chess.SQUARE_NAMES[piece])
-                    print(calcGenMean(attackValues, 2))
+                    print(f'{colorSymbol}{chess.piece_symbol(pieceType).upper()} {chess.SQUARE_NAMES[piece]}: {round(calcGenMean(attackValues, 2), 3)}')
 
                 pieceActivities.append(calcGenMean(attackValues, 2))
         activity[colorIndex] = calcGenMean(pieceActivities, boardMeanP)
+    if debug:
+        print(f'White: {round(activity[0], 3)}, Black: {round(activity[1], 3)}')
     return activity
 
 
@@ -209,6 +212,40 @@ def plotPieceActivity(pgnPath: str, title: str = None, filename: str = None):
             players = list()
 
 
+def plotSquareHeatMap(squareValues: list, filename: str = None):
+    fig, ax = plt.subplots(figsize=(8, 8))
+    files = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    ranks = [8, 7, 6, 5, 4, 3, 2, 1]
+    pieceNames = ['Pawns', 'Knights', 'Bishops', 'Rooks', 'Queen', 'King']
+    # Mapping the chessboard to the output
+    data = np.reshape(list(squareValues), (8, 8))
+    # data = [list(reversed(l)) for l in data]
+    im = ax.imshow(data, cmap='plasma')
+
+    ax.set_xticks(np.arange(8), labels=files)
+    ax.set_yticks(np.arange(8), labels=ranks)
+    ax.set_xticks(np.arange(9)-.5, minor=True)
+    ax.set_yticks(np.arange(9)-.5, minor=True)
+    ax.grid(which='minor', color="black", linestyle='-', linewidth=1)
+    # ax.figure.colorbar(im)
+
+    for i in range(8):
+        if i < 4:
+            c = "black"
+        else:
+            c = "white"
+        for j in range(8):
+            ax.text(j, i, data[i, j], ha="center", va="center", color=c, fontsize=18)
+
+    ax.set_title("Activity values for each square from white's perspective")
+    fig.tight_layout()
+    fig.patch.set_facecolor('#e6f7f2')
+    if filename:
+        plt.savefig(f'../out/{filename}.png', dpi=400)
+    else:
+        plt.show()
+
+
 if __name__ == '__main__':
     fen = 'r6r/pp1qnkpp/5p2/3p4/3N4/8/PP2QPPP/2R1R1K1 w - - 2 19'
     fens = ['r6r/pp1qnkpp/5p2/3p4/3N4/8/PP2QPPP/2R1R1K1 w - - 2 19', 
@@ -221,10 +258,29 @@ if __name__ == '__main__':
              'r5rk/1ppb2bp/n2p1nq1/3P1p2/1PP1pP2/2N1B2P/2BQN1P1/1R3R1K w - - 0 1', 
              'rb1q1r1k/1p4p1/1Pp1bn1p/p1P1pn2/3pN2P/P2P1PP1/1NQB2BK/4RR2 w - - 0 1', 
              '1rr2bk1/1p3p1p/p1n1p1p1/2Nq4/1P1P4/P3BP2/2Q3PP/2RR2K1 w - - 0 1', 
-             'r3k2r/pp2qppp/2b1p3/2n1P3/3N4/2P5/P1B1QPPP/R2R2K1 b kq - 0 1']
+             'r3k2r/pp2qppp/2b1p3/2n1P3/3N4/2P5/P1B1QPPP/R2R2K1 b kq - 0 1',
+             '2r2k1r/pp2qppp/4p3/1Qn1P3/8/2P5/P1B2PPP/R2R2K1 w - - 1 4']
+    postFENs = ['2b2k2/rpp1q1pp/5p2/b1P1pP2/4N1P1/r3P2P/2Q4K/1R1R1B2 w - - 0 1',
+                '5k2/rpp1q1pp/5p2/bQP1pP2/4N1P1/4P2P/7K/3R4 b - - 0 4',
+                'r5rk/1ppb2bp/n2p1nq1/3P1p2/1PP1pP2/2N1B2P/2BQN1P1/1R3R1K w - - 0 1', 
+                '1r4rk/1ppb2bp/n2p4/3P1p1q/1PPNpP2/2N1B2P/3Q2P1/1R3R1K w - - 0 4',
+                '2br2r1/1pp2qbk/n2p3p/3P1p2/1PPNpP2/6RP/3QNBPK/5R2 w - - 10 10', 
+                'rb1q1r1k/1p4p1/1Pp1bn1p/p1P1pn2/3pN2P/P2P1PP1/1NQB2BK/4RR2 w - - 0 1',
+                'rb1q1r1k/1p4p1/1Pp4p/p1P1pb1n/3pN2P/P2P1PP1/1NQB3K/4RR2 w - - 0 3',
+                'rb3r1k/1p3qp1/1Pp4p/p1P1p2P/Pn1pN3/1b1P1PP1/3BQNK1/R4R2 b - - 2 10',
+                '1rr2bk1/1p3p1p/p1n1p1p1/2Nq4/1P1P4/P3BP2/2Q3PP/2RR2K1 w - - 0 1']
     pgn = '../resources/steinitz-vonBardeleben.pgn'
-    # plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1895')
+    plotPieceActivity(pgn, title='Steinitz-von Bardeleben, 1895', filename="../out/s-vbActivity")
     # plotPieceActivity('../resources/fedoseev-carlsen.pgn', title='Fedoseev-Carlsen, 2021')
     # plotPieceActivity('../resources/huzman-aronian.pgn', title='Huzman-Aronian, 2010')
-    for fen in fens2:
+    for fen in postFENs:
         print(updatedPieceActivity(fen, includeKing=False))
+    boardValues = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+                   0.7, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.7,
+                   0.6, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.6,
+                   0.6, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.6,
+                   0.5, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.5,
+                   0.4, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.4,
+                   0.3, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3,
+                   0.2, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.2]
+    # plotSquareHeatMap(boardValues, 'activity2Squares')
