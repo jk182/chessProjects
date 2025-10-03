@@ -111,7 +111,7 @@ def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list
     """
     A general function to create line charts.
     data: list
-        A list of lists, containing the data to be plotted
+        A list of lists, each list contains the data for one category
     xLabel, yLabel:
         Labels for the axes
     title: str
