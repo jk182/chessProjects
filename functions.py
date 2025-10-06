@@ -87,7 +87,7 @@ def accuracy(winPercentBefore: float, winPercentAfter: float) -> float:
     return -> float:
         The accuracy of the move (0-100)
     """
-    return min(103.1668 * np.exp(-0.04354 * (winPercentBefore - winPercentAfter)) - 3.1669, 150)
+    return min(103.1668 * np.exp(-0.04354 * (winPercentBefore - winPercentAfter)) - 3.1669, 100)
 
 
 def winP(centipawns: int) -> float:
