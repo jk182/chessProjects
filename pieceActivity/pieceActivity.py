@@ -216,7 +216,6 @@ def plotSquareHeatMap(squareValues: list, filename: str = None):
     fig, ax = plt.subplots(figsize=(8, 8))
     files = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     ranks = [8, 7, 6, 5, 4, 3, 2, 1]
-    pieceNames = ['Pawns', 'Knights', 'Bishops', 'Rooks', 'Queen', 'King']
     # Mapping the chessboard to the output
     data = np.reshape(list(squareValues), (8, 8))
     # data = [list(reversed(l)) for l in data]
