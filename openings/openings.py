@@ -94,8 +94,8 @@ def numberOfGames(pgnPath: str, script: str, db: str) -> dict:
     db: str
         Path to the SCID-database to compare the game to
     return -> dict
-        Dictionary indexed by player names, containing a list for each game, containing a tuple with the number of games before and after the player move
-        dict(name, list(list(tuple(nGamesBefore, nGamesAfter))))
+        Dictionary indexed by player names, containing a list for each game where the first index shows the color (white=0, black=1), containing a tuple with the number of games before and after the player move
+        dict(name, list(list(list(tuple(nGamesBefore, nGamesAfter))))
     """
     bookMoves = dict()
     cache = dict()
@@ -105,8 +105,9 @@ def numberOfGames(pgnPath: str, script: str, db: str) -> dict:
             white = game.headers["White"]
             black = game.headers["Black"]
             print(white, black)
-            whiteMoves = list()
-            blackMoves = list()
+            # The first index indicates the color of the player in the game
+            whiteMoves = [0]
+            blackMoves = [1]
 
             board = game.board()
 
@@ -158,6 +159,53 @@ def gamesFromSearchOutput(output: str) -> int:
     """
     games = re.findall(r'\d+', output)[0]
     return int(games)
+
+
+def getClockTimesByPlayer(pgnPath: str, minutes: bool = True, startTime: int = 5400) -> dict:
+    """
+    This function reads the times from a PGN file with time stamps
+    minutes: bool
+        If this is set, the time will be calculated in minutes
+    return -> dict
+        A dictionary indexed by player names containing a list of lists of clock times for each game
+    """
+    times = dict()
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            # The first index indicates the color of the player
+            if minutes:
+                c = [[0, startTime/60], [1, startTime/60]]
+            else:
+                c = [[0, startTime], [1, startTime]]
+
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+                if node.clock() is None:
+                    continue
+                time = int(node.clock())
+                if minutes:
+                    time /= 60
+                if not time:
+                    break
+                if not node.turn():
+                    c[0].append(time)
+                else:
+                    c[1].append(time)
+            
+            if white in times.keys():
+                times[white].append(c[0])
+            else:
+                times[white] = [c[0]]
+            if black in times.keys():
+                times[black].append(c[1])
+            else:
+                times[black] = [c[1]]
+    return times
 
 
 def isMistake(posBefore: str, posAfter: str, mistakeThreshold: int = 10) -> bool:
@@ -305,6 +353,32 @@ def plotBookMoves(bookMoves: dict, short: dict = None, filename: str = None, nGa
         plt.show()
 
 
+def plotBookMoveReductions(bookMoveData: dict, players: list = None):
+    if players is None:
+        players = list(bookMoveData.keys())
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    gameNr = 0
+    for player, data in bookMoveData.items():
+        if player not in players:
+            continue
+
+        for game in data:
+            gameNr += 1
+            if game[0] == 0:
+                color = 'White'
+                lineColor = 'blue'
+            else:
+                color = 'Black'
+                lineColor = 'black'
+
+            plotData = [d[1] for d in game[1:]]
+            ax.plot(range(len(plotData)), plotData, label=f'{player}, {color}, {gameNr}', color=lineColor)
+
+    ax.legend()
+    ax.set_yscale('log')
+    plt.show()
+
 
 if __name__ == '__main__':
     # db = '/home/julian/chess/database/gameDB/novelties'
@@ -312,10 +386,18 @@ if __name__ == '__main__':
     player = 'Carlsen, M.'
     script = 'searchPosition.tcl'
     pgn = '../out/candidates2024-WDL+CP.pgn'
+    usChamps = '../resources/usChamps2025.pgn'
     fen = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
-    print(numberOfGames(pgn, script, db))
+    # numGames = numberOfGames(usChamps, script, db)
+    # with open('../out/usChampsBook.pkl', 'wb+') as f:
+    #     pickle.dump(numGames, f)
 
-    # o = subprocess.run(['tkscid', script, db, fen], stdout=subprocess.PIPE).stdout
+    with open('../out/usChampsBook.pkl', 'rb+') as f:
+        numGames = pickle.load(f)
+    print(numGames)
+    # print(getClockTimesByPlayer(usChamps))
+    plotBookMoveReductions(numGames, ['Sevian, Samuel'])
+
     # print(o)
     # print(gamesFromSearchOutput(str(o)))
 
