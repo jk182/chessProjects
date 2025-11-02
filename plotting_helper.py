@@ -58,7 +58,7 @@ def getDefaultColors() -> list:
     return getColors(['blue', 'orange', 'green', 'red', 'purple'])
 
 
-def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, filename: str = None):
+def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, filename: str = None):
     """
     A general function to create bar charts, where each player (or group of players) gets multiple bars.
     data: list
@@ -84,6 +84,8 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
     plt.xticks(ticks=range(1, len(data)+1), labels=xTickLabels)
+    if xlabel:
+        ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
 
     nBars = len(data[0])

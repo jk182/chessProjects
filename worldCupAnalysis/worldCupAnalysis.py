@@ -2,9 +2,12 @@ import chess
 import chess.pgn
 import pandas as pd
 
-import os
+import os, sys
 from os import listdir
 from os.path import isfile, join
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import plotting_helper
 
 
 def changeRoundNumbers(inFile: str, outFile):
@@ -58,7 +61,6 @@ def extractData(pgnPaths: list) -> pd.DataFrame:
                         playerRatings[game.headers[color]] = elo
 
         seedings = list(dict(reversed(sorted(playerRatings.items(), key=lambda item: item[1]))).keys())
-        print(seedings)
 
         with open(pgnPath, 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
@@ -94,8 +96,6 @@ def extractData(pgnPaths: list) -> pd.DataFrame:
                 data["WhiteSeed"].append(seedings.index(header["White"])+1)
                 data["BlackSeed"].append(seedings.index(header["Black"])+1)
                 data["Result"].append(header["Result"])
-
-
         
     return pd.DataFrame.from_dict(data)
 
@@ -109,7 +109,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
     """
     # TODO: can color sequence change in tiebreaks?
     matchData = dict()
-    keys = ["Match", "Round", "White", "Black", "WhiteElo", "BlackElo", "GameResults", "MatchResult", "Tiebreak"]
+    keys = ["Match", "Round", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "GameResults", "MatchResult", "Tiebreak"]
 
     for i, row in df.iterrows():
         match = row["Match"]
@@ -119,7 +119,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
             matchData[match]["GameResults"] = list()
         gameNr = row["GameNr"]
         if gameNr == 1:
-            for k in ["White", "Black", "WhiteElo", "BlackElo"]:
+            for k in ["White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed"]:
                 matchData[match][k] = row[k]
 
         if gameNr <= len(matchData[match]["GameResults"]):
@@ -149,6 +149,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
         elif wPoints < len(gameResults) / 2:
             matchData[match]["MatchResult"] = "0-1"
         else:
+            matchData[match]["MatchResult"] = "0-1"
             # TODO: add armageddon scoring
             print(f'Tied match? {match} {matchData[match]}')
 
@@ -187,9 +188,12 @@ def mustWinGames(matchData: dict) -> dict:
 
 def getWDL(df: pd.DataFrame) -> list:
     wdl = [0, 0, 0]
-    nGames = len(df)
+    nGames = 0
     
     for i, row in df.iterrows():
+        if row["GameNr"] > 2:
+            continue
+        nGames += 1
         if row["Result"] == "1-0":
             wdl[0] += 1
         elif row["Result"] == "1/2-1/2":
@@ -219,14 +223,336 @@ def analyseGameResults(df: pd.DataFrame):
     print(wScore/(wScore+bScore), bScore/(wScore+bScore))
 
 
-def getWDLAfterFirstGame(df: pd.DataFrame) -> list:
-    firstRoundResults = dict()
-    for i, row in df.iterrows():
-        matchName = row["Match"]
-        if row["GameNr"] == 1:
-            firstRoundResults[matchName] = row["Result"]
+def getWDLAfterFirstGame(matchData: dict) -> list:
+    ratingDiffs = [0, 50, 100, 150, 200]
+    results = dict()
 
-        print(row)
+    for data in matchData.values():
+        r = max(ratingDiffs)
+        diff = data["WhiteElo"] - data["BlackElo"]
+        for i in range(len(ratingDiffs)-1):
+            if ratingDiffs[i] <= abs(diff) < ratingDiffs[i+1]:
+                r = ratingDiffs[i]
+                break
+
+        if r not in results.keys():
+            results[r] = dict()
+            for i in range(3):
+                results[r][i] = [0, 0, 0]
+
+        if data["GameResults"][0] == "1/2-1/2":
+            resultIndex = 1
+
+        if diff >= 0:
+            if data["GameResults"][0] == "1-0":
+                resultIndex = 0
+            elif data["GameResults"][0] == "0-1":
+                resultIndex = 2
+        else:
+            if data["GameResults"][0] == "0-1":
+                resultIndex = 0
+            elif data["GameResults"][0] == "1-0":
+                resultIndex = 2
+        
+        if data["GameResults"][1] == "1/2-1/2":
+            results[r][resultIndex][1] += 1
+        elif data["GameResults"][1] == "1-0":
+            results[r][resultIndex][0] += 1
+        else:
+            results[r][resultIndex][2] += 1
+    print(results)
+
+
+def seedingAnalysis(df: pd.DataFrame) -> dict:
+    roundData = dict()
+    for i, row in df.iterrows():
+        year = row["Match"][-2:]
+        k = f'20{year} R{row["Round"]}'
+        if k not in roundData.keys():
+            roundData[k] = set()
+        for s in ["WhiteSeed", "BlackSeed"]:
+            roundData[k].add(row[s])
+    return roundData
+
+
+def decisiveGamesAndTiebreaksPerRound(matchData: dict):
+    games = dict()
+    matches = dict()
+    mustWin = dict()
+
+    for data in matchData.values():
+        roundNr = data["Round"]
+
+        if roundNr not in games.keys():
+            games[roundNr] = [0, 0]
+        if roundNr not in matches.keys():
+            matches[roundNr] = [0, 0]
+        if roundNr not in mustWin.keys():
+            mustWin[roundNr] = [0, 0]
+
+        games[roundNr][1] += 2
+        for r in data["GameResults"][:2]:
+            if r != "1/2-1/2":
+                games[roundNr][0] += 1
+
+        matches[roundNr][1] += 1
+        if data["Tiebreak"]:
+            matches[roundNr][0] += 1
+
+        if data["GameResults"][0] in ["1-0", "0-1"]:
+            mustWin[roundNr][1] += 1
+            if data["GameResults"][0] == data["GameResults"][1]:
+                mustWin[roundNr][0] += 1
+
+    games = dict(sorted(games.items()))
+    matches = dict(sorted(matches.items()))
+
+    plotData = list()
+
+    for r in games.keys():
+        plotData.append([games[r][0]/games[r][1], matches[r][0]/matches[r][1]])
+        # print(r)
+        # print(f'Decisive games: {games[r][0]/games[r][1]}')
+        # print(f'Must win conversion: {mustWin[r][0]/mustWin[r][1]}')
+        # print(f'Tiebreak rate: {matches[r][0]/matches[r][1]}')
+    plotting_helper.plotPlayerBarChart(plotData, games.keys(), 'Percentage of games/matches', 'Decisive game and match results in different rounds', ['Classical game results', 'Match tiebreaks'])
+
+
+def resultsByRatingGap(df: pd.DataFrame):
+    ratingDiffs = [0, 50, 100, 150, 200, 300]
+    matchData = getMatchData(df)
+    gameData = dict()
+    matchResults = dict()
+
+    for data in matchData.values():
+        r = max(ratingDiffs)
+        diff = data["WhiteElo"] - data["BlackElo"]
+        for i in range(len(ratingDiffs)-1):
+            if ratingDiffs[i] <= abs(diff) < ratingDiffs[i+1]:
+                r = ratingDiffs[i]
+                break
+
+        if r not in gameData.keys():
+            gameData[r] = [0, 0, 0]
+            matchResults[r] = [0, 0, 0, 0] # classical WDL + tiebreak result
+
+        for i in range(2):
+            if data["GameResults"][i] == "1/2-1/2":
+                gameData[r][1] += 1
+                continue
+            if (diff >= 0 and i == 0) or (diff < 0 and i == 1):
+                if data["GameResults"][i] == "1-0":
+                    gameData[r][0] += 1
+                else:
+                    gameData[r][2] += 1
+            else:
+                if data["GameResults"][i] == "0-1":
+                    gameData[r][0] += 1
+                else:
+                    gameData[r][2] += 1
+
+        if data["Tiebreak"]:
+            matchResults[r][1] += 1
+            if (diff >= 0 and data["MatchResult"] == "1-0") or (diff < 0 and data["MatchResult"] == "0-1"):
+                matchResults[r][3] += 1
+        else:
+            if diff >= 0:
+                if data["MatchResult"] == "1-0":
+                    matchResults[r][0] += 1
+                else:
+                    matchResults[r][2] += 1
+            else:
+                if data["MatchResult"] == "0-1":
+                    matchResults[r][0] += 1
+                else:
+                    matchResults[r][2] += 1
+
+    gameData = dict(sorted(gameData.items()))
+    matchResults = dict(sorted(matchResults.items()))
+    print(gameData)
+    print(matchResults)
+
+    plotData = list()
+    for wdl in gameData.values():
+        plotData.append([x/sum(wdl) for x in wdl])
+
+    xTicks = ['0-50', '50-100', '100-150', '150-200', '200-300', '300+']
+    plotting_helper.plotPlayerBarChart(plotData, xTicks, 'Relative number of games', 'Wins, draws and losses based on rating gap', ['Wins', 'Draws', 'Losses'], xlabel='Elo advantage', colors=plotting_helper.getColors(['green', 'blue', 'orange']), filename='../out/worldCups/gameResults.png')
+
+    plotMatchData = list()
+    for data in matchResults.values():
+        cm = data[0]+data[1]+data[2]
+        plotMatchData.append([x/cm if i < 3 else x/data[1] for i,x in enumerate(data)])
+    plotting_helper.plotPlayerBarChart(plotMatchData, xTicks, 'Relative number of matches', 'Match results based on rating gap', ['Classical wins', 'Classical draws', 'Classical losses', 'Tiebreak wins'], xlabel='Elo advantage', colors=plotting_helper.getColors(['green', 'blue', 'orange', 'purple']), filename='../out/worldCups/matchResults.png')
+
+
+def tiebreakImpact(matchData: dict):
+    tiebreaks = dict()
+    for match, data in matchData.items():
+        if data["Tiebreak"]:
+            year = match[-2:]
+            k = f'{year}R{data["Round"]}'
+            if data["MatchResult"] == "1-0":
+                player = data["White"]
+            else:
+                player = data["Black"]
+
+            if k not in tiebreaks.keys():
+                tiebreaks[k] = [player]
+            else:
+                tiebreaks[k].append(player)
+
+    tiebreakData = list()
+    results = ["0-1", "1/2-1/2", "1-0"]
+    for match, data in matchData.items():
+        k = f'{match[-2:]}R{data["Round"]-1}' # looking at tiebreaks in the previous round
+        if k not in tiebreaks.keys():
+            continue
+        if data["White"] in tiebreaks[k] and data["Black"] in tiebreaks[k]:
+            # I only want matches where one player had to play a tiebreak
+            continue
+        td = dict()
+        if data["White"] in tiebreaks[k]:
+            td["Player"] = data["White"]
+            td["EloDiff"] = data["WhiteElo"]-data["BlackElo"]
+            td["GameResults"] = [results.index(data["GameResults"][0])/2, (2-results.index(data["GameResults"][1]))/2]
+            td["MatchResult"] = results.index(data["MatchResult"])/2
+        elif data["Black"] in tiebreaks[k]:
+            td["Player"] = data["Black"]
+            td["EloDiff"] = data["BlackElo"]-data["WhiteElo"]
+            td["GameResults"] = [(2-results.index(data["GameResults"][0]))/2, results.index(data["GameResults"][1])/2]
+            td["MatchResult"] = (2-results.index(data["MatchResult"]))/2
+        else:
+            continue
+        td["Tiebreak"] = data["Tiebreak"]
+        tiebreakData.append(td)
+
+    scores = [0, 0]
+    matchPoints = 0
+    ratingDiff = 0
+    ratingDiffs = [0, 50, 100, 200, 300]
+    tbGameData = dict()
+    tbMatchData = dict()
+    for tb in tiebreakData:
+        matchPoints += tb["MatchResult"]
+        ratingDiff += tb["EloDiff"]
+        for i in range(2):
+            scores[i] += tb["GameResults"][i]
+
+        r = max(ratingDiffs)
+        for i in range(len(ratingDiffs)-1):
+            if ratingDiffs[i] <= abs(tb["EloDiff"]) < ratingDiffs[i+1]:
+                r = ratingDiffs[i]
+                continue
+        if tb["EloDiff"] < 0:
+            r *= -1
+        
+        if r not in tbMatchData.keys():
+            tbGameData[r] = [[0, 0, 0], [0, 0, 0]]
+            tbMatchData[r] = [0, 0, 0, 0]
+
+        for j in range(2):
+            tbGameData[r][j][2-int(tb["GameResults"][j]*2)] += 1
+        if tb["Tiebreak"]:
+            offset = 2
+        else:
+            offset = 0
+        tbMatchData[r][1-int(tb["MatchResult"])+offset] += 1
+
+    tbGameData = dict(sorted(tbGameData.items()))
+    tbMatchData = dict(sorted(tbMatchData.items()))
+    print([s/len(tiebreakData) for s in scores])
+    print(matchPoints/len(tiebreakData))
+    print(ratingDiff/len(tiebreakData))
+    print(tbGameData)
+    print(tbMatchData)
+    plotData = [[x/sum(d[0]) for x in d[0]] for d in tbGameData.values()]
+    plotData2 = [[x/sum(d[1]) for x in d[1]] for d in tbGameData.values()]
+    plotData3 = [[(d[0][0]+d[0][1]*0.5)/sum(d[0]), (d[1][0]+d[1][1]*0.5)/sum(d[1])] for d in tbGameData.values()]
+    # plotting_helper.plotPlayerBarChart(plotData, [-200, -100, -50, 0, 50, 100, 200], 'Relative number of games', 'Result after tiebreak', ['Wins', 'Draws', 'Losses'])
+    # plotting_helper.plotPlayerBarChart(plotData2, [-200, -100, -50, 0, 50, 100, 200], 'Relative number of games', 'Result after tiebreak game 2', ['Wins', 'Draws', 'Losses'])
+    plotting_helper.plotPlayerBarChart(plotData3, [-200, -100, -50, 0, 50, 100, 200], 'Relative number of games', 'Result after tiebreak game 2', ['Wins', 'Draws', 'Losses'])
+
+
+def mustWinGamesByRating(mustWinData: dict):
+    ratings = [0, 50, 100, 200]
+    mwData = dict()
+
+    for data in mustWinData.values():
+        if data["Leader"] == "White":
+            colorIndex = 1
+            eloDiff = data["BlackElo"]-data["WhiteElo"]
+        else:
+            colorIndex = 0
+            eloDiff = data["WhiteElo"]-data["BlackElo"]
+        
+        ratingBucket = 300
+        for i in range(len(ratings)-1):
+            if ratings[i] <= abs(eloDiff) < ratings[i+1]:
+                ratingBucket = ratings[i]
+                break
+        if eloDiff < 0:
+            ratingBucket *= -1
+
+        if ratingBucket not in mwData.keys():
+            mwData[ratingBucket] = [[0, 0, 0], [0, 0, 0]] # White and black WDL
+
+        mws = data["MustWinScore"]
+        if mws == 1:
+            mwData[ratingBucket][colorIndex][0] += 1
+        if mws == 0.5:
+            mwData[ratingBucket][colorIndex][1] += 1
+        else:
+            mwData[ratingBucket][colorIndex][2] += 1
+
+    mwData = dict(sorted(mwData.items()))
+    plotData = list()
+    for data in mwData.values():
+        l = list()
+        for d in data:
+            if sum(d) > 0:
+                l.append([x/sum(d) for x in d])
+            else:
+                l.append([0, 0, 0])
+
+        plotData.append(l)
+    print(plotData)
+    whiteData = [l[0] for l in plotData]
+    blackData = [l[1] for l in plotData]
+    # plotting_helper.plotPlayerBarChart(plotData, [-300, -200, -100, -50, 0, 50, 100, 200, 300], 'Relative number of games', 'Results in must win games', ['White wins', 'White draws', 'White losses', 'Black wins', 'Black draws', 'Black losses'])
+    colors = plotting_helper.getColors(['green', 'blue', 'orange'])
+    plotting_helper.plotPlayerBarChart(whiteData, [-200, -100, -50, 0, 50, 100, 200], 'Relative number of games', 'Results in must win games for White', ['White wins', 'White draws', 'White losses'], xlabel="White's Elo advantage", colors=colors, filename='../out/worldCups/mustWinWhite.png')
+    plotting_helper.plotPlayerBarChart(blackData, [-200, -100, -50, 0, 50, 100, 200], 'Relative number of games', 'Results in must win games for Black', ['Black wins', 'Black draws', 'Black losses'], xlabel="Black's elo advantage", colors=colors, filename='../out/worldCups/mustWinBlack.png')
+
+
+def getUpsetData(matchData: dict):
+    upsetData = list()
+    results = ["1-0", "1/2-1/2", "0-1"]
+    for data in matchData.values():
+        upset = dict()
+        upset["FirstGame"] = [0, 0, 0]
+        upset["SecondGame"] = [0, 0, 0]
+        if data["MatchResult"] == "1-0" and data["WhiteElo"]-data["BlackElo"] < -100:
+            upset["Tiebreak"] = data["Tiebreak"]
+            upset["FirstGame"][results.index(data["GameResults"][0])] += 1
+            upset["SecondGame"][2-results.index(data["GameResults"][1])] += 1
+            upsetData.append(upset)
+        elif data["MatchResult"] == "0-1" and data["BlackElo"]-data["WhiteElo"] < -100:
+            upset["Tiebreak"] = data["Tiebreak"]
+            upset["FirstGame"][2-results.index(data["GameResults"][0])] += 1
+            upset["SecondGame"][results.index(data["GameResults"][1])] += 1
+            upsetData.append(upset)
+
+    data = [0, 0, 0]
+    for u in upsetData:
+        if u["Tiebreak"]:
+            data[2] += 1
+            continue
+        if u["FirstGame"][0] == 1:
+            data[0] += 1
+        else:
+            data[1] += 1
+    print([d/sum(data) for d in data])
 
 
 if __name__ == '__main__':
@@ -234,12 +560,33 @@ if __name__ == '__main__':
     worldCups = '../resources/worldCups/'
     pgns = [join(worldCups, f) for f in listdir(worldCups) if isfile(join(worldCups, f))]
     df = extractData(pgns)
-    print(df)
-    analyseGameResults(df)
+    # analyseGameResults(df)
+    # Seeding data
+    """
+    seedingData = seedingAnalysis(df)
+    for k, v in sorted(seedingData.items()):
+        if '05' in k:
+            print(k, v)
+        # print(k, min(v), max(v))
     """
     matchData = getMatchData(df)
-    mustWin = mustWinGames(matchData)
+    # getUpsetData(matchData)
+    tiebreakImpact(matchData)
+    # Having white in the first game
+    # resultsByRatingGap(df)
+    """
+    wWins = 0
+    for data in matchData.values():
+        if data["MatchResult"] == "1-0":
+            wWins += 1
+    print(wWins/len(matchData))
+    # getWDLAfterFirstGame(matchData)
+    # decisiveGamesAndTiebreaksPerRound(matchData)
+    """
+    # mustWin = mustWinGames(matchData)
+    # mustWinGamesByRating(mustWin)
     # Looking at results in must win games
+    """
     wdl = [0, 0, 0]
     for match in mustWin.keys():
         if mustWin[match]["MustWinScore"] == 1:
@@ -250,6 +597,8 @@ if __name__ == '__main__':
             wdl[2] += 1
     print([x/sum(wdl) for x in wdl])
     print(getWDL(df))
+    """
+    """
     # Tiebreaks
     nTiebreaks = 0
     for match in matchData.keys():
