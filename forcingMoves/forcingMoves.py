@@ -2,25 +2,25 @@ import chess
 import chess.pgn
 
 
-def isForcingMove(board: chess.Board, move: chess.Move) -> bool:
+def isForcingMove(board: chess.Board, move: chess.Move, captureHistory: list) -> bool:
     """
     This function determines whether the given move is a forcing move in the position
     """
-    newPos = board.copy()
-    newPos.push(move)
-
-    if newPos.is_check():
-        return True
-
-    if board.is_capture(move):
-        # I feel like there are some complexities I miss
-        return True
 
     if board.gives_check(move):
         return True
 
+    if board.is_capture(move):
+        if captureHistory:
+            if move.to_square != captureHistory[-1].to_square:
+                # Removing recaptures
+                return True
+        else:
+            return True
+
+    newPos = board.copy()
+    newPos.push(move)
     # Threat detection
-    # TODO: check if the attacking piece is pinned, discovered attacks
     attackingPiece = board.piece_type_at(move.from_square)
     for sq in newPos.attacks(move.to_square):
         if newPos.color_at(sq) == newPos.turn:
@@ -61,6 +61,7 @@ def countForcingMoves(pgnPaths: list) -> dict:
     for pgnPath in pgnPaths:
         with open(pgnPath, 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
+                captureHistory = list()
                 for color in ["White", "Black"]:
                     if game.headers[color] not in fMoves.keys():
                         fMoves[game.headers[color]] = [0, 0]
@@ -71,15 +72,19 @@ def countForcingMoves(pgnPaths: list) -> dict:
                         player = game.headers["White"]
                     else:
                         player = game.headers["Black"]
-                    if isForcingMove(board, move):
+                    if isForcingMove(board, move, captureHistory):
                         fMoves[player][0] += 1
-                        print(move)
                     fMoves[player][1] += 1
                     board.push(move)
+                    captureHistory.append(move)
     return fMoves
 
 
 if __name__ == '__main__':
     board = chess.Board('r3k1nr/pp3pb1/1np2qp1/3p1p1p/3P3P/1PNQPPP1/P1P3B1/R1B1K2R b KQkq - 0 12')
-    isForcingMove(board, chess.Move.from_uci('f5f4'))
-    print(countForcingMoves(['../resources/tal-hecht.pgn']))
+    # isForcingMove(board, chess.Move.from_uci('f5f4'))
+    pgns = ['../resources/games/kasparov.pgn', '../resources/games/karpov.pgn', '../resources/games/tal.pgn', '../resources/games/botvinnik.pgn']
+    data = countForcingMoves(pgns)
+    for k, v in data.items():
+        if 'Kasparov' in k or 'Karpov' in k or 'Tal' in k or 'Botvinnik' in k:
+            print(k, v, v[0]/v[1])

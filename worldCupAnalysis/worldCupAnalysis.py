@@ -620,10 +620,10 @@ if __name__ == '__main__':
 
     matchData = getMatchData(df)
     # plotUpsetsByRound(matchData, [1, 2, 3])
-    # getUpsetData(matchData)
-    tiebreakImpact(matchData)
+    getUpsetData(matchData)
+    # tiebreakImpact(matchData)
     # Having white in the first game
-    resultsByRatingGap(df)
+    # resultsByRatingGap(df)
     """
     wWins = 0
     for data in matchData.values():
