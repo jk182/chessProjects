@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import plotting_helper
 
 
-def changeRoundNumbers(inFile: str, outFile):
+def changeRoundNumbers(inFile: str, outFile: str):
     """
     This function changes the round number is a PGN file
     """
@@ -36,6 +36,17 @@ def changeRoundNumbers(inFile: str, outFile):
             # print(game)
             game.headers["Round"] = f"{roundNr}.{gameNr}"
             
+            print(game, file=open(outFile, "a+"), end="\n\n")
+
+
+def changeRoundNumbers2025(inFile: str, outFile: str, roundNr: int, gameNrOffset: int = 0):
+    """
+    This function changes the round number for PGN files of the 2025 World Cup downloaded from Lichess
+    """
+    with open(inFile, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            gameNr = int(game.headers["Round"].split(".")[0])
+            game.headers["Round"] = f"{roundNr}.{gameNr-gameNrOffset}"
             print(game, file=open(outFile, "a+"), end="\n\n")
 
 
@@ -109,7 +120,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
     """
     # TODO: can color sequence change in tiebreaks?
     matchData = dict()
-    keys = ["Match", "Round", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "GameResults", "MatchResult", "Tiebreak"]
+    keys = ["Match", "Round", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "GameResults", "MatchResult", "Tiebreak", "WhitePlayers"]
 
     for i, row in df.iterrows():
         match = row["Match"]
@@ -117,6 +128,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
             matchData[match] = dict()
             matchData[match]["Round"] = row["Round"]
             matchData[match]["GameResults"] = list()
+            matchData[match]["WhitePlayers"] = list()
         gameNr = row["GameNr"]
         if gameNr == 1:
             for k in ["White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed"]:
@@ -124,12 +136,23 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
 
         if gameNr <= len(matchData[match]["GameResults"]):
             matchData[match]["GameResults"][gameNr-1] = row["Result"]
+            matchData[match]["WhitePlayers"][gameNr-1] = row["White"]
         else:
             l = [0] * (gameNr - len(matchData[match]["GameResults"]))
             l[gameNr - len(matchData[match]["GameResults"]) - 1] = row["Result"]
             matchData[match]["GameResults"].extend(l)
 
+            l2 = [0] * (gameNr - len(matchData[match]["WhitePlayers"]))
+            l2[gameNr - len(matchData[match]["WhitePlayers"]) - 1] = row["White"]
+            matchData[match]["WhitePlayers"].extend(l2)
+
     for match in matchData.keys():
+        for i in range(2, len(matchData[match]["GameResults"]), 2):
+            if matchData[match]["WhitePlayers"][i] != matchData[match]["WhitePlayers"][0] and i < len(matchData[match]["GameResults"])-1:
+                r = matchData[match]["GameResults"][i]
+                matchData[match]["GameResults"][i] = matchData[match]["GameResults"][i+1]
+                matchData[match]["GameResults"][i+1] = r
+                
         gameResults = matchData[match]["GameResults"]
         if len(gameResults) > 2: # TODO: some finals were 4 games
             matchData[match]["Tiebreak"] = True
@@ -555,10 +578,35 @@ def getUpsetData(matchData: dict):
     print([d/sum(data) for d in data])
 
 
+def plotUpsetsByRound(matchData: dict, rounds: list, years: list = [2021, 2023, 2025]):
+    upsetData = dict()
+    for r in rounds:
+        upsetData[r] = [0] * len(years)
+
+    for match, data in matchData.items():
+        if int(f'20{match[-2:]}') in years:
+            if data['Round'] not in rounds:
+                continue
+            if (data["MatchResult"] == "1-0" and data["WhiteElo"]-data["BlackElo"] <= -75) or (data["MatchResult"] == "0-1" and data["BlackElo"]-data["WhiteElo"] <= -75):
+                print(match, data["Round"], data["GameResults"])
+                yIndex = years.index(int(f'20{match[-2:]}'))
+                upsetData[data["Round"]][yIndex] += 1
+
+    plotData = list()
+    for data in upsetData.values():
+        plotData.append(list(data))
+
+    plotting_helper.plotPlayerBarChart(plotData, ['Round 1', 'Round 2', 'Round 3'], 'Number of upsets', 'Number of upsets in the first three rounds in 2021, 2023 and 2025', years, filename='../out/wcUpsets.png')
+
+
+
 if __name__ == '__main__':
     # changeRoundNumbers('../resources/wcupW23Bad.pgn', '../resources/worldCups/wcupW23.pgn')
     worldCups = '../resources/worldCups/'
     pgns = [join(worldCups, f) for f in listdir(worldCups) if isfile(join(worldCups, f))]
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-1_CBWLKDSY_2025.11.03.pgn', '../resources/worldCups/wcup25.pgn', 1)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-2_C8xGMEpX_2025.11.06.pgn', '../resources/worldCups/wcup25.pgn', 2, 8)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-3_sOK6GBCf_2025.11.09.pgn', '../resources/worldCups/wcup25.pgn', 3, 19)
     df = extractData(pgns)
     # analyseGameResults(df)
     # Seeding data
@@ -567,13 +615,15 @@ if __name__ == '__main__':
     for k, v in sorted(seedingData.items()):
         if '05' in k:
             print(k, v)
-        # print(k, min(v), max(v))
+        print(k, sorted(v))
     """
+
     matchData = getMatchData(df)
+    # plotUpsetsByRound(matchData, [1, 2, 3])
     # getUpsetData(matchData)
     tiebreakImpact(matchData)
     # Having white in the first game
-    # resultsByRatingGap(df)
+    resultsByRatingGap(df)
     """
     wWins = 0
     for data in matchData.values():
