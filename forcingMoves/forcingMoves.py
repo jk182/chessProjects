@@ -142,6 +142,44 @@ def getForcingMovesPerPlayer(pgnPaths: list, players: list) -> dict:
     return fMoves
 
 
+def getForcingMovesByResult(pgnPaths: list, players: list) -> dict:
+    fMoves = dict()
+    for i, pgnPath in enumerate(pgnPaths):
+        with open(pgnPath, 'r') as pgn:
+            moveData = [[0, 0], [0, 0], [0, 0]]
+            while game := chess.pgn.read_game(pgn):
+                lastCaptureSquare = None
+                result = game.headers["Result"]
+                if result == "1/2-1/2":
+                    resultIndex = 1
+                if players[i] in game.headers["White"]:
+                    color = True
+                    if result == "1-0":
+                        resultIndex = 0
+                    elif result == "0-1":
+                        resultIndex = 2
+                elif players[i] in game.headers["Black"]:
+                    color = False
+                    if result == "0-1":
+                        resultIndex = 0
+                    elif result == "1-0":
+                        resultIndex = 2
+                else:
+                    continue
+
+                board = game.board()
+                for move in game.mainline_moves():
+                    if board.turn == color:
+                        moveData[resultIndex][1] += 1
+                        if isForcingMove(board, move, lastCaptureSquare):
+                            moveData[resultIndex][0] += 1
+                    if board.is_capture(move):
+                        lastCaptureSquare = move.to_square
+                    board.push(move)
+        fMoves[players[i]] = moveData
+    return fMoves
+
+
 def getSplitForcingMoves(pgnPaths: list, players: list) -> dict:
     fMoves = dict()
     for i, pgnPath in enumerate(pgnPaths):
@@ -196,6 +234,9 @@ if __name__ == '__main__':
     players = ['Alekhine', 'Capablanca', 'Tal', 'Botvinnik', 'Smyslov', 'Kasparov', 'Karpov']
     plotData = list()
     # fMoveData = getForcingMovesPerPlayer(pgnsTest, ['Kasparov', 'Karpov'])
+    data = getForcingMovesByResult(pgns, players)
+    for k, v in data.items():
+        print(k, f'W: {round(v[0][0]/v[0][1], 3)}', f'D: {round(v[1][0]/v[1][1], 3)}', f'L: {round(v[2][0]/v[2][1], 3)}')
     """
     fMoveData = getForcingMovesPerPlayer(pgns, players)
     for k, v in fMoveData.items():
@@ -203,8 +244,10 @@ if __name__ == '__main__':
         plotData.append([v[0]/v[1]])
     plotting_helper.plotPlayerBarChart(plotData, players, 'Relative number of forcing moves', 'Relative number of forcing moves for different players', ['Forcing moves'], filename='../out/forcingMoves.png')
     """
+    """
     data = getSplitForcingMoves(pgns, players)
     for k, v in data.items():
         # print(k, v[0]/v[3], v[1]/v[3], v[2]/v[3])
         plotData.append([v[i]/v[3] for i in range(3)])
     plotting_helper.plotPlayerBarChart(plotData, players, 'Relative number of moves', 'Checks, captures and threats for different players', ['Checks', 'Captures', 'Threats'], filename='../out/CCT.png')
+    """
