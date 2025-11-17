@@ -146,7 +146,7 @@ def getForcingMovesByResult(pgnPaths: list, players: list) -> dict:
     fMoves = dict()
     for i, pgnPath in enumerate(pgnPaths):
         with open(pgnPath, 'r') as pgn:
-            moveData = [[0, 0], [0, 0], [0, 0]]
+            moveData = [[0, 0], [0, 0], [0, 0], [0, 0]]
             while game := chess.pgn.read_game(pgn):
                 lastCaptureSquare = None
                 result = game.headers["Result"]
@@ -171,8 +171,10 @@ def getForcingMovesByResult(pgnPaths: list, players: list) -> dict:
                 for move in game.mainline_moves():
                     if board.turn == color:
                         moveData[resultIndex][1] += 1
+                        moveData[3][1] += 1
                         if isForcingMove(board, move, lastCaptureSquare):
                             moveData[resultIndex][0] += 1
+                            moveData[3][0] += 1
                     if board.is_capture(move):
                         lastCaptureSquare = move.to_square
                     board.push(move)
@@ -223,6 +225,7 @@ if __name__ == '__main__':
     board = chess.Board('r3k1nr/pp3pb1/1np2qp1/3p1p1p/3P3P/1PNQPPP1/P1P3B1/R1B1K2R b KQkq - 0 12')
     # isForcingMove(board, chess.Move.from_uci('f5f4'))
     pgns = ['../resources/games/alekhine.pgn', '../resources/games/capablanca.pgn', '../resources/games/tal.pgn', '../resources/games/botvinnik.pgn', '../resources/games/smyslov.pgn', '../resources/games/kasparov.pgn', '../resources/games/karpov.pgn']
+    pgns2 = ['../resources/games/tal.pgn', '../resources/games/botvinnik.pgn', '../resources/games/smyslov.pgn', '../resources/games/kasparov.pgn', '../resources/games/karpov.pgn']
     pgnsTest = ['../resources/games/kasparov.pgn', '../resources/games/karpov.pgn']
     """
     data = countForcingMoves(pgns)
@@ -232,11 +235,15 @@ if __name__ == '__main__':
     """
     # global DIAGONALS = generateDiagonals()
     players = ['Alekhine', 'Capablanca', 'Tal', 'Botvinnik', 'Smyslov', 'Kasparov', 'Karpov']
+    players2 = ['Tal', 'Botvinnik', 'Smyslov', 'Kasparov', 'Karpov']
     plotData = list()
     # fMoveData = getForcingMovesPerPlayer(pgnsTest, ['Kasparov', 'Karpov'])
-    data = getForcingMovesByResult(pgns, players)
+    data = getForcingMovesByResult(pgns2, players2)
+    plotData = list()
     for k, v in data.items():
+        plotData.append([v[0][0]/v[0][1], v[1][0]/v[1][1], v[2][0]/v[2][1], v[3][0]/v[3][1]])
         print(k, f'W: {round(v[0][0]/v[0][1], 3)}', f'D: {round(v[1][0]/v[1][1], 3)}', f'L: {round(v[2][0]/v[2][1], 3)}')
+    plotting_helper.plotPlayerBarChart(plotData, players2, 'Relative number of forcing moves', 'Relative number of forcing moves for different results', ['Wins', 'Draws', 'Losses', 'Overall'], colors=plotting_helper.getColors(['green', 'yellow', 'red', 'blue']), filename='../out/forcingMovesResults.png')
     """
     fMoveData = getForcingMovesPerPlayer(pgns, players)
     for k, v in fMoveData.items():
