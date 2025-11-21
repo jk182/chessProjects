@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 
 def getAllColors() -> dict:
@@ -17,6 +18,8 @@ def getAllColors() -> dict:
     colors['lightred'] = '#FD8A8A'
     colors['violet'] = '#85586F'
     colors['yellow'] = '#f7cf77'
+    colors['grey'] = '#758A93'
+    colors['darkgreen'] = '#5D866C'
 
     colors['much better'] = '#4ba35a'
     colors['slightly better'] = '#9cf196'
@@ -142,23 +145,27 @@ def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list
 
     for i, d in enumerate(data):
         # ax.plot([(j+1)/2 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
-        ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
+        ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i], linewidth=1.5)
         xMax = max(xMax, len(d)//2)
         yMin = min(yMin, min(d))
         yMax = max(yMax, max(d))
 
+    yMin = min(0.5, yMin-0.01)
     ax.legend()
     # ax.set_xlim(xMin, xMax)
     # ax.set_ylim(yMin-0.5, yMax+0.5)
-    # ax.set_ylim(0, yMax+0.01)
+    ax.set_ylim(yMin, 1)
     if xTicks is not None:
         ax.set_xlim(1, len(data[-1]))
-        ax.set_xticks([j+1 for j in range(len(data[-1]))])
-        ax.set_xticklabels(xTicks)
+        # ax.set_xticks([j+1 for j in range(len(data[-1]))])
+        # ax.set_xticklabels(xTicks)
+        ax.xaxis.set_major_locator(ticker.LinearLocator(11))
+        ax.xaxis.set_minor_locator(ticker.LinearLocator(21))
+        ax.set_xticklabels([f'+{t/100}' for t in xTicks if t%100 == 0])
     plt.title(title)
     if hlineHeight is not None:
         plt.axhline(hlineHeight, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=400)
