@@ -8,6 +8,8 @@ from os.path import isfile, join
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import plotting_helper
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 
 def changeRoundNumbers(inFile: str, outFile: str):
@@ -599,6 +601,42 @@ def plotUpsetsByRound(matchData: dict, rounds: list, years: list = [2021, 2023, 
     plotting_helper.plotPlayerBarChart(plotData, ['Round 1', 'Round 2', 'Round 3'], 'Number of upsets', 'Number of upsets in the first three rounds in 2021, 2023 and 2025', years, filename='../out/wcUpsets.png')
 
 
+def setupAxes(ax, maxPlayers=206):
+    ax.yaxis.set_major_locator(ticker.NullLocator())
+    ax.spines[['left', 'right', 'top']].set_visible(False)
+    ax.set_xlim(0, maxPlayers+1)
+    ax.set_ylim(-1, 1)
+
+
+def fadeBetweenColors(startColor: tuple, endColor: tuple, steps: int) -> list:
+    gradient = list()
+    diff = (endColor[0]-startColor[0], endColor[1]-startColor[1], endColor[2]-startColor[2])
+    for i in range(steps):
+        c = list()
+        for j in range(3):
+            c.append((startColor[j]+diff[j]*i/steps)/255)
+        gradient.append(tuple(c))
+    return gradient
+
+
+def plotPlayerSeeds(df: pd.DataFrame, year: str, nRounds: int = 8):
+    seedingData = seedingAnalysis(df)
+    plotData = list()
+    for k, v in sorted(seedingData.items()):
+        if year in k:
+            plotData.append(list(sorted(v)))
+            print(len(v), k, sorted(v))
+
+    gradient = fadeBetweenColors((104, 156, 242), (248, 169, 88), 206)
+    gradient = fadeBetweenColors((247, 223, 119), (133, 88, 111), 206)
+    fig, ax = plt.subplots(nRounds, 1, figsize=(10, 6), layout='constrained')
+    for i in range(nRounds):
+        setupAxes(ax[i])
+        colors = [gradient[j-1] for j in plotData[i]]
+        ax[i].scatter(plotData[i], [0] * len(plotData[i]), s=5, c=colors)
+
+    plt.show()
+
 
 if __name__ == '__main__':
     # changeRoundNumbers('../resources/wcupW23Bad.pgn', '../resources/worldCups/wcupW23.pgn')
@@ -607,7 +645,13 @@ if __name__ == '__main__':
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-1_CBWLKDSY_2025.11.03.pgn', '../resources/worldCups/wcup25.pgn', 1)
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-2_C8xGMEpX_2025.11.06.pgn', '../resources/worldCups/wcup25.pgn', 2, 8)
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-3_sOK6GBCf_2025.11.09.pgn', '../resources/worldCups/wcup25.pgn', 3, 19)
-    df = extractData(pgns)
+
+    outFile = '../out/worldCupData.pkl'
+    # df = extractData(pgns)
+    # df.to_pickle(outFile)
+    # df = pd.read_pickle(outFile)
+    df = extractData(['../resources/worldCups/wcup23.pgn'])
+    plotPlayerSeeds(df, '23')
     # analyseGameResults(df)
     # Seeding data
     """
@@ -618,9 +662,9 @@ if __name__ == '__main__':
         print(k, sorted(v))
     """
 
-    matchData = getMatchData(df)
+    # matchData = getMatchData(df)
     # plotUpsetsByRound(matchData, [1, 2, 3])
-    getUpsetData(matchData)
+    # getUpsetData(matchData)
     # tiebreakImpact(matchData)
     # Having white in the first game
     # resultsByRatingGap(df)

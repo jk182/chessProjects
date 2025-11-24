@@ -142,4 +142,4 @@ def extractAnalysedGames(ratings: list, gamesPerBand: int, timeControls: list, m
 # extractGamesByRating([1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600], 5000)
 # extractGamesByRating([2600, 2700], 5000, maxRatingDiff=80)
 # extractAnalysedGames([1200, 1600, 2000, 2400], 2000, ["60+0", "180+0", "300+0", "600+0"])
-extractAnalysedGames([2600], 3000, ["60+0", "120+1", "180+0", "180+2", "300+0", "300+3", "600+0"])
+extractAnalysedGames([1200, 1600, 2000, 2200], 3000, ["600+0", "600+5", "900+10"])

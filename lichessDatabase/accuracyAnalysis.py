@@ -161,25 +161,27 @@ def plotOpeningData(groupedOpeningData: dict, ratings: list, timeControls: list)
         plottingData = list()
         for tc in timeControls:
             plottingData.append(list(groupedOpeningData[rating][tc].values()))
-        plotting_helper.plotLineChart(plottingData, 'Evaluation', 'Score', f'Score of {rating} rated players in different time controls based on evaluation', [f'{int(tc.split("+")[0])//60}+{tc.split("+")[1]}' for tc in timeControls], xTicks=[50*i for i in range(len(plottingData[0]))], colors=colors, filename=f'../out/openingAdv/rating{rating}.png')
+        plotting_helper.plotLineChart(plottingData, 'Evaluation', 'Score', f'Score of {rating} rated players in different time controls based on evaluation', [f'{int(tc.split("+")[0])//60}+{tc.split("+")[1]}' for tc in timeControls], xTicks=[50*i for i in range(len(plottingData[0]))], colors=colors)# , filename=f'../out/openingAdv/rating{rating}.png')
 
 
 if __name__ == '__main__':
     basePath = '../out/lichessDB/analysed_300g_rating'
     ratings = [1200, 1600, 2000, 2200, 2400]
+    r2 = [1200, 1600, 2000, 2200]
     r1200 = [1200]
     timeControls = ["60+0", "180+0", "300+0", "600+0"]
     tc2 = ["60+0", "120+1", "180+0", "180+2", "300+0", "300+3"]
+    tc3 = ["120+1", "180+0", "180+2", "300+0", "300+3", "600+0", "600+5", "900+10"]
 
     """
-    openingData = openingAdvantage(basePath, ratings, tc2, targetMove=10)
-    with open('../out/openingDataMove10.pkl', 'wb+') as f:
+    openingData = openingAdvantage(basePath, r2, tc3, targetMove=10)
+    with open('../out/openingDataMove10-2.pkl', 'wb+') as f:
         pickle.dump(openingData, f)
     """
-    with open('../out/openingDataMove10.pkl', 'rb+') as f:
+    with open('../out/openingDataMove10-2.pkl', 'rb+') as f:
         openingData = pickle.load(f)
-    groupedOpeningData = groupOpeningData(openingData, tc2, nGroups=21)
-    plotOpeningData(groupedOpeningData, ratings, tc2)
+    groupedOpeningData = groupOpeningData(openingData, tc3, nGroups=21)
+    plotOpeningData(groupedOpeningData, ratings, tc3)
     # with open('../out/lichessAcc.pkl', 'rb') as f:
         # accData = pickle.load(f)
 
