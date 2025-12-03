@@ -7,6 +7,7 @@ from os import listdir
 from os.path import isfile, join
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
 import plotting_helper
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -54,7 +55,7 @@ def changeRoundNumbers2025(inFile: str, outFile: str, roundNr: int, gameNrOffset
 
 def extractData(pgnPaths: list) -> pd.DataFrame:
     data = dict()
-    keys = ["Match", "Round", "GameNr", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "Result"]
+    keys = ["Match", "Round", "GameNr", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "Result", "Opening"]
 
     for key in keys:
         data[key] = list()
@@ -92,9 +93,10 @@ def extractData(pgnPaths: list) -> pd.DataFrame:
 
                 data["Match"].append(matchName)
                 data["Round"].append(int(header["Round"].split(".")[0]))
-                data["GameNr"].append(int(header["Round"][-1]))
+                data["GameNr"].append(int(header["Round"].split(".")[-1]))
                 data["White"].append(header["White"])
                 data["Black"].append(header["Black"])
+                data["Opening"].append(header["Opening"])
                 if "WhiteElo" in header.keys():
                     data["WhiteElo"].append(int(header["WhiteElo"]))
                 else:
@@ -120,9 +122,8 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
     gameData: pd.DataFrame
         The DataFrame created by the extractData method
     """
-    # TODO: can color sequence change in tiebreaks?
     matchData = dict()
-    keys = ["Match", "Round", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "GameResults", "MatchResult", "Tiebreak", "WhitePlayers"]
+    keys = ["Match", "Round", "White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed", "GameResults", "MatchResult", "Tiebreak", "WhitePlayers", "Openings"]
 
     for i, row in df.iterrows():
         match = row["Match"]
@@ -131,6 +132,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
             matchData[match]["Round"] = row["Round"]
             matchData[match]["GameResults"] = list()
             matchData[match]["WhitePlayers"] = list()
+            matchData[match]["Openings"] = list()
         gameNr = row["GameNr"]
         if gameNr == 1:
             for k in ["White", "Black", "WhiteElo", "BlackElo", "WhiteSeed", "BlackSeed"]:
@@ -139,6 +141,7 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
         if gameNr <= len(matchData[match]["GameResults"]):
             matchData[match]["GameResults"][gameNr-1] = row["Result"]
             matchData[match]["WhitePlayers"][gameNr-1] = row["White"]
+            matchData[match]["Openings"][gameNr-1] = row["Opening"]
         else:
             l = [0] * (gameNr - len(matchData[match]["GameResults"]))
             l[gameNr - len(matchData[match]["GameResults"]) - 1] = row["Result"]
@@ -148,13 +151,20 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
             l2[gameNr - len(matchData[match]["WhitePlayers"]) - 1] = row["White"]
             matchData[match]["WhitePlayers"].extend(l2)
 
+            l3 = [0] * (gameNr - len(matchData[match]["Openings"]))
+            l3[gameNr - len(matchData[match]["Openings"]) - 1] = row["Opening"]
+            matchData[match]["Openings"].extend(l3)
+
     for match in matchData.keys():
+        """
+        # deprecated
         for i in range(2, len(matchData[match]["GameResults"]), 2):
             if matchData[match]["WhitePlayers"][i] != matchData[match]["WhitePlayers"][0] and i < len(matchData[match]["GameResults"])-1:
                 r = matchData[match]["GameResults"][i]
                 matchData[match]["GameResults"][i] = matchData[match]["GameResults"][i+1]
                 matchData[match]["GameResults"][i+1] = r
-                
+        """
+
         gameResults = matchData[match]["GameResults"]
         if len(gameResults) > 2: # TODO: some finals were 4 games
             matchData[match]["Tiebreak"] = True
@@ -165,9 +175,9 @@ def getMatchData(gameData: pd.DataFrame) -> dict:
             if result == "1/2-1/2":
                 wPoints += 0.5
                 continue
-            if i % 2 == 0 and result == "1-0":
+            if matchData[match]["WhitePlayers"][i] == matchData[match]["White"] and result == "1-0":
                 wPoints += 1
-            elif i % 2 == 1 and result == "0-1":
+            elif matchData[match]["WhitePlayers"][i] == matchData[match]["Black"] and result == "0-1":
                 wPoints += 1
         if wPoints > len(gameResults) / 2:
             matchData[match]["MatchResult"] = "1-0"
@@ -580,16 +590,18 @@ def getUpsetData(matchData: dict):
     print([d/sum(data) for d in data])
 
 
-def plotUpsetsByRound(matchData: dict, rounds: list, years: list = [2021, 2023, 2025]):
+def plotUpsetsByRound(matchData: dict, rounds: list = None, eloDiff: int = 75, years: list = [2021, 2023, 2025], filename: str = None):
     upsetData = dict()
+    if rounds is None:
+        rounds = [r+1 for r in range(8)]
     for r in rounds:
         upsetData[r] = [0] * len(years)
 
     for match, data in matchData.items():
         if int(f'20{match[-2:]}') in years:
-            if data['Round'] not in rounds:
+            if rounds is not None and data['Round'] not in rounds:
                 continue
-            if (data["MatchResult"] == "1-0" and data["WhiteElo"]-data["BlackElo"] <= -75) or (data["MatchResult"] == "0-1" and data["BlackElo"]-data["WhiteElo"] <= -75):
+            if (data["MatchResult"] == "1-0" and data["WhiteElo"]-data["BlackElo"] <= -eloDiff) or (data["MatchResult"] == "0-1" and data["BlackElo"]-data["WhiteElo"] <= -eloDiff):
                 print(match, data["Round"], data["GameResults"])
                 yIndex = years.index(int(f'20{match[-2:]}'))
                 upsetData[data["Round"]][yIndex] += 1
@@ -598,7 +610,7 @@ def plotUpsetsByRound(matchData: dict, rounds: list, years: list = [2021, 2023, 
     for data in upsetData.values():
         plotData.append(list(data))
 
-    plotting_helper.plotPlayerBarChart(plotData, ['Round 1', 'Round 2', 'Round 3'], 'Number of upsets', 'Number of upsets in the first three rounds in 2021, 2023 and 2025', years, filename='../out/wcUpsets.png')
+    plotting_helper.plotPlayerBarChart(plotData, [f'Round {i+1}' for i in range(len(plotData))], 'Number of upsets', 'Number of upsets in the first three rounds in 2021, 2023 and 2025', years, filename=filename)
 
 
 def setupAxes(ax, maxPlayers=206):
@@ -638,6 +650,306 @@ def plotPlayerSeeds(df: pd.DataFrame, year: str, nRounds: int = 8):
     plt.show()
 
 
+def getAccuracies(pgnPath: str) -> dict:
+    mate_score = 10000
+    accData = dict()
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+            roundNr = int(game.headers["Round"][0])
+            gameNr = int(game.headers["Round"][-1])
+
+            lastEval = None
+            xsLosses = [list(), list()]
+
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+                if node.eval() is None:
+                    lastEval = None
+                    continue
+                currentEval = node.eval().white().score(mate_score = mate_score)
+
+                if lastEval is None:
+                    lastEval = currentEval
+                    continue
+
+                if not node.turn():
+                    xsLoss = max(0, functions.expectedScore(lastEval)-functions.expectedScore(currentEval))
+                    xsLosses[0].append(xsLoss)
+                else:
+                    xsLoss = max(0, functions.expectedScore(-1*lastEval)-functions.expectedScore(-1*currentEval))
+                    xsLosses[1].append(xsLoss)
+
+                lastEval = currentEval
+
+            for i, player in enumerate([white, black]):
+                if len(xsLosses[i]) == 0:
+                    print(game)
+                    xsLoss = (0, 0)
+                else:
+                    xsLoss = (float(functions.gameAccuracy(float(sum(xsLosses[i])/len(xsLosses[i])))), len(xsLosses[i]))
+                if player not in accData.keys():
+                    accData[player] = dict()
+                if roundNr in accData[player].keys():
+                    accData[player][roundNr].append(xsLoss)
+                else:
+                    accData[player][roundNr] = [xsLoss]
+    overallData = dict()
+    for player, d in accData.items():
+        overallData[player] = list()
+        classicalAcc = list()
+        rapidAcc = list()
+        blitzAcc = list()
+        for a in d.values():
+            totalAcc = 0
+            totalMoves = 0
+            for i, x in enumerate(a):
+                totalAcc += x[0]*x[1]
+                totalMoves += x[1]
+                if i == 1:
+                    classicalAcc.append((totalAcc, totalMoves))
+                    totalAcc = 0
+                    totalMoves = 0
+                if i == 5:
+                    rapidAcc.append((totalAcc, totalMoves))
+                    totalAcc = 0
+                    totalMoves = 0
+                if i == len(a)-1 and i != 5 and totalMoves > 0: 
+                    if i < 5:
+                        rapidAcc.append((totalAcc, totalMoves))
+                    else:
+                        blitzAcc.append((totalAcc, totalMoves))
+        for tcAcc in [classicalAcc, rapidAcc, blitzAcc]:
+            if len(tcAcc) > 0:
+                if tcAcc[0][-1] == 0:
+                    overallData[player].append(0)
+                else:
+                    overallData[player].append(sum([b[0] for b in tcAcc])/sum([b[1] for b in tcAcc]))
+    return overallData
+
+
+def getScoreInBetterAndWorseGames(pgnPath: str, cpCutoff: int = 100) -> dict:
+    mate_score = 10000
+    data = dict()
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            for player in [white, black]:
+                if player not in data.keys():
+                    data[player] = dict()
+                    # for each time control, there is a list with the WDL
+                    data[player]["better"] = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+                    data[player]["worse"] = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+
+            result = game.headers["Result"]
+            if result == "1-0":
+                resultIndex = 0
+            elif result == "1/2-1/2":
+                resultIndex = 1
+            elif result == "0-1":
+                resultIndex = 2
+            else:
+                print(f'Result {result} not found!')
+
+            gameNr = int(game.headers["Round"][-1])
+            if gameNr <= 2:
+                tcIndex = 0
+            elif gameNr <= 6:
+                tcIndex = 1
+            else:
+                tcIndex = 2
+            wBetter = False
+            bBetter = False
+
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+                if node.eval() is None:
+                    continue
+                cp = node.eval().white().score(mate_score=mate_score)
+                if cp > cpCutoff:
+                    wBetter = True
+                if cp < -cpCutoff:
+                    bBetter = True
+                if wBetter and bBetter:
+                    break
+            
+            if wBetter:
+                data[white]["better"][tcIndex][resultIndex] += 1
+                data[black]["worse"][tcIndex][2-resultIndex] += 1
+            if bBetter:
+                data[white]["worse"][tcIndex][resultIndex] += 1
+                data[black]["better"][tcIndex][2-resultIndex] += 1
+    return data
+
+
+def getOpenings(pgnPath: str) -> dict:
+    openings = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            opening = game.headers["Opening"].split(':')[0]
+            roundNr = int(game.headers["Round"][0])
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            for player in [white, black]:
+                if player not in openings.keys():
+                    openings[player] = dict()
+
+            if roundNr not in openings[white].keys():
+                openings[white][roundNr] = [[opening, None]]
+            elif openings[white][roundNr][-1][0] is None:
+                openings[white][roundNr][-1][0] = opening
+            else:
+                openings[white][roundNr].append([opening, None])
+
+            if roundNr not in openings[black].keys():
+                openings[black][roundNr] = [[None, opening]]
+            elif openings[black][roundNr][-1][1] is None:
+                openings[black][roundNr][-1][1] = opening
+            else:
+                openings[black][roundNr].append([None, opening])
+    return openings
+
+
+def getNumberOfGamesAndMoves(pgnPath: str) -> dict:
+    data = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+            gameNr = int(game.headers["Round"][-1])
+            if gameNr <= 2:
+                tcIndex = 0
+            elif gameNr <= 6:
+                tcIndex = 1
+            else:
+                tcIndex = 2
+
+            for player in [white, black]:
+                if player not in data.keys():
+                    data[player] = [[0, 0], [0, 0], [0, 0]]
+                moves = len(list(game.mainline_moves()))//2
+                data[player][tcIndex][0] += 1
+                data[player][tcIndex][1] += moves
+    return data
+
+
+def getMustWinResults(matchData: dict) -> dict:
+    mustWinData = dict()
+    for match, row in matchData.items():
+        white = row["White"]
+        black = row["Black"]
+        for player in [white, black]:
+            if player not in mustWinData.keys():
+                mustWinData[player] = [[0, 0], [0, 0], [0, 0], [0, 0]] # classical, rapid, blitz, armageddon
+        for i, result in enumerate(row["GameResults"]):
+            if i == 0:
+                tcIndex = 0
+            elif i == 2 or i == 4:
+                tcIndex = 1
+            elif i == 6 or i == 8:
+                tcIndex = 2
+            elif i == 9:
+                mustWinData[row["WhitePlayers"][i]][3][1] += 1
+                if result == "1-0":
+                    mustWinData[row["WhitePlayers"][i]][3][0] += 1
+                break
+            else:
+                continue
+            if result == "1/2-1/2":
+                continue
+            if result == "1-0":
+                if row["WhitePlayers"][i] == white:
+                    mwPlayer = black
+                else:
+                    mwPlayer = white
+            else:
+                mwPlayer = row["WhitePlayers"][i]
+            mustWinData[mwPlayer][tcIndex][1] += 1
+            print(row["GameResults"])
+            if row["GameResults"][i+1] == result:
+                mustWinData[mwPlayer][tcIndex][0] += 1
+    return mustWinData
+
+
+def getPerformanceRatings(matchData: dict) -> dict:
+    ratingSums = dict()
+    for match, row in matchData.items():
+        white = row["White"]
+        black = row["Black"]
+        wElo = row["WhiteElo"]
+        bElo = row["BlackElo"]
+        wPoints = [1 if result == "1-0" else 0.5 if result == "1/2-1/2" else 0 for result in row["GameResults"]]
+
+        for player in [white, black]:
+            if player not in ratingSums.keys():
+                ratingSums[player] = [[0, 0], [0, 0], [0, 0], [0, 0]]
+
+        ratingSums[white][0][0] += bElo
+        ratingSums[white][0][1] += 1
+        ratingSums[black][0][0] += wElo
+        ratingSums[black][0][1] += 1
+
+        for i, wp in enumerate(wPoints):
+            if i < 2:
+                tcIndex = 1
+            elif i < 6:
+                tcIndex = 2
+            else:
+                tcIndex = 3
+            
+            if row["WhitePlayers"][i] == white:
+                whitePoints = wp
+                blackPoints = 1-wp
+            else:
+                whitePoints = 1-wp
+                blackPoints = wp
+            ratingSums[white][tcIndex][0] += bElo+800*(whitePoints-0.5)
+            ratingSums[white][tcIndex][1] += 1
+            ratingSums[black][tcIndex][0] += wElo+800*(blackPoints-0.5)
+            ratingSums[black][tcIndex][1] += 1
+    perfRatings = dict()
+    for player, eloData in ratingSums.items():
+        perfRatings[player] = list()
+        for d in eloData:
+            if d[1] > 0:
+                perfRatings[player].append(d[0]/d[1])
+            else:
+                perfRatings[player].append(0)
+    return perfRatings
+
+
+def getPlayerOpenings(matchData: dict) -> dict:
+    openings = dict()
+    for match, row in matchData.items():
+        white = row["White"]
+        black = row["Black"]
+        roundNr = row["Round"]
+
+        for player in [white, black]:
+            if player not in openings.keys():
+                openings[player] = dict()
+        
+        openings[white][roundNr] = [(opening, 'White') if row["WhitePlayers"][i] == white else (opening, "Black") for i, opening in enumerate(row["Openings"])]
+        openings[black][roundNr] = [(opening, 'White') if row["WhitePlayers"][i] == black else (opening, "Black") for i, opening in enumerate(row["Openings"])]
+    return openings
+
+
+def plotPlayerCharts(matchData: dict, players: list):
+    perfRatings = getPerformanceRatings(matchData)
+    PRplotData = list()
+    for player in players:
+        PRplotData.append(perfRatings[player])
+    plotting_helper.plotPlayerBarChart(PRplotData, players, 'Rating', 'Opponent and performance rating', ['Avg opponent rating', 'PR classical', 'PR rapid', 'PR blitz'])
+
+
 if __name__ == '__main__':
     # changeRoundNumbers('../resources/wcupW23Bad.pgn', '../resources/worldCups/wcupW23.pgn')
     worldCups = '../resources/worldCups/'
@@ -645,13 +957,53 @@ if __name__ == '__main__':
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-1_CBWLKDSY_2025.11.03.pgn', '../resources/worldCups/wcup25.pgn', 1)
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-2_C8xGMEpX_2025.11.06.pgn', '../resources/worldCups/wcup25.pgn', 2, 8)
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-3_sOK6GBCf_2025.11.09.pgn', '../resources/worldCups/wcup25.pgn', 3, 19)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-4_xLyRWYPA_2025.11.13.pgn', '../resources/worldCups/wcup25.pgn', 4, 30)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--round-5_zb9ruNEJ_2025.11.16.pgn', '../resources/worldCups/wcup25.pgn', 5, 41)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--quarterfinals_4Zfj97D4_2025.11.19.pgn', '../resources/worldCups/wcup25.pgn', 6, 49)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--semifinals_25zoKzpI_2025.11.23.pgn', '../resources/worldCups/wcup25.pgn', 7, 55)
+    # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--finals_DqmmnYSq_2025.11.26.pgn', '../resources/worldCups/wcup25.pgn', 8, 59)
 
-    outFile = '../out/worldCupData.pkl'
-    # df = extractData(pgns)
+    outFile = '../out/worldCupData21-25.pkl'
+    df = extractData(['../resources/worldCups/wcup25.pgn'])
     # df.to_pickle(outFile)
     # df = pd.read_pickle(outFile)
-    df = extractData(['../resources/worldCups/wcup23.pgn'])
-    plotPlayerSeeds(df, '23')
+    # df = extractData(['../resources/worldCups/wcup25.pgn'])
+    # plotPlayerSeeds(df, '25')
+    matchData = getMatchData(df)
+    for k, v in matchData.items():
+        print(k, v)
+    mwd = getMustWinResults(matchData)
+    for k, v in dict(sorted(mwd.items(), key=lambda x: sum([x[1][i][0] for i in range(len(x[1]))]))).items():
+        print(k, v)
+    # plotPlayerCharts(matchData, ['Yakubboev, Nodirbek', 'Esipenko, Andrey', 'Wei, Yi', 'Sindarov, Javokhir'])
+    openings = getPlayerOpenings(matchData)
+    for k, v in openings.items():
+        print(k, v)
+    # plotUpsetsByRound(matchData, eloDiff=50)
+    # plotUpsetsByRound(matchData, eloDiff=75)
+    # plotUpsetsByRound(matchData, eloDiff=100)
+    """
+    accuracies = getAccuracies('../resources/worldCups/wcup25.pgn') 
+    for i, (k, v) in enumerate(dict(sorted(accuracies.items(), key=lambda item: item[1])).items()):
+        print(len(accuracies)-i, k, v)
+    """
+
+    """
+    for k, v in getScoreInBetterAndWorseGames('../resources/worldCups/wcup25.pgn').items():
+        print(k, v)
+    for k, v in getOpenings('../resources/worldCups/wcup25.pgn').items():
+        print(k, v)
+    """
+    """
+    nMoveData = getNumberOfGamesAndMoves('../resources/worldCups/wcup25.pgn')
+    for k, v in dict(sorted(nMoveData.items(), key=lambda x: sum([y[1] for y in x[1]]))).items():
+        print(k, v)
+    """
+    """
+    perfRatings = getPerformanceRatings(matchData)
+    for k, v in perfRatings.items():
+        print(k, v)
+    """
     # analyseGameResults(df)
     # Seeding data
     """
@@ -662,7 +1014,6 @@ if __name__ == '__main__':
         print(k, sorted(v))
     """
 
-    # matchData = getMatchData(df)
     # plotUpsetsByRound(matchData, [1, 2, 3])
     # getUpsetData(matchData)
     # tiebreakImpact(matchData)
