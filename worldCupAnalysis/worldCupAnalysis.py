@@ -11,6 +11,7 @@ import functions
 import plotting_helper
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import numpy as np
 
 
 def changeRoundNumbers(inFile: str, outFile: str):
@@ -96,7 +97,10 @@ def extractData(pgnPaths: list) -> pd.DataFrame:
                 data["GameNr"].append(int(header["Round"].split(".")[-1]))
                 data["White"].append(header["White"])
                 data["Black"].append(header["Black"])
-                data["Opening"].append(header["Opening"])
+                if "Opening" in header.keys():
+                    data["Opening"].append(header["Opening"])
+                else:
+                    data["Opening"].append("No Opening")
                 if "WhiteElo" in header.keys():
                     data["WhiteElo"].append(int(header["WhiteElo"]))
                 else:
@@ -602,7 +606,7 @@ def plotUpsetsByRound(matchData: dict, rounds: list = None, eloDiff: int = 75, y
             if rounds is not None and data['Round'] not in rounds:
                 continue
             if (data["MatchResult"] == "1-0" and data["WhiteElo"]-data["BlackElo"] <= -eloDiff) or (data["MatchResult"] == "0-1" and data["BlackElo"]-data["WhiteElo"] <= -eloDiff):
-                print(match, data["Round"], data["GameResults"])
+                print(match, data["Round"], data["MatchResult"], data["WhitePlayers"][0])
                 yIndex = years.index(int(f'20{match[-2:]}'))
                 upsetData[data["Round"]][yIndex] += 1
 
@@ -615,9 +619,11 @@ def plotUpsetsByRound(matchData: dict, rounds: list = None, eloDiff: int = 75, y
 
 def setupAxes(ax, maxPlayers=206):
     ax.yaxis.set_major_locator(ticker.NullLocator())
+    # ax.xaxis.set_major_locator(ticker.NullLocator())
     ax.spines[['left', 'right', 'top']].set_visible(False)
     ax.set_xlim(0, maxPlayers+1)
     ax.set_ylim(-1, 1)
+    ax.set_xticks([1, 25, 50, 75, 100, 125, 150, 175, 200, 206])
 
 
 def fadeBetweenColors(startColor: tuple, endColor: tuple, steps: int) -> list:
@@ -631,7 +637,7 @@ def fadeBetweenColors(startColor: tuple, endColor: tuple, steps: int) -> list:
     return gradient
 
 
-def plotPlayerSeeds(df: pd.DataFrame, year: str, nRounds: int = 8):
+def plotPlayerSeeds(df: pd.DataFrame, year: str, nRounds: int = 8, fillUpFirstRound: bool = True, filename: str = None):
     seedingData = seedingAnalysis(df)
     plotData = list()
     for k, v in sorted(seedingData.items()):
@@ -639,15 +645,49 @@ def plotPlayerSeeds(df: pd.DataFrame, year: str, nRounds: int = 8):
             plotData.append(list(sorted(v)))
             print(len(v), k, sorted(v))
 
+    if fillUpFirstRound:
+        maxPlayers = 206
+        plotData[0] = list(range(1, maxPlayers+1))
+
+    # all remaining seeds
     gradient = fadeBetweenColors((104, 156, 242), (248, 169, 88), 206)
     gradient = fadeBetweenColors((247, 223, 119), (133, 88, 111), 206)
-    fig, ax = plt.subplots(nRounds, 1, figsize=(10, 6), layout='constrained')
-    for i in range(nRounds):
+    gradient = fadeBetweenColors((104, 156, 242), (133, 88, 111), 206)
+    fig, ax = plt.subplots(nRounds-1, 1, figsize=(10, 6), layout='constrained')
+    fig.suptitle('Remaining seeds before each round')
+    fig.patch.set_facecolor(plotting_helper.getColor('background'))
+    for i in range(nRounds-1):
         setupAxes(ax[i])
         colors = [gradient[j-1] for j in plotData[i]]
-        ax[i].scatter(plotData[i], [0] * len(plotData[i]), s=5, c=colors)
+        ax[i].scatter(plotData[i], [0] * len(plotData[i]), s=8, c=colors)
+        ax[i].set_facecolor(plotting_helper.getColor('background'))
+        ax[i].set_title(f'Round {i+1}')
 
-    plt.show()
+    # line graph
+    """
+    plotData = plotData[:-1]
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(plotting_helper.getColor('background'))
+    ax.plot(range(1, len(plotData)+1), [max(seed) for seed in plotData], label='Highest seed', color=plotting_helper.getColor('purple'))
+    ax.plot(range(1, len(plotData)+1), [min(seed) for seed in plotData], label='Lowest seed', color=plotting_helper.getColor('blue'))
+    # ax.plot(range(1, len(plotData)+1), [np.percentile(seed, 25) for seed in plotData], label='Q1')
+    ax.plot(range(1, len(plotData)+1), [np.percentile(seed, 50) for seed in plotData], label='Mean seed', color=plotting_helper.getColor('orange'))
+    # ax.plot(range(1, len(plotData)+1), [np.percentile(seed, 75) for seed in plotData], label='Q3')
+    plt.title('Lowest, mean and highest seed in each round')
+    ax.legend()
+
+    ax.set_xlim(1, nRounds-1)
+    ax.set_ylim(0.1, 206)
+    ax.set_yticks([1, 25, 50, 75, 100, 125, 150, 175, 200, 206])
+    ax.set_xlabel('Round')
+    ax.set_ylabel('Player seed')
+    ax.yaxis.set_inverted(True)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    """
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
 
 
 def getAccuracies(pgnPath: str) -> dict:
@@ -687,7 +727,7 @@ def getAccuracies(pgnPath: str) -> dict:
 
             for i, player in enumerate([white, black]):
                 if len(xsLosses[i]) == 0:
-                    print(game)
+                    # print(game)
                     xsLoss = (0, 0)
                 else:
                     xsLoss = (float(functions.gameAccuracy(float(sum(xsLosses[i])/len(xsLosses[i])))), len(xsLosses[i]))
@@ -728,6 +768,8 @@ def getAccuracies(pgnPath: str) -> dict:
                     overallData[player].append(0)
                 else:
                     overallData[player].append(sum([b[0] for b in tcAcc])/sum([b[1] for b in tcAcc]))
+            else:
+                overallData[player].append(0)
     return overallData
 
 
@@ -942,12 +984,37 @@ def getPlayerOpenings(matchData: dict) -> dict:
     return openings
 
 
-def plotPlayerCharts(matchData: dict, players: list):
+def plotPlayerCharts(matchData: dict, players: list, pgnPath: str):
     perfRatings = getPerformanceRatings(matchData)
     PRplotData = list()
     for player in players:
         PRplotData.append(perfRatings[player])
     plotting_helper.plotPlayerBarChart(PRplotData, players, 'Rating', 'Opponent and performance rating', ['Avg opponent rating', 'PR classical', 'PR rapid', 'PR blitz'])
+
+    gameAccuracies = getAccuracies(pgnPath)
+    accPlotData = list()
+    for player in players:
+        accPlotData.append(gameAccuracies[player])
+    plotting_helper.plotPlayerBarChart(accPlotData, players, 'Accuracy', 'Accuracy in different time controls', ['Classical', 'Rapid', 'Blitz'])
+
+
+def getOpeningRepeats(matchData: dict):
+    openingData = [0, 0]
+    for match, data in matchData.items():
+        if data["Tiebreak"]:
+            openings = [opening.split(':')[0] for opening in data["Openings"]]
+            if data["WhitePlayers"][0] == data["WhitePlayers"][2]:
+                if openings[0] == openings[2]:
+                    openingData[0] += 1
+                if openings[1] == openings[3]:
+                    openingData[1] += 1
+            else:
+                if openings[0] == openings[3]:
+                    openingData[0] += 1
+                if openings[1] == openings[2]:
+                    openingData[0] += 1
+            openingData[1] += 2
+    return openingData
 
 
 if __name__ == '__main__':
@@ -964,23 +1031,33 @@ if __name__ == '__main__':
     # changeRoundNumbers2025('/Users/julian/Desktop/lichess_broadcast_fide-world-cup-2025--finals_DqmmnYSq_2025.11.26.pgn', '../resources/worldCups/wcup25.pgn', 8, 59)
 
     outFile = '../out/worldCupData21-25.pkl'
-    df = extractData(['../resources/worldCups/wcup25.pgn'])
+    # df = extractData(['../resources/worldCups/wcup21.pgn', '../resources/worldCups/wcup23.pgn', '../resources/worldCups/wcup25.pgn'])
     # df.to_pickle(outFile)
     # df = pd.read_pickle(outFile)
-    # df = extractData(['../resources/worldCups/wcup25.pgn'])
-    # plotPlayerSeeds(df, '25')
+    df = extractData(['../resources/worldCups/wcup25.pgn'])
     matchData = getMatchData(df)
+    print(getOpeningRepeats(matchData))
+    # Plots for post about 2025
+    """
+    """
+    # plotPlayerCharts(matchData, ['Yakubboev, Nodirbek', 'Esipenko, Andrey', 'Wei, Yi', 'Sindarov, Javokhir'], '../resources/worldCups/wcup25.pgn')
+    # plotUpsetsByRound(matchData, eloDiff=75, filename='../out/wcUpsets.png')
+    # plotPlayerSeeds(df, '21')
+    # plotPlayerSeeds(df, '23')
+    plotPlayerSeeds(df, '25', filename='../out/WCseeds.png')
+
+
+    """
     for k, v in matchData.items():
         print(k, v)
     mwd = getMustWinResults(matchData)
     for k, v in dict(sorted(mwd.items(), key=lambda x: sum([x[1][i][0] for i in range(len(x[1]))]))).items():
         print(k, v)
-    # plotPlayerCharts(matchData, ['Yakubboev, Nodirbek', 'Esipenko, Andrey', 'Wei, Yi', 'Sindarov, Javokhir'])
     openings = getPlayerOpenings(matchData)
     for k, v in openings.items():
         print(k, v)
+    """
     # plotUpsetsByRound(matchData, eloDiff=50)
-    # plotUpsetsByRound(matchData, eloDiff=75)
     # plotUpsetsByRound(matchData, eloDiff=100)
     """
     accuracies = getAccuracies('../resources/worldCups/wcup25.pgn') 
@@ -1014,7 +1091,6 @@ if __name__ == '__main__':
         print(k, sorted(v))
     """
 
-    # plotUpsetsByRound(matchData, [1, 2, 3])
     # getUpsetData(matchData)
     # tiebreakImpact(matchData)
     # Having white in the first game
