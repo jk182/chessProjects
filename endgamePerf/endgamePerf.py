@@ -1,8 +1,9 @@
-import berserk
+# import berserk
 import chess
 from chess import pgn
 import time
 import requests
+import pickle as pkl
 
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -97,14 +98,14 @@ def getEndgameType(board: chess.Board) -> str:
         queen
     """
     pieces = set(board.piece_map().values())
-    pieces.remove(chess.Piece.from_symbol('K'))
-    pieces.remove(chess.Piece.from_symbol('k'))
+    pieces.discard(chess.Piece.from_symbol('K'))
+    pieces.discard(chess.Piece.from_symbol('k'))
 
     if len(pieces) == 0:
         return None
 
-    pieces.remove(chess.Piece.from_symbol('P'))
-    pieces.remove(chess.Piece.from_symbol('p'))
+    pieces.discard(chess.Piece.from_symbol('P'))
+    pieces.discard(chess.Piece.from_symbol('p'))
 
     if len(pieces) == 0:
         return 'pawn'
@@ -125,7 +126,8 @@ def getEndgameType(board: chess.Board) -> str:
 def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
     scores = dict()
     depth = 22
-    with open(pgnPath, 'r') as pgn:
+    timeLimit = 4
+    with open(pgnPath, 'r', encoding='windows-1252') as pgn:
         while game := chess.pgn.read_game(pgn):
             if player in game.headers["White"]:
                 white = True
@@ -151,15 +153,17 @@ def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
             for move in game.mainline_moves():
                 board.push(move)
                 endgame = getEndgameType(board)
-                print(endgame)
                 if endgame == lastEndgame:
                     continue
 
                 if endgame is not None:
-                    endgames.add(endgame)
-                    info = sf.analyse(board, chess.engine.Limit(depth=depth))
+                    info = sf.analyse(board, chess.engine.Limit(time=timeLimit))
+                    if 'wdl' not in info.keys():
+                        print('WDL not found')
+                        print(info)
+                        continue
                     wdl = list(chess.engine.PovWdl.white(info['wdl']))
-                    print(wdl)
+                    endgames.add(endgame)
                     if white:
                         startScore = (wdl[0] + 0.5*wdl[1])/1000
                     else:
@@ -167,8 +171,9 @@ def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
 
                 if lastEndgame is not None:
                     if lastEndgame not in scores.keys():
-                        scores[lastEndgame] = [0, 0]
+                        scores[lastEndgame] = [0, 0, 0]
                     scores[lastEndgame][1] += startScore
+                    scores[lastEndgame][2] += 1
                     if white:
                         scores[lastEndgame][0] += wPoints
                     else:
@@ -179,8 +184,9 @@ def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
             if endgame == lastEndgame and endgame is not None:
                     if lastEndgame is not None:
                         if lastEndgame not in scores.keys():
-                            scores[lastEndgame] = [0, 0]
+                            scores[lastEndgame] = [0, 0, 0]
                         scores[lastEndgame][1] += startScore
+                        scores[lastEndgame][2] += 1
                         if white:
                             scores[lastEndgame][0] += wPoints
                         else:
@@ -189,8 +195,8 @@ def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
 
 
 if __name__ == '__main__':
-    with open('../resources/tbToken', 'r') as tokenFile:
-        token = tokenFile.read().strip()
+    # with open('../resources/tbToken', 'r') as tokenFile:
+        # token = tokenFile.read().strip()
 
     pos = '8/4k3/8/8/8/8/4P3/4K3 w - - 0 1'
     pos2 = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1'
@@ -203,7 +209,49 @@ if __name__ == '__main__':
     g2 = ['../out/games/2700games2023-out.pgn']
     # print(getEndgameMistakes(token, g2))
 
-    sf = configureEngine('stockfish', {'Threads': '6', 'Hash': '8192', 'UCI_ShowWDL': 'true'})
+    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192', 'UCI_ShowWDL': 'true'})
+    """
     # print(getEndgamePerformance('../resources/games/Rubinstein-Duras.pgn', 'Rubinstein', sf))
-    print(getEndgamePerformance('../resources/games/Tartakower-Rubinstein.pgn', 'Rubinstein', sf))
+    # print(getEndgamePerformance('../resources/carlsen2019.pgn', 'Carlsen', sf))
+    print('Carlsen')
+    # print(getEndgamePerformance('../resources/carlsenGames.pgn', 'Carlsen', sf))
+    print('Caruana')
+    # print(getEndgamePerformance('../resources/caruanaGames.pgn', 'Caruana', sf))
+    print('Nakamura')
+    # print(getEndgamePerformance('../resources/nakaGames.pgn', 'Nakamura', sf))
+    print('MVL')
+    with open('../resources/mvlEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/mvlGames.pgn', 'Vachier-Lagrave', sf)
+        print(p)
+        pkl.dump(p, f)
+    print('Nepo')
+    with open('../resources/nepoEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/nepoGames.pgn', 'Nepom', sf)
+        print(p)
+        pkl.dump(p, f)
+    """
+    with open('../resources/firouzjaEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/firouzjaGames.pgn', 'Firouzja', sf)
+        print(p)
+        pkl.dump(p, f)
+    with open('../resources/abdusattorovEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/abdusattorovGames.pgn', 'Abdusattorov', sf)
+        print(p)
+        pkl.dump(p, f)
+    with open('../resources/keymerEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/keymerGames.pgn', 'Keymer', sf)
+        print(p)
+        pkl.dump(p, f)
+    with open('../resources/carlsenEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/carlsenGames.pgn', 'Carlsen', sf)
+        print(p)
+        pkl.dump(p, f)
+    with open('../resources/caruanaEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/caruanaGames.pgn', 'Caruana', sf)
+        print(p)
+        pkl.dump(p, f)
+    with open('../resources/nakaEndgames.pkl', 'wb+') as f:
+        p = getEndgamePerformance('../resources/nakaGames.pgn', 'Nakamura', sf)
+        print(p)
+        pkl.dump(p, f)
     sf.quit()
