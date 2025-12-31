@@ -101,7 +101,7 @@ def getMoveData(pgnPaths: list) -> pd.DataFrame:
     return df
 
 
-def getMoveByMoveExpectedScore(pgnPath: str, addScore: bool = True) -> dict:
+def getMoveByMoveExpectedScore(pgnPath: str, addScore: bool = True, lichessAnalysis: bool = True) -> dict:
     """
     This calculates the expected score for each player after each move. Only used for matches to make the moves comparable
     return -> dict
@@ -123,9 +123,15 @@ def getMoveByMoveExpectedScore(pgnPath: str, addScore: bool = True) -> dict:
             node = game
             while not node.is_end():
                 node = node.variations[0]
-                if not functions.readComment(node, True, True):
-                    continue
-                cp = functions.readComment(node, True, True)[1]
+                if lichessAnalysis:
+                    if node.eval():
+                        cp = int(node.eval().white().score(mate_score=10000))
+                    else:
+                        continue
+                else:
+                    if not functions.readComment(node, True, True):
+                        continue
+                    cp = functions.readComment(node, True, True)[1]
                 wxs.append(float(functions.expectedScore(cp))/100)
             bxs = [1-w for w in wxs]
             xs[w].append([s+scores[w] for s in wxs])
@@ -170,7 +176,8 @@ def plotMoveByMoveExpectedScore(xsData: dict, nicknames: dict = None, filename: 
 
     ax.legend()
     ax.set_xlim(0, len(scores)-1)
-    ax.set_ylim(0, max(scores)+0.2)
+    # ax.set_ylim(0, max(scores)+0.2)
+    ax.set_ylim(0, 2)
     ax.set_xlabel('Move number')
     ax.set_ylabel('Expected number of points')
     plt.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
@@ -224,7 +231,7 @@ def getPlayerVolatilities(pgnPaths: list) -> dict:
     return avgVol
 
 
-def getGameAccuracies(pgnPath: str) -> dict:
+def getGameAccuracies(pgnPath: str, lichessAnalysis: bool = True) -> dict:
     """
     This function calculates the accuracies of each player
     pgnPath: str
@@ -244,9 +251,14 @@ def getGameAccuracies(pgnPath: str) -> dict:
             cpB = None
             while not node.is_end():
                 node = node.variations[0]
-                if not functions.readComment(node, True, True):
-                    continue
-                cpA = functions.readComment(node, True, True)[1]
+                if lichessAnalysis:
+                    if node.eval() is None:
+                        continue
+                    cpA = int(node.eval().white().score(mate_score=10000))
+                else:
+                    if not functions.readComment(node, True, True):
+                        continue
+                    cpA = functions.readComment(node, True, True)[1]
                 if cpB is None:
                     cpB = cpA
                     continue
@@ -260,16 +272,19 @@ def getGameAccuracies(pgnPath: str) -> dict:
                     esA = functions.expectedScore(cpA)
                     wxs.append(max(esB-esA, 0))
                 cpB = cpA
-            wA = float(functions.gameAccuracy(sum(wxs)/len(wxs)))
-            bA = float(functions.gameAccuracy(sum(bxs)/len(bxs)))
-            if w not in accuracies.keys():
-                accuracies[w] = [[wA, bA]]
+            if len(wxs) != 0 and len(bxs) != 0:
+                wA = float(functions.gameAccuracy(sum(wxs)/len(wxs)))
+                bA = float(functions.gameAccuracy(sum(bxs)/len(bxs)))
+                if w not in accuracies.keys():
+                    accuracies[w] = [[wA, bA]]
+                else:
+                    accuracies[w].append([wA, bA])
+                if b not in accuracies.keys():
+                    accuracies[b] = [[bA, wA]]
+                else:
+                    accuracies[b].append([bA, wA])
             else:
-                accuracies[w].append([wA, bA])
-            if b not in accuracies.keys():
-                accuracies[b] = [[bA, wA]]
-            else:
-                accuracies[b].append([bA, wA])
+                print(game.headers)
     return accuracies
 
 
@@ -407,6 +422,7 @@ def plotRoundScores(scores: dict, players: list = None, colors: list = None, tit
     ax.set_facecolor('#e6f7f2')
     if colors is None:
         colors = ['#8D77AB', '#689bf2', '#f8a978', '#ff87ca', '#beadfa']
+        colors = plotting_helper.getColors(['blue', 'orange', 'purple'])
     linestyles = ['-', '--', '-.']
     index = 0
     minScore = 0
@@ -425,12 +441,12 @@ def plotRoundScores(scores: dict, players: list = None, colors: list = None, tit
             p = nicknames[player]
         else:
             p = player.split(',')[0]
-        ax.plot(range(len(score)), pScore, label=p, alpha=1, linestyle=linestyles[index%len(linestyles)], color=colors[index%len(colors)], linewidth=3)
+        ax.plot(range(len(pScore)), pScore, label=p, alpha=1, linestyle=linestyles[index%len(linestyles)], color=colors[index%len(colors)], linewidth=3)
         index += 1
     
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
     ax.legend()
-    ax.set_xlim(0, len(scores)-1)
+    ax.set_xlim(0, len(pScore)-1)
     ax.set_xlabel('Round')
     ax.set_ylabel('Score')
     yTicks = [y for y in range(minScore, maxScore+1)]
@@ -446,7 +462,7 @@ def plotRoundScores(scores: dict, players: list = None, colors: list = None, tit
         plt.show()
 
 
-def getMoveSituation(pgnPath: str) -> dict:
+def getMoveSituation(pgnPath: str, lichessAnalysis: bool = True) -> dict:
     """
     This function returns a dictionary index by the players and containing the number of moves where they were:
         much better (1+), slightly better (1-0.5), equal, slightly worse and much worse
@@ -465,7 +481,11 @@ def getMoveSituation(pgnPath: str) -> dict:
             while not node.is_end():
                 node = node.variations[0]
                 if node.comment != 'None' and node.comment:
-                    cp = int(float(node.comment.split(';')[-1]))
+                    if lichessAnalysis:
+                        if node.eval():
+                            cp = int(node.eval().white().score(mate_score=10000))
+                    else:
+                        cp = int(float(node.comment.split(';')[-1]))
                     if not node.turn():
                         moves[w][0] += 1
                         if cp > 100:
@@ -493,7 +513,7 @@ def getMoveSituation(pgnPath: str) -> dict:
     return moves
 
 
-def worseGames(pgnPath: str) -> dict:
+def worseGames(pgnPath: str, lichessAnalysis: bool = True) -> dict:
     """
     This function counts the number of games where a player was worse and the number of lost games.
     """
@@ -518,7 +538,11 @@ def worseGames(pgnPath: str) -> dict:
             while not node.is_end():
                 node = node.variations[0]
                 if node.comment:
-                    cp = int(float(node.comment.split(';')[-1]))
+                    if lichessAnalysis:
+                        if node.eval():
+                            cp = int(node.eval().white().score(mate_score=10000))
+                    else:
+                        cp = int(float(node.comment.split(';')[-1]))
                     if cp < -100 and not rec[0]:
                         games[w][0] += 1
                         rec[0] = True
@@ -528,7 +552,7 @@ def worseGames(pgnPath: str) -> dict:
     return games
 
 
-def betterGames(pgnPath: str) -> dict:
+def betterGames(pgnPath: str, lichessAnalysis: bool = True) -> dict:
     games = dict()
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
@@ -550,7 +574,11 @@ def betterGames(pgnPath: str) -> dict:
             while not node.is_end():
                 node = node.variations[0]
                 if node.comment:
-                    cp = int(float(node.comment.split(';')[-1]))
+                    if lichessAnalysis:
+                        if node.eval():
+                            cp = int(node.eval().white().score(mate_score=10000))
+                    else:
+                        cp = int(float(node.comment.split(';')[-1]))
                     if cp < -100 and not rec[0]:
                         games[b][0] += 1
                         rec[0] = True
@@ -584,7 +612,7 @@ def sortPlayers(d: dict, index: int) -> list:
     return players
 
 
-def getInaccMistakesBlunders(pgnPath: str) -> dict:
+def getInaccMistakesBlunders(pgnPath: str, lichessAnalysis: bool = True) -> dict:
     games = dict()
     # win percentage drop for inaccuracy, mistake and blunder
     bounds = (10, 15, 20)
@@ -603,7 +631,11 @@ def getInaccMistakesBlunders(pgnPath: str) -> dict:
             while not node.is_end():
                 node = node.variations[0]
                 if node.comment:
-                    cpA = functions.readComment(node, True, True)[1]
+                    if lichessAnalysis:
+                        if node.eval() is not None:
+                            cpA = int(node.eval().white().score(mate_score=10000))
+                    else:
+                        cpA = functions.readComment(node, True, True)[1]
                     if cpB is None:
                         cpB = cpA
                         continue
@@ -946,39 +978,58 @@ def plotMultAccDistributions(pgnPaths: list, playerNames: list, labels: list, fi
         plt.show()
 
 
-def generateTournamentPlots(pgnPath: str, nicknames: dict = None, filename: str = None) -> None:
-    nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
-    players = getPlayers(pgnPath)
+def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list = None, filename: str = None) -> None:
+    # nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
+    if players is None:
+        players = getPlayers(pgnPath)
     # generateAccDistributionGraphs(pgnPath, players)
-    scores = getPlayerScores(pgnPath)
-    moveSit = getMoveSituation(pgnPath)
-    worse = worseGames(pgnPath)
-    worseColors = ['#f8a978', '#fa5a5a']
-    better = betterGames(pgnPath)
-    sharpChange = analysis.sharpnessChangePerPlayer(pgnPath)
-    IMB = getInaccMistakesBlunders(pgnPath)
-    gameAcc = getGameAccuracies(pgnPath)
+
+    allScores = getPlayerScores(pgnPath)
+    allMoveSit = getMoveSituation(pgnPath)
+    allWorse = worseGames(pgnPath)
+    allBetter = betterGames(pgnPath)
+    # allSharpChange = analysis.sharpnessChangePerPlayer(pgnPath)
+    allIMB = getInaccMistakesBlunders(pgnPath)
+    allGameAcc = getGameAccuracies(pgnPath)
+    scores = dict()
+    moveSit = dict()
+    worse = dict()
+    better = dict()
+    sharpChange = dict()
+    IMB = dict()
+    gameAcc = dict()
+    for player in players:
+        scores[player] = allScores[player]
+        moveSit[player] = allMoveSit[player]
+        worse[player] = allWorse[player]
+        better[player] = allBetter[player]
+        IMB[player] = allIMB[player]
+        gameAcc[player] = allGameAcc[player]
+        # sharpChange[player] = allSharpChange[player]
     avgGameAcc = dict()
     for p, v in gameAcc.items():
         pA = sum([a[0] for a in v])/len(v)
         oA = sum([a[1] for a in v])/len(v)
         avgGameAcc[p] = [pA, oA]
 
+    worseColors = ['#f8a978', '#fa5a5a']
+    IMBcolors = plotting_helper.getColors(['blue', 'yellow', 'red'])
+    print(nicknames)
     if filename:
         createMovePlot(moveSit, nicknames, f'{filename}-movePlot.png')
-        analysis.plotSharpChange(sharpChange, short=nicknames, filename=f'{filename}-sharpChange.png')
+        # analysis.plotSharpChange(sharpChange, short=nicknames, filename=f'{filename}-sharpChange.png')
         plotScores(scores, nicknames, f'{filename}-scores.png')
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1, colors=worseColors)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
-        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0)
+        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0, colors=IMBcolors)
         plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy', short=nicknames, filename=f'{filename}-gameAcc.png', colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
     else:
         createMovePlot(moveSit, nicknames)
-        analysis.plotSharpChange(sharpChange, short=nicknames)
+        # analysis.plotSharpChange(sharpChange, short=nicknames)
         plotScores(scores, nicknames)
         plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, sortIndex=1, colors=worseColors)
         plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, sortIndex=1)
-        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0)
+        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0, colors=IMBcolors)
         plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy', short=nicknames, colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
 
 
@@ -1015,6 +1066,25 @@ if __name__ == '__main__':
     # mmxs = getMoveByMoveExpectedScore(tb)
     # plotMoveByMoveExpectedScore(mmxs, nicknames=nicknames, filename=f'{plotPath}-TB.png')
     # plotRoundScores(roundScores, players=fightForFirst, title='Fight for 1st place', nicknames=nicknames, filename=f'{plotPath}-roundScores.png')
+
+    rapidPGN = '../resources/worldRapid2025.pgn'
+    rapidNicknames = {'Erigaisi Arjun': 'Erigaisi', 'Dominguez Perez': 'Dominguez', 'Vachier-Lagrave': 'MVL'}
+    rapidPlayers = ['Carlsen, Magnus', 'Artemiev, Vladislav', 'Erigaisi Arjun', 'Niemann, Hans Moke', 'Dominguez Perez, Leinier']
+    rapidPlayers = ['Carlsen, Magnus', 'Artemiev, Vladislav', 'Erigaisi Arjun', 'Niemann, Hans Moke', 'Dominguez Perez, Leinier', 'Vachier-Lagrave, Maxime', 'Sindarov, Javokhir', 'So, Wesley', 'Giri, Anish', 'Esipenko, Andrey', 'Sevian, Samuel', 'Dubov, Daniil', 'Mamedyarov, Shakhriyar']
+    # generateTournamentPlots(rapidPGN, players=rapidPlayers, nicknames=rapidNicknames, filename='../out/rapidAndBlitz2025/rapid')
+    # roundScores = getRoundByRoundScores(rapidPGN)
+    # plotRoundScores(roundScores, players=rapidPlayers, title='Fight for the rapid world championship', nicknames=rapidNicknames, filename='../out/rapidAndBlitz2025/roundScores.png')
+
+    rapidPGNw = '../resources/worldRapid2025w.pgn'
+    wNicknames = {'Savitha Shri B': 'Savitha'}
+    womenPlayers = ['Goryachkina, Aleksandra', 'Zhu, Jiner', 'Koneru, Humpy', 'Savitha Shri B', 'Vaishali, Rameshbabu', 'Atalik, Ekaterina']
+    # generateTournamentPlots(rapidPGNw, players=womenPlayers, nicknames=wNicknames, filename='../out/rapidAndBlitz2025/rapidW')
+    # roundScores = getRoundByRoundScores(rapidPGNw)
+    # plotRoundScores(roundScores, players=womenPlayers[:3], title="Fight for the women's rapid world championship", filename='../out/rapidAndBlitz2025/roundScoresW.png')
+    tbData = getMoveByMoveExpectedScore('../resources/worldRapid2025wTB.pgn')
+    plotMoveByMoveExpectedScore(tbData, filename='../out/rapidAndBlitz2025/wTB.png')
+
+
     # Ding games
     """
     preCovid = '../out/games/dingPreCovid-out.pgn'
@@ -1026,10 +1096,12 @@ if __name__ == '__main__':
         print(scores['Ding Liren'])
     """
 
+    """
     t = '../out/candidates2024-WDL+CP.pgn'
     nicknames = {'Nepomniachtchi': 'Nepo', 'Praggnanandhaa R': 'Pragg'}
     sharpChange = analysis.sharpnessChangePerPlayer(t)
     analysis.plotSharpChange(sharpChange, short=nicknames)
+    """
     """
     # Candidates data
     nwc = '../out/games/norwayChessClassical.pgn'
