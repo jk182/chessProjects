@@ -20,6 +20,11 @@ def getAllColors() -> dict:
     colors['yellow'] = '#f7cf77'
     colors['grey'] = '#758A93'
     colors['darkgreen'] = '#5D866C'
+    colors['darkblue'] = '#434E78'
+    # colors['darkgreen'] = '#B0D9B1'
+    colors['darkorange'] = '#F39E60'
+    colors['darkred'] = '#E16A54'
+    colors['rosa'] = '#F0A8D0'
 
     colors['much better'] = '#4ba35a'
     colors['slightly better'] = '#9cf196'
@@ -61,7 +66,7 @@ def getDefaultColors() -> list:
     return getColors(['blue', 'orange', 'green', 'red', 'purple'])
 
 
-def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, filename: str = None):
+def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, legendUnderPlot: bool = False, yTicks: list = None, filename: str = None):
     """
     A general function to create bar charts, where each player (or group of players) gets multiple bars.
     data: list
@@ -100,14 +105,19 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         ax.bar([i+1+offset+(width*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=width, label=legend[j])
         yMax = max(yMax, max([d[j] for d in data]))
 
-    ax.legend()
+    if legendUnderPlot:
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.04), ncol=5)
+    else:
+        ax.legend()
+    if yTicks:
+        ax.set_yticks(yTicks)
     ax.set_ylim(0, yMax * 1.05)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
     if filename:
-        plt.savefig(filename, dpi=400)
+        plt.savefig(filename, dpi=300)
     else:
         plt.show()
 
