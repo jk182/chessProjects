@@ -9,6 +9,7 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from functions import configureEngine
+import plotting_helper
 
 
 def tablebaseLookup(token: str, fen: str) -> dict:
@@ -194,6 +195,25 @@ def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
     return scores
 
 
+def plotEndgamePerformances(players: dict, endgameTypes: list = ['pawn', 'knight', 'bishop', 'rook', 'queen']):
+    """
+    players: dict
+        Dictionary indexed by player name and containing the path to the pickle file of the data as value
+    """
+    plotData = list()
+    for player, path in players.items():
+        with open(path, 'rb') as f:
+            data = pkl.load(f)
+        plotData.append([])
+        for endgameType in endgameTypes:
+            if endgameType not in data.keys():
+                plotData[-1].append(0)
+            else:
+                plotData[-1].append((data[endgameType][0]-data[endgameType][1])/data[endgameType][2])
+
+    plotting_helper.plotPlayerBarChart(plotData, list(players.keys()), 'Difference between score and expected score per game', 'Endgames', endgameTypes)
+
+
 if __name__ == '__main__':
     # with open('../resources/tbToken', 'r') as tokenFile:
         # token = tokenFile.read().strip()
@@ -208,9 +228,13 @@ if __name__ == '__main__':
     games = ['../out/games/norwayChessOpen2024-out.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/2700games2023-out.pgn']
     g2 = ['../out/games/2700games2023-out.pgn']
     # print(getEndgameMistakes(token, g2))
+    players = {'Carlsen': '../resources/carlsenEndgames.pkl', 'Nakamura': '../resources/nakaEndgames.pkl', 'Caruana': '../resources/caruanaEndgames.pkl', 'MVL': '../resources/mvlEndgames.pkl', 'Nepo': '../resources/nepoEndgames.pkl'}
+    youngPlayers = {'Firouzja': '../resources/firouzjaEndgames.pkl', 'Erigaisi': '../resources/erigaisiEndgames.pkl', 'Gukesh': '../resources/gukeshEndgames.pkl', 'Abdusattorov': '../resources/abdusattorovEndgames.pkl', 'Keymer': '../resources/keymerEndgames.pkl'}
+    plotEndgamePerformances(players)
+    plotEndgamePerformances(youngPlayers)
 
-    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192', 'UCI_ShowWDL': 'true'})
     """
+    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192', 'UCI_ShowWDL': 'true'})
     # print(getEndgamePerformance('../resources/games/Rubinstein-Duras.pgn', 'Rubinstein', sf))
     # print(getEndgamePerformance('../resources/carlsen2019.pgn', 'Carlsen', sf))
     print('Carlsen')
@@ -229,7 +253,6 @@ if __name__ == '__main__':
         p = getEndgamePerformance('../resources/nepoGames.pgn', 'Nepom', sf)
         print(p)
         pkl.dump(p, f)
-    """
     with open('../resources/firouzjaEndgames.pkl', 'wb+') as f:
         p = getEndgamePerformance('../resources/firouzjaGames.pgn', 'Firouzja', sf)
         print(p)
@@ -255,3 +278,4 @@ if __name__ == '__main__':
         print(p)
         pkl.dump(p, f)
     sf.quit()
+    """
