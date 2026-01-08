@@ -195,7 +195,43 @@ def getEndgamePerformance(pgnPath: str, player: str, sf: chess.engine) -> dict:
     return scores
 
 
-def plotEndgamePerformances(players: dict, endgameTypes: list = ['pawn', 'knight', 'bishop', 'rook', 'queen']):
+def getOpponentRatingPerEndgameType(pgnPath: str, player: str) -> dict:
+    """
+    This function calculates the average opponent rating for each endgame type
+    """
+    oppRatings = dict()
+    with open(pgnPath, 'r', encoding='utf-8') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if "WhiteElo" not in game.headers or "BlackElo" not in game.headers:
+                continue
+            if player in game.headers["White"]:
+                white = True
+                oppRating = int(game.headers["BlackElo"])
+            elif player in game.headers["Black"]:
+                white = False
+                oppRating = int(game.headers["WhiteElo"])
+            else:
+                continue
+
+            endgames = set()
+            board = chess.Board()
+            for move in game.mainline_moves():
+                board.push(move)
+                endgame = getEndgameType(board)
+                if endgame is not None and endgame not in endgames:
+                    endgames.add(endgame)
+                    if endgame in oppRatings:
+                        oppRatings[endgame][0] += oppRating
+                        oppRatings[endgame][1] += 1
+                    else:
+                        oppRatings[endgame] = [oppRating, 1]
+    avgRatings = dict()
+    for endgame, data in oppRatings.items():
+        avgRatings[endgame] = round(data[0]/data[1], 2)
+    return avgRatings
+
+
+def plotEndgamePerformances(players: dict, endgameTypes: list = ['pawn', 'knight', 'bishop', 'rook', 'queen'], colors: list = None, filename: str = None):
     """
     players: dict
         Dictionary indexed by player name and containing the path to the pickle file of the data as value
@@ -211,7 +247,7 @@ def plotEndgamePerformances(players: dict, endgameTypes: list = ['pawn', 'knight
             else:
                 plotData[-1].append((data[endgameType][0]-data[endgameType][1])/data[endgameType][2])
 
-    plotting_helper.plotPlayerBarChart(plotData, list(players.keys()), 'Difference between score and expected score per game', 'Endgames', endgameTypes)
+    plotting_helper.plotPlayerBarChart(plotData, list(players.keys()), '(xsAfter - xsBefore)/games', 'Performance in different endgame types', endgameTypes, colors=colors, filename=filename)
 
 
 if __name__ == '__main__':
@@ -230,8 +266,18 @@ if __name__ == '__main__':
     # print(getEndgameMistakes(token, g2))
     players = {'Carlsen': '../resources/carlsenEndgames.pkl', 'Nakamura': '../resources/nakaEndgames.pkl', 'Caruana': '../resources/caruanaEndgames.pkl', 'MVL': '../resources/mvlEndgames.pkl', 'Nepo': '../resources/nepoEndgames.pkl'}
     youngPlayers = {'Firouzja': '../resources/firouzjaEndgames.pkl', 'Erigaisi': '../resources/erigaisiEndgames.pkl', 'Gukesh': '../resources/gukeshEndgames.pkl', 'Abdusattorov': '../resources/abdusattorovEndgames.pkl', 'Keymer': '../resources/keymerEndgames.pkl'}
-    plotEndgamePerformances(players)
-    plotEndgamePerformances(youngPlayers)
+    colors = plotting_helper.getColors(['purple', 'blue', 'green', 'yellow', 'red'])
+    plotEndgamePerformances(players, colors=colors, filename='../out/endgames1990.png')
+    plotEndgamePerformances(youngPlayers, colors=colors, filename='../out/endgames2003.png')
+
+    """
+    pgns = {'Carlsen': '../resources/carlsenGames.pgn', 'Nakamura': '../resources/nakaGames.pgn', 'Caruana': '../resources/caruanaGames.pgn', 'Vachier-Lagrave': '../resources/mvlGames.pgn', 'Nepo': '../resources/nepoGames.pgn'}
+    pgns2 = {'Firouzja': '../resources/firouzjaGames.pgn', 'Erigaisi': '../resources/erigaisiGames.pgn', 'Gukesh': '../resources/gukeshGames.pgn', 'Abdusattorov': '../resources/abdusattorovGames.pgn', 'Keymer': '../resources/keymerGames.pgn'}
+    for player, pgn in pgns.items():
+        print(player, getOpponentRatingPerEndgameType(pgn, player))
+    for player, pgn in pgns2.items():
+        print(player, getOpponentRatingPerEndgameType(pgn, player))
+    """
 
     """
     sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192', 'UCI_ShowWDL': 'true'})
