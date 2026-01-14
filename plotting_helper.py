@@ -220,3 +220,25 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
     else:
         plt.show()
 
+
+def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, scatterColor = None, filename: str = None):
+    """
+    A general function to generate scatter plots
+    """
+    if not scatterColor:
+        scatterColor = getColor('blue')
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+
+    ax.scatter(xValues, yValues, color=scatterColor)
+
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+    plt.title(title)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
