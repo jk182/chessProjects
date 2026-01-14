@@ -264,7 +264,7 @@ if __name__ == '__main__':
     games = ['../out/games/norwayChessOpen2024-out.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/2700games2023-out.pgn']
     g2 = ['../out/games/2700games2023-out.pgn']
     # print(getEndgameMistakes(token, g2))
-    players = {'Carlsen': '../resources/carlsenEndgames.pkl', 'Nakamura': '../resources/nakaEndgames.pkl', 'Caruana': '../resources/caruanaEndgames.pkl', 'MVL': '../resources/mvlEndgames.pkl', 'Nepo': '../resources/nepoEndgames.pkl'}
+    players = {'Carlsen': '../resources/carlsenEndgames.pkl', 'Nakamura': '../resources/nakaEndgames.pkl', 'Caruana': '../resources/caruanaEndgames.pkl', 'Vachier-Lagrave': '../resources/mvlEndgames.pkl', 'Nepomniachtchi': '../resources/nepoEndgames.pkl'}
     youngPlayers = {'Firouzja': '../resources/firouzjaEndgames.pkl', 'Erigaisi': '../resources/erigaisiEndgames.pkl', 'Gukesh': '../resources/gukeshEndgames.pkl', 'Abdusattorov': '../resources/abdusattorovEndgames.pkl', 'Keymer': '../resources/keymerEndgames.pkl'}
     colors = plotting_helper.getColors(['purple', 'blue', 'green', 'yellow', 'red'])
     plotEndgamePerformances(players, colors=colors, filename='../out/endgames1990.png')

@@ -7,11 +7,14 @@ pgn = ""
 gameNr = 0
 analysedGames = 0
 players = dict()
-while gameNr < 1000000000:
+while gameNr < 100000:
     line = input()
     if line.strip():
         pgn = f"{pgn}{line}\n"
         if line[0] == '1':
+            if "eval" in line:
+                analysedGames += 1
+            """
             game = chess.pgn.read_game(io.StringIO(pgn))
             if game.variations:
                 node = game.variations[0]
@@ -22,6 +25,7 @@ while gameNr < 1000000000:
                         else:
                             players[player] += 1
                     analysedGames += 1
+            """
             gameNr += 1
             pgn = ""
 
