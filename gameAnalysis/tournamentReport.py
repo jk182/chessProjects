@@ -739,6 +739,99 @@ def getInaccMistakesBlunders(pgnPath: str, lichessAnalysis: bool = True) -> dict
     return games
 
 
+def getFirstMoves(pgnPath: str) -> dict:
+    """
+    This extracts the first move from each game
+    pgnPath: str
+        THe path to the PGN file
+    return -> dict
+        Dictionary indexed by first move, containing the number of games with this first move as a value
+    """
+    firstMoves = dict()
+    startPos = chess.Board()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            firstMove = list(game.mainline_moves())[0]
+            firstMove = startPos.san(firstMove)
+
+            if firstMove in firstMoves:
+                firstMoves[firstMove] += 1
+            else:
+                firstMoves[firstMove] = 1
+    return firstMoves
+
+
+def getOpenings(pgnPath: str, shortNames: bool = False) -> dict:
+    """
+    This extracts the openings from a PGN
+    pgnPath: str
+        The path to the PGN file
+    return -> dict
+        Dictionary indexed by opening name, containing the number of games with the opening as a value
+    """
+    openings = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if "Opening" not in game.headers:
+                continue
+
+            opening = game.headers["Opening"]
+            if shortNames:
+                opening = opening.split(':')[0]
+            
+            if opening in openings:
+                openings[opening] += 1
+            else:
+                openings[opening] = 1
+    return openings
+
+
+def getOpeningsByFirstMove(pgnPath: str, firstMove: str, shortNames: bool = False) -> dict:
+    """
+    This extracts the opening names from games with the same first moves
+    pgnPath: str
+        The path to the PGN file
+    firstMove: str
+        The SAN of the first move to consider
+    shortNames: bool
+        If this is set, only the first part of the opening name will be taken
+    return -> dict
+        Dictionary indexed by opening name, containing the number of games with the opening as a value
+    """
+    openings = dict()
+    startPos = chess.Board()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if firstMove == startPos.san(list(game.mainline_moves())[0]) and "Opening" in game.headers:
+                opening = game.headers["Opening"]
+                if shortNames:
+                    opening = opening.split(':')[0]
+
+                if opening in openings:
+                    openings[opening] += 1
+                else:
+                    openings[opening] = 1
+    return openings
+
+
+def plotPieChart(plotData: dict, title: str, filename: str = None):
+    """
+    A standard function to plot pie charts
+    plotData: dict
+        The data to plot. The keys are assumed to be the lables, the values the actual data
+    """
+    plotData = dict(reversed(sorted(plotData.items(), key=lambda x: x[1])))
+    fig, ax = plt.subplots(figsize=(8, 6))
+    fig.set_facecolor(plotting_helper.getColor('background'))
+    ax.pie(plotData.values(), labels=plotData.keys(), autopct='%1.1f%%')
+    plt.title(title)
+
+    if filename:
+        plt.savefig(filename, dpi=300)
+    else:
+        plt.show()
+
+
 def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     """
     This creates a plot with the number of moves a player spent being better or worse
@@ -1343,7 +1436,18 @@ if __name__ == '__main__':
     # plotMoveByMoveExpectedScore(mmxs, nicknames=nicknames, filename=f'{plotPath}-TB.png')
     # plotRoundScores(roundScores, players=fightForFirst, title='Fight for 1st place', nicknames=nicknames, filename=f'{plotPath}-roundScores.png')
 
+    openings = getOpenings('../resources/wijkMasters2025.pgn', shortNames=True)
+    print(dict(reversed(sorted(openings.items(), key=lambda item: item[1]))))
+    # plotPieChart(openings, 'Openings')
+    # firstMoves = getFirstMoves('../resources/wijkMasters2025.pgn')
+    # plotPieChart(firstMoves, 'First moves')
+    e4openings = getOpeningsByFirstMove('../resources/wijkMasters2025.pgn', 'e4', shortNames=True)
+    d4openings = getOpeningsByFirstMove('../resources/wijkMasters2025.pgn', 'd4', shortNames=True)
+    plotPieChart(e4openings, 'E4 Opening')
+    plotPieChart(d4openings, 'D4 Opening')
+
     # World Rapid 2025
+    """
     rapidPGN = '../resources/worldRapid2025.pgn'
     rapidNicknames = {'Erigaisi Arjun': 'Erigaisi', 'Dominguez Perez': 'Dominguez', 'Vachier-Lagrave': 'MVL'}
     rapidPlayers = ['Carlsen, Magnus', 'Artemiev, Vladislav', 'Erigaisi Arjun', 'Niemann, Hans Moke', 'Dominguez Perez, Leinier']
@@ -1351,6 +1455,7 @@ if __name__ == '__main__':
     generateTournamentPlots(rapidPGN, players=rapidPlayers, nicknames=rapidNicknames, lichessAnalysis=True)
     # roundScores = getRoundByRoundScores(rapidPGN)
     # plotRoundScores(roundScores, players=rapidPlayers, title='Fight for the rapid world championship', nicknames=rapidNicknames, filename='../out/rapidAndBlitz2025/roundScores.png')
+    """
 
     """
     rapidPGNw = '../resources/worldRapid2025w.pgn'
