@@ -25,6 +25,7 @@ def getAllColors() -> dict:
     colors['darkorange'] = '#F39E60'
     colors['darkred'] = '#E16A54'
     colors['rosa'] = '#F0A8D0'
+    colors['black'] = '#111111'
 
     colors['much better'] = '#4ba35a'
     colors['slightly better'] = '#9cf196'
@@ -221,20 +222,72 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
         plt.show()
 
 
-def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, scatterColor = None, filename: str = None):
+def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, scatterColors: list = None, legend: list = None, refFunction = None, filename: str = None):
     """
     A general function to generate scatter plots
     """
-    if not scatterColor:
-        scatterColor = getColor('blue')
+    if not scatterColors:
+        scatterColors = getDefaultColors()
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_facecolor('#e6f7f2')
+    ax.set_facecolor(getColor('background'))
+    
+    xMin = min(xValues[0])
+    xMax = max(xValues[0])
+    for i in range(len(xValues)):
+        if legend:
+            ax.scatter(xValues[i], yValues[i], color=scatterColors[i%len(scatterColors)], label=legend[i])
+        else:
+            ax.scatter(xValues[i], yValues[i], color=scatterColors[i%len(scatterColors)])
+        xMin = min(xMin, min(xValues[i]))
+        xMax = max(xMax, max(xValues[i]))
 
-    ax.scatter(xValues, yValues, color=scatterColor)
+    if refFunction:
+        steps = 100
+        xVals = [xMin + i/steps*(xMax-xMin) for i in range(steps+1)]
+        if legend:
+            ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1])
+            ax.legend()
+        else:
+            ax.plot(xVals, [refFunction(x) for x in xVals])
 
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
+    plt.title(title)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, filename: str = None):
+    if not colors:
+        colors = getDefaultColors()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+
+    xMin = min([min(x) for x in xValues])
+    xMax = max([max(x) for x in xValues])
+    yMin = min([min(y) for y in yValues])
+    yMax = max([max(y) for y in yValues])
+
+    for i in range(len(xValues)):
+        ax.plot(xValues[i], yValues[i], color=colors[i%len(colors)], label=legend[i])
+
+    if refFunction:
+        steps = 100
+        xVals = [xMin + i/steps*(xMax-xMin) for i in range(steps+1)]
+        ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1])
+
+    ax.set_xlim(xMin, xMax)
+    ax.set_ylim(yMin*0.95, yMax*1.05)
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+
+    ax.legend()
     plt.title(title)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
