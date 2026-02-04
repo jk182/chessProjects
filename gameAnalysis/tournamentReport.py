@@ -814,17 +814,35 @@ def getOpeningsByFirstMove(pgnPath: str, firstMove: str, shortNames: bool = Fals
     return openings
 
 
-def plotPieChart(plotData: dict, title: str, filename: str = None):
+def plotPieChart(plotData: dict, title: str, colors: list = None, minSize: float = 0, filename: str = None):
     """
     A standard function to plot pie charts
     plotData: dict
         The data to plot. The keys are assumed to be the lables, the values the actual data
+    minSize: float
+        The minimum which should still be displayed. Everything else will be grouped as 'other'
     """
+    if colors is None:
+        colors = plotting_helper.getDefaultColors()
+
     plotData = dict(reversed(sorted(plotData.items(), key=lambda x: x[1])))
+
+    if minSize > 0:
+        newData = dict()
+        for k, v in plotData.items():
+            if v < minSize:
+                if 'Other' in newData:
+                    newData['Other'] += v
+                else:
+                    newData['Other'] = v
+            else:
+                newData[k] = v
+        plotData = newData
+
     fig, ax = plt.subplots(figsize=(8, 6))
     fig.set_facecolor(plotting_helper.getColor('background'))
-    ax.pie(plotData.values(), labels=plotData.keys(), autopct='%1.1f%%')
-    plt.title(title)
+    ax.pie(plotData.values(), labels=plotData.keys(), autopct='%1.1f%%', colors=colors,  wedgeprops={'edgecolor': 'black', 'linewidth': 0.7, 'antialiased': True}, radius=1.2, pctdistance=0.8, startangle=-20)
+    ax.set_title(title, pad=30, fontsize=18)
 
     if filename:
         plt.savefig(filename, dpi=300)
@@ -832,7 +850,33 @@ def plotPieChart(plotData: dict, title: str, filename: str = None):
         plt.show()
 
 
-def createMovePlot(moves: dict, short: dict = None, filename: str = None):
+def plotOpeningsByFirstMove(firstMoves: list, pgnPath: str, shortNames: bool = True, colors: list = None, filename: str = None):
+    """
+    This plots the openings after different first moves as pie charts
+    firstMoves: list
+        List of the first moves in SAN notation
+    """
+    if colors is None:
+        colors = plotting_helper.getDefaultColors()
+
+    plotData = list()
+    for move in firstMoves:
+        plotData.append(getOpeningsByFirstMove(pgnPath, move, shortNames))
+
+    fig, axes = plt.subplots(1, len(firstMoves), figsize = (10, 5))
+    fig.set_facecolor(plotting_helper.getColor('background'))
+
+    for i, ax in enumerate(axes):
+        ax.pie(plotData[i].values(), labels=plotData[i].keys(), colors=colors, autopct='%1.1f%%')
+        ax.title.set_text(f'Openings after 1.{firstMoves[i]}')
+
+    if filename:
+        plt.savefig(filename, dpi=300)
+    else:
+        plt.show()
+
+
+def createMovePlot(moves: dict, short: dict = None, title: str = 'Percentage of moves where players were better, equal and worse', filename: str = None):
     """
     This creates a plot with the number of moves a player spent being better or worse
     short: dict
@@ -872,7 +916,7 @@ def createMovePlot(moves: dict, short: dict = None, filename: str = None):
     else:
         fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.04), ncol=5)
-    plt.title('Percentage of moves where players were better, equal and worse')
+    plt.title(title)
     ax.set_xlim(-0.5, len(moves)-0.5)
     ax.set_ylim(0, 100)
     ax.set_ylabel('Percentage of total moves')
@@ -998,7 +1042,7 @@ def getClockTimesByColor(pgnPath: str, minutes: bool = True) -> list:
     return times
 
 
-def plotScores(scores: dict, short: dict = None, filename: str = None):
+def plotScores(scores: dict, short: dict = None, title: str = 'Scores with White and Black', filename: str = None):
     """
     This function plots the scores of the tournament
     filename: str
@@ -1024,7 +1068,7 @@ def plotScores(scores: dict, short: dict = None, filename: str = None):
             bottom += scores[player][i]
 
     fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
-    plt.title('Scores with White and Black')
+    plt.title(title)
     ax.set_ylabel('Tournament Score')
     ax.set_xlim(-0.5, len(sortedPlayers)-0.5)
 
@@ -1163,7 +1207,7 @@ def plotMultAccDistributions(pgnPaths: list, playerNames: list, labels: list, fi
         plt.show()
 
 
-def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, filename: str = None):
+def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, title: str = 'Relative number of wins and losses', filename: str = None):
     """
     This plots the decisive games dats
     decisiveGames: dict
@@ -1174,7 +1218,7 @@ def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, filename: str
         The name of the file to which the graph should be saved.
         If no name is specified, the graph will be shown instead of saved.
     """
-    colors = plotting_helper.getColors(['red', 'green'])
+    colors = plotting_helper.getColors(['blue', 'orange'])
 
     decisiveGames = dict(reversed(sorted(decisiveGames.items(), key=lambda item: sum(item[1]))))
 
@@ -1183,7 +1227,7 @@ def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, filename: str
     plt.xticks(rotation=90)
     legend = True
     for player, data in decisiveGames.items():
-        if player in nicknames:
+        if nicknames is not None and player in nicknames:
             p = nicknames[player]
         else:
             p = player.split(',')[0]
@@ -1192,18 +1236,19 @@ def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, filename: str
         losses = data[1]/data[2]
 
         if legend:
-            label = 'Losses'
-        ax.bar(p, losses, color=colors[0], edgecolor='black', linewidth=0.5, label=label)
-        if legend:
             label = 'Wins'
-        ax.bar(p, wins, bottom=losses, color=colors[1], edgecolor='black', linewidth=0.5, label=label)
+        ax.bar(p, wins, bottom=losses, color=colors[0], edgecolor='black', linewidth=0.5, label=label)
+        if legend:
+            label = 'Losses'
+        ax.bar(p, losses, color=colors[1], edgecolor='black', linewidth=0.5, label=label)
 
         legend = False
         label = '_nolegend_'
 
     ax.set_ylabel('Relative number of games')
+    ax.set_xlim(-0.5, len(decisiveGames)-0.5)
     fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
-    plt.title('Relative number of wins and losses')
+    plt.title(title)
     ax.legend()
 
     if filename:
@@ -1212,11 +1257,13 @@ def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, filename: str
         plt.show()
 
 
-def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list = None, lichessAnalysis: bool = False, filename: str = None) -> None:
-    # nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
+def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list = None, lichessAnalysis: bool = False, firstPlaceRace: list = None, eventName: str = "", minGamesPerOpening: int = 0, filename: str = None) -> None:
     if players is None:
         players = getPlayers(pgnPath)
     # generateAccDistributionGraphs(pgnPath, players)
+
+    if len(eventName) > 0:
+        eventName = f' in {eventName}'
 
     allScores = getPlayerScores(pgnPath)
     allDecisive = getDecisiveGames(pgnPath)
@@ -1227,6 +1274,9 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
         allSharpChange = analysis.sharpnessChangePerPlayer(pgnPath)
     allIMB = getInaccMistakesBlunders(pgnPath, lichessAnalysis=lichessAnalysis)
     allGameAcc = getGameAccuracies(pgnPath, lichessAnalysis=lichessAnalysis)
+    firstMoveData = getFirstMoves(pgnPath)
+    openings = getOpenings(pgnPath, shortNames=True)
+
     scores = dict()
     decisive = dict()
     moveSit = dict()
@@ -1255,26 +1305,39 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
     decisiveColors = plotting_helper.getColors(['green', 'red'])
     worseColors = ['#f8a978', '#fa5a5a']
     IMBcolors = plotting_helper.getColors(['blue', 'yellow', 'red'])
+
+    if firstPlaceRace is not None:
+        roundScores = getRoundByRoundScores(pgnPath)
+        raceTitle = f'Fight for first place{eventName}'
+        if filename is None:
+            plotRoundScores(roundScores, players=firstPlaceRace, title=raceTitle)
+        else:
+            plotRoundScores(roundScores, players=firstPlaceRace, title=raceTitle, filename=f'{filename}-rankings.png')
+    
     if filename:
-        createMovePlot(moveSit, nicknames, f'{filename}-movePlot.png')
+        createMovePlot(moveSit, nicknames, title=f'Percentage of moves where players were better, equal and worse{eventName}', filename=f'{filename}-movePlot.png')
         if not lichessAnalysis:
             analysis.plotSharpChange(sharpChange, short=nicknames, filename=f'{filename}-sharpChange.png')
-        plotScores(scores, nicknames, f'{filename}-scores.png')
-        plotDecisiveGames(decisive, nicknames, f'{filename}-decisive.png')
-        plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1, colors=worseColors)
-        plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
-        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0, colors=IMBcolors)
-        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy', short=nicknames, filename=f'{filename}-gameAcc.png', colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
+        plotScores(scores, nicknames, title=f'Player scores with white and black{eventName}', filename=f'{filename}-scores.png')
+        plotDecisiveGames(decisive, nicknames, title=f'Relative number of wins and losses{eventName}', filename=f'{filename}-decisive.png')
+        plotBarChart(worse, ['# of worse games', '# of lost games'], f'Number of worse and lost games{eventName}', 'Number of games', nicknames, f'{filename}-worse.png', sortIndex=1, colors=worseColors)
+        plotBarChart(better, ['# of better games', '# of won games'], f'Number of better and won games{eventName}', 'Number of games', nicknames, f'{filename}-better.png', sortIndex=1)
+        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], f'Number of inaccuracies, mistakes and blunders{eventName}', 'Number of moves', nicknames, f'{filename}-IMB.png', sortIndex=0, colors=IMBcolors)
+        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], f'Game accuracy for each player{eventName}', 'Average game accuracy', short=nicknames, filename=f'{filename}-gameAcc.png', colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
+        plotPieChart(firstMoveData, f'First moves{eventName}', filename=f'{filename}-firstMoves.png')
+        plotPieChart(openings, f'Openings played{eventName}', minSize=minGamesPerOpening, filename=f'{filename}-openings.png')
     else:
-        createMovePlot(moveSit, nicknames)
+        createMovePlot(moveSit, nicknames, title=f'Percentage of moves where players were better, equal and worse{eventName}')
         if not lichessAnalysis:
             analysis.plotSharpChange(sharpChange, short=nicknames)
-        plotScores(scores, nicknames)
-        plotDecisiveGames(decisive, nicknames)
-        plotBarChart(worse, ['# of worse games', '# of lost games'], 'Number of worse and lost games', 'Number of games', nicknames, sortIndex=1, colors=worseColors)
-        plotBarChart(better, ['# of better games', '# of won games'], 'Number of better and won games', 'Number of games', nicknames, sortIndex=1)
-        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], 'Number of inaccuracies, mistakes and blunders', 'Number of moves', nicknames, sortIndex=0, colors=IMBcolors)
-        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], 'Game accuracy', 'Average game accuracy', short=nicknames, colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
+        plotScores(scores, nicknames, title=f'Player scores with white and black{eventName}')
+        plotDecisiveGames(decisive, nicknames, title=f'Relative number of wins and losses{eventName}')
+        plotBarChart(worse, ['# of worse games', '# of lost games'], f'Number of worse and lost games{eventName}', 'Number of games', nicknames, sortIndex=1, colors=worseColors)
+        plotBarChart(better, ['# of better games', '# of won games'], f'Number of better and won games{eventName}', 'Number of games', nicknames, sortIndex=1)
+        plotBarChart(IMB, ['Inaccuracies', 'Mistakes', 'Blunders'], f'Number of inaccuracies, mistakes and blunders{eventName}', 'Number of moves', nicknames, sortIndex=0, colors=IMBcolors)
+        plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], f'Game accuracy for each player{eventName}', 'Average game accuracy', short=nicknames, colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
+        plotPieChart(firstMoveData, f'First moves{eventName}')
+        plotPieChart(openings, f'Openings played{eventName}', minSize=minGamesPerOpening)
 
 
 def multipleStagePlots(firstStagePGN: str, secondStagePGNs: list, nicknames: dict = None, players: list = None, relativeGames: bool = True, firstPlaceRace: list = None, cutoffPlace: int = None, knockoutWinScore: float = None, firstStageName: str = 'Swiss', secondStageName: str = 'finals', playerColors: dict = None, roundxTicks: list = None, filename: str = None):
@@ -1436,15 +1499,28 @@ if __name__ == '__main__':
     # plotMoveByMoveExpectedScore(mmxs, nicknames=nicknames, filename=f'{plotPath}-TB.png')
     # plotRoundScores(roundScores, players=fightForFirst, title='Fight for 1st place', nicknames=nicknames, filename=f'{plotPath}-roundScores.png')
 
-    openings = getOpenings('../resources/wijkMasters2025.pgn', shortNames=True)
+    # Wijk aan Zee 2026
+    masters = '../resources/wijkMasters2026.pgn'
+    challengers = '../resources/wijkChallengers2026.pgn'
+    # plotOpeningsByFirstMove(['e4', 'd4'], masters)
+    openings = getOpenings(challengers, shortNames=True)
+    plotPieChart(openings, 'Openings played in the Wijk aan Zee challengers', minSize=3, filename='../out/wijk2026/wijkChallengers2026-openings.png')
+    """
+    openings = getOpenings(masters, shortNames=True)
     print(dict(reversed(sorted(openings.items(), key=lambda item: item[1]))))
-    # plotPieChart(openings, 'Openings')
-    # firstMoves = getFirstMoves('../resources/wijkMasters2025.pgn')
-    # plotPieChart(firstMoves, 'First moves')
-    e4openings = getOpeningsByFirstMove('../resources/wijkMasters2025.pgn', 'e4', shortNames=True)
-    d4openings = getOpeningsByFirstMove('../resources/wijkMasters2025.pgn', 'd4', shortNames=True)
+    plotPieChart(openings, 'Openings')
+    firstMoves = getFirstMoves(masters)
+    plotPieChart(firstMoves, 'First moves')
+    e4openings = getOpeningsByFirstMove(masters, 'e4', shortNames=True)
+    d4openings = getOpeningsByFirstMove(masters, 'd4', shortNames=True)
     plotPieChart(e4openings, 'E4 Opening')
     plotPieChart(d4openings, 'D4 Opening')
+    """
+    nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Panesar Vedant': 'Panesar'}
+    challengersFirstPlace = ['Woodward, Andy', 'Ivanchuk, Vasyl', 'Suleymanli, Aydin']
+    # generateTournamentPlots(masters, nicknames=nicknames, lichessAnalysis=True, eventName='the Wijk aan Zee masters', minGamesPerOpening=3, filename='../out/wijk2026/wijkMasters2026')
+    # generateTournamentPlots(challengers, nicknames=nicknames, lichessAnalysis=True, firstPlaceRace=challengersFirstPlace, eventName='the Wijk aan Zee challengers', minGamesPerOpening=3, filename='../out/wijk2026/wijkChallengers2026')
+
 
     # World Rapid 2025
     """

@@ -64,7 +64,7 @@ def getDefaultColors() -> list:
     """
     This returns a list of default colors
     """
-    return getColors(['blue', 'orange', 'green', 'red', 'purple'])
+    return getColors(['blue', 'orange', 'green', 'red', 'purple', 'yellow', 'violet', 'rosa'])
 
 
 def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, legendUnderPlot: bool = False, yTicks: list = None, filename: str = None):
