@@ -247,10 +247,14 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
         xVals = [xMin + i/steps*(xMax-xMin) for i in range(steps+1)]
         if legend:
             ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1])
-            ax.legend()
         else:
             ax.plot(xVals, [refFunction(x) for x in xVals])
 
+    if legend:
+        ax.legend()
+
+    offset = (xMax-xMin)*0.03
+    ax.set_xlim(xMin-offset, xMax+offset)
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
     plt.title(title)
