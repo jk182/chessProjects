@@ -256,19 +256,66 @@ def plotDrawRateBetweenSameRatings(df: pd.DataFrame, minRating: int, maxRating: 
     plotting_helper.plotScatterPlot([list(drawRates.keys())], [list(drawRates.values())], 'Rating', 'Relative number of draws', 'Relative number of draws between players of the same rating', filename=filename)
 
 
+def getBaseDrawRate(rating: int) -> float:
+    """
+    This calculates the base draw rate for a given rating, based on some estimations
+    """
+    if rating < 2500:
+        return 0.5
+
+    if 2500 <= rating < 2600:
+        return 0.575 + ((rating-2500)/100) * 0.025
+
+    if 2600 <= rating < 2700:
+        return 0.6 + ((rating-2600)/100) * 0.05
+
+    if 2700 <= rating < 2800:
+        return 0.65 + ((rating-2700)/100) * 0.10
+
+    return 0.75
+
+
+def predictResult(whiteRating: int, blackRating: int) -> list:
+    """
+    This predicts the results of a game between players of given ratings.
+    return -> list:
+        [winProbability, drawProb, lossProb]
+    """
+    ratingDiff = abs(whiteRating-blackRating)
+    if whiteRating >= blackRating:
+        expectedScore = eloFormula(whiteRating+35, blackRating)
+        baseDrawRate = getBaseDrawRate(whiteRating)
+        k = -0.002359
+        relativeDrawRate = linearDrawRate(ratingDiff, k)
+    else:
+        expectedScore = eloFormula(blackRating, whiteRating+35)
+        baseDrawRate = getBaseDrawRate(blackRating)
+        k = -0.002829
+        relativeDrawRate = linearDrawRate(ratingDiff, k, ratingOffset=100)
+
+    draws = baseDrawRate * relativeDrawRate
+    wins = expectedScore - 0.5*draws
+    losses = 1 - draws - wins
+
+    return [wins, draws, losses]
+
+
 if __name__ == '__main__':
     pgn = '../resources/2500+gamesUTF8.pgn'
+    print(predictResult(2600, 2550))
+    print(predictResult(2550, 2600))
     # df = extractResultData(pgn)
     # print(df)
     # df.to_pickle('../out/all2500games.pkl')
-    df = pd.read_pickle('../out/all2500games.pkl')
-    white = getResultsByRating(df, 2750, True, oppRatingGroupWidth=50)
-    black = getResultsByRating(df, 2750, False, oppRatingGroupWidth=50)
+    # df = pd.read_pickle('../out/all2500games.pkl')
+    # white = getResultsByRating(df, 2750, True, oppRatingGroupWidth=50)
+    # black = getResultsByRating(df, 2750, False, oppRatingGroupWidth=50)
     # plotResultData(white)
     # plotResultData(black)
     # dp = getDataPoints(df, [2500, 2550, 2600, 2650, 2700, 2750, 2800, 2850], 20)
 
     # Draws
+    """
     ratings = [250, 200, 150, 100, 50]
     wDrawRates = [0.45, 0.51, 0.65, 0.79, 0.92]
     bDrawRates = [0.63, 0.76, 0.87, 0.98, 0.98]
@@ -284,6 +331,7 @@ if __name__ == '__main__':
     # plotting_helper.plotScatterPlot([ratings25, ratings25], [WDR2, BDR2], 'Rating advantage', 'Relative draw rate', 'Relative draw rate based on rating advantage and color of the higher rated player', scatterColors=plotting_helper.getColors(['orange', 'black']), legend=['White higher rated', 'Black higher rated'], filename='../out/relativeDrawRates.png')
 
     # plotDrawRateBetweenSameRatings(df, 2500, 2800, stepSize=20, filename='../out/standardDrawRates.png')
+    """
 
 
     """
