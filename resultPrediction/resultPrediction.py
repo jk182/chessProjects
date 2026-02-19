@@ -1,4 +1,5 @@
 import chess
+import random
 import chess.pgn
 import numpy as np
 import pandas as pd
@@ -279,7 +280,7 @@ def predictResult(whiteRating: int, blackRating: int) -> list:
     """
     This predicts the results of a game between players of given ratings.
     return -> list:
-        [winProbability, drawProb, lossProb]
+        [winProbability, drawProb, lossProb] from white's perspective
     """
     ratingDiff = abs(whiteRating-blackRating)
     if whiteRating >= blackRating:
@@ -293,17 +294,292 @@ def predictResult(whiteRating: int, blackRating: int) -> list:
         k = -0.002829
         relativeDrawRate = linearDrawRate(ratingDiff, k, ratingOffset=100)
 
-    draws = baseDrawRate * relativeDrawRate
+    draws = baseDrawRate * relativeDrawRate * 0.96
     wins = expectedScore - 0.5*draws
     losses = 1 - draws - wins
 
-    return [wins, draws, losses]
+    if whiteRating >= blackRating:
+        return [wins, draws, losses]
+    return [losses, draws, wins]
+
+
+def predictPlayerResults(pgnPath: str) -> dict:
+    """
+    This function predicts the results of each player in the given PGN file
+    pgnPath: str
+        Path to the PGN file
+    return -> dict
+        Dictonary indexed by player names containing the expected number of wins, draws and losses as a list
+    """
+    results = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if "WhiteElo" not in game.headers or "BlackElo" not in game.headers:
+                print('No Elo!')
+                continue
+
+            white = game.headers["White"]
+            black = game.headers["Black"]
+            whiteElo = int(game.headers["WhiteElo"])
+            blackElo = int(game.headers["BlackElo"])
+
+            resultPrediction = predictResult(whiteElo, blackElo)
+
+            if white not in results:
+                results[white] = resultPrediction
+            else:
+                for i in range(3):
+                    results[white][i] += resultPrediction[i]
+
+            if black not in results:
+                results[black] = [0, 0, 0]
+
+            for i in range(3):
+                results[black][i] += resultPrediction[2-i]
+
+    return results
+
+
+def predictColorResults(pgnPath: str) -> list:
+    """
+    This function predictes the reults in the PGN by colors
+    return -> list:
+        [whiteWins, draws, blackWins]
+    """
+    results = [0, 0, 0]
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            if "WhiteElo" not in game.headers or "BlackElo" not in game.headers:
+                print('No Elo!')
+                continue
+
+            white = game.headers["White"]
+            black = game.headers["Black"]
+            whiteElo = int(game.headers["WhiteElo"])
+            blackElo = int(game.headers["BlackElo"])
+
+            resultPrediction = predictResult(whiteElo, blackElo)
+
+            for i in range(3):
+                results[i] += resultPrediction[i]
+
+    return results
+
+
+def getPlayerResults(pgnPath: str) -> dict:
+    """
+    This function extracts the results of the players from a PGN file
+    """
+    results = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            if white not in results:
+                results[white] = [0, 0, 0]
+            if black not in results:
+                results[black] = [0, 0, 0]
+
+            result = game.headers["Result"]
+            if result == "1-0":
+                results[white][0] += 1
+                results[black][2] += 1
+            elif result == "1/2-1/2":
+                results[white][1] += 1
+                results[black][1] += 1
+            elif result == "0-1":
+                results[white][2] += 1
+                results[black][0] += 1
+            else:
+                print(f'Result not found: {result}')
+
+    return results
+
+
+def getColorResults(pgnPath: str) -> dict:
+    """
+    This gets the results by color
+    """
+    results = [0, 0, 0]
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            result = game.headers["Result"]
+
+            if result == "1-0":
+                results[0] += 1
+            elif result == "1/2-1/2":
+                results[1] += 1
+            elif result == "0-1":
+                results[2] += 1
+            else:
+                print(f'Result not found: {result}')
+    return results
+
+
+def evaluateResultPrediction(pgnPaths: list):
+    """
+    This function compares the predicted results to the actual ones in the given PGNs
+    """
+    totalDifference = [0, 0, 0]
+    for pgnPath in pgnPaths:
+        """
+        results = getPlayerResults(pgnPath)
+        predictedResults = predictPlayerResults(pgnPath)
+        for player in results.keys():
+            for i in range(3):
+                totalDifference[i] += predictedResults[player][i]-results[player][i]
+        """
+        results = getColorResults(pgnPath)
+        predictedResults = predictColorResults(pgnPath)
+        for i in range(3):
+            totalDifference[i] += predictedResults[i] - results[i]
+    return totalDifference
+
+
+def comparePredictedAndActualPoints(pgnPath: str) -> dict:
+    """
+    Return -> dict:
+        {playerName: [predictedPoints, actualPoints]}
+    """
+    points  = dict()
+    predictedResults = predictPlayerResults(pgnPath)
+    results = getPlayerResults(pgnPath)
+    for player, result in results.items():
+        predictedPoints = predictedResults[player][0] + predictedResults[player][1]*0.5
+        actualPoints = result[0] + result[1]*0.5
+        points[player] = [predictedPoints, actualPoints]
+    return points
+
+
+def calculatePointMSE(pgnPaths: str) -> float:
+    """
+    This function calculates the mean squared error of the predicted points in the PGNs
+    """
+    squaredError = 0
+    nGames = 0
+    for pgnPath in pgnPaths:
+        players = comparePredictedAndActualPoints(pgnPath)
+        for player, points in players.items():
+            squaredError += (points[0]-points[1])**2
+        squaredError /= len(players)
+    return squaredError
+
+
+def getPlayersFromPGN(pgnPath: str) -> dict:
+    """
+    This gets the players with their ratings from a PGN file
+    """
+    players = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            if white not in players and "WhiteElo" in game.headers:
+                players[white] = int(game.headers["WhiteElo"])
+            if black not in players and "BlackElo" in game.headers:
+                players[black] = int(game.headers["BlackElo"])
+    return players
+
+
+def getPairingsFromPGN(pgnPath: str) -> list:
+    """
+    This extracts the pairings from the PGN
+    """
+    pairings = list()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            pairings.append((white, black))
+    return pairings
+
+
+def simulateTournament(players: dict, pairings: list, simulations: int = 10000) -> dict:
+    """
+    This function simulates a tournament to figure out the placings of the players
+    players: dict
+        {playerName: rating}
+    pairings: list
+        [(whitePlayer, blackPlayer), ...]
+        The names have to be exactly the same as in players
+    simulations: int
+        The number of simulations
+
+    """
+    results = dict()
+    for player in players.keys():
+        results[player] = [0] * simulations
+
+    for i in range(simulations):
+        for white, black in pairings:
+            predictedResult = predictResult(players[white], players[black])
+            x = random.random()
+            if x <= predictedResult[0]:
+                results[white][i] += 1
+            elif x <= predictedResult[0]+predictedResult[1]:
+                results[white][i] += 0.5
+                results[black][i] += 0.5
+            else:
+                results[black][i] += 1
+
+    return results
+
+
+def getPlaceProbabilities(tournamentSim: dict) -> dict:
+    """
+    This function calculates the probability of each placings from the tournament simulation
+    tournamentSim: dict
+        The dict returned by simulateTournament()
+    """
+    placings = dict()
+    for player in tournamentSim.keys():
+        placings[player] = [0] * (len(tournamentSim) + 1)   # extra space for shared first places
+
+    nSims = len(list(tournamentSim.values())[0])
+
+    for i in range(nSims):
+        points = list(reversed(sorted([v[i] for v in tournamentSim.values()])))
+
+        if points[0] == points[1]:
+            sharedFirst = True
+        else:
+            sharedFirst = False
+
+        for player in tournamentSim.keys():
+            place = points.index(tournamentSim[player][i])+1
+            if place == 1 and sharedFirst:
+                placings[player][0] += 1
+            else:
+                placings[player][place] += 1
+
+    for player in placings.keys():
+        placings[player] = [x / nSims for x in placings[player]]
+
+    return placings
 
 
 if __name__ == '__main__':
     pgn = '../resources/2500+gamesUTF8.pgn'
-    print(predictResult(2600, 2550))
-    print(predictResult(2550, 2600))
+    directory = os.fsencode('../resources/tournaments')
+    tournaments = list()
+    for file in os.listdir(directory):
+        filename = os.fsdecode(file)
+        tournaments.append(os.path.join('../resources/tournaments/', filename))
+
+    # print(evaluateResultPrediction(tournaments))
+    # for t in tournaments:
+        # print(comparePredictedAndActualPoints(t))
+
+    # print(calculatePointMSE(tournaments))
+
+    wijk = '../resources/tournaments/wijkMasters2026.pgn'
+    players = getPlayersFromPGN(wijk)
+    pairings = getPairingsFromPGN(wijk)
+    ts = simulateTournament(players, pairings)
+    print(getPlaceProbabilities(ts))
     # df = extractResultData(pgn)
     # print(df)
     # df.to_pickle('../out/all2500games.pkl')
