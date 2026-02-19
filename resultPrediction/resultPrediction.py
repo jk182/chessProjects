@@ -440,7 +440,7 @@ def evaluateResultPrediction(pgnPaths: list):
 def comparePredictedAndActualPoints(pgnPath: str) -> dict:
     """
     Return -> dict:
-        {playerName: [predictedPoints, actualPoints]}
+        {playerName: [predictedPoints, actualPoints, numberOfRounds]}
     """
     points  = dict()
     predictedResults = predictPlayerResults(pgnPath)
@@ -448,22 +448,23 @@ def comparePredictedAndActualPoints(pgnPath: str) -> dict:
     for player, result in results.items():
         predictedPoints = predictedResults[player][0] + predictedResults[player][1]*0.5
         actualPoints = result[0] + result[1]*0.5
-        points[player] = [predictedPoints, actualPoints]
+        points[player] = [predictedPoints, actualPoints, sum(result)]
     return points
 
 
-def calculatePointMSE(pgnPaths: str) -> float:
+def calculatePredictionPointError(pgnPaths: str) -> list:
     """
     This function calculates the mean squared error of the predicted points in the PGNs
     """
-    squaredError = 0
+    errors = list()
     nGames = 0
     for pgnPath in pgnPaths:
         players = comparePredictedAndActualPoints(pgnPath)
         for player, points in players.items():
-            squaredError += (points[0]-points[1])**2
-        squaredError /= len(players)
-    return squaredError
+            error = abs(points[0]-points[1])
+            error = error * 9 / points[2]   # normalising the error to a 9 round tournament
+            errors.append(error)
+    return errors
 
 
 def getPlayersFromPGN(pgnPath: str) -> dict:
@@ -551,6 +552,8 @@ def getPlaceProbabilities(tournamentSim: dict) -> dict:
         for player in tournamentSim.keys():
             place = points.index(tournamentSim[player][i])+1
             if place == 1 and sharedFirst:
+                placings[player][1] += 1
+            elif place == 1:
                 placings[player][0] += 1
             else:
                 placings[player][place] += 1
@@ -559,6 +562,86 @@ def getPlaceProbabilities(tournamentSim: dict) -> dict:
         placings[player] = [x / nSims for x in placings[player]]
 
     return placings
+
+
+def getAveragePoints(tournamentSim: dict, nSims: int = None) -> dict:
+    """
+    This function calculates the average points of each player in the simulations
+    tournamentSim: dict
+        The dict returned by simulateTournament()
+    nSims: int
+        The number of simulations to consider (mainly used for comparison)
+        If no value is given, the total number will be taken
+    """
+    if nSims is None:
+        nSims = len(list(tournamentSim.values())[0])
+
+    avgPoints = dict()
+
+    for player, points in tournamentSim.items():
+        avgPoints[player] = sum(points[:nSims])/nSims
+
+    return dict(reversed(sorted(avgPoints.items(), key=lambda x: x[1])))
+
+
+def plotPlaceProbabilities(placings: dict, filename: str = None):
+    """
+    This function plots the place probabilities obtained by getPlaceProbabilities()
+    """
+    xValues = list(range(len(list(placings.values())[0])))
+    # xValues[0] = 1.5
+    plotting_helper.plotLineChart([xValues] * len(placings), [v for v in placings.values()], 'Position', 'Probability', 'Probability for each position', list(placings.keys()), filename=filename)
+
+
+def calculateSimulationPointErrorPerPlayer(pgnPath: str, nSims: int, simStepSize: int) -> list:
+    """
+    This function calculates the error in the points at given simulation intervals
+    nSims: int
+        Maximum number of simulations
+    simStepSize: int
+        The step size for evaluating the simulations
+    """
+    predictedResults = predictPlayerResults(wijk)
+    predictedPoints = dict()
+    for player, results in predictedResults.items():
+        predictedPoints[player] = results[0]+results[1]*0.5
+
+    players = getPlayersFromPGN(pgnPath)
+    pairings = getPairingsFromPGN(pgnPath)
+    simulation = simulateTournament(players, pairings, nSims)
+
+    errors = list()
+    for sims in range(simStepSize, nSims+simStepSize, simStepSize):
+        errors.append(0)
+        simPoints = getAveragePoints(simulation, sims)
+        for player in players.keys():
+            errors[-1] += abs(simPoints[player] - predictedPoints[player])
+
+    return errors
+
+
+def plotSimulationPointErrorPerPlayer(pgnPath: str, nSims: int, simStepSize: int, filename: str = None):
+    errors = calculateSimulationPointErrorPerPlayer(pgnPath, nSims, simStepSize)
+    xValues = list(range(simStepSize, nSims+simStepSize, simStepSize))
+
+    plotting_helper.plotLineChart([xValues], [errors], 'Number of simulations', 'Average point error per player', 'Point error in Monte Carlo simulations', ['Error'], filename=filename)
+
+
+def plotPredictionPointErrors(errors: list, filename: str = None):
+    groupWidth = 0.1
+    groupedErrors = dict()
+    for error in errors:
+        for i in range(1, int(max(errors)/groupWidth)+2):
+            if error <= i*groupWidth:
+                e = (i-1) * groupWidth
+                if e in groupedErrors:
+                    groupedErrors[e] += 1
+                else:
+                    groupedErrors[e] = 1
+                break
+
+    normalisedY = [y/sum(groupedErrors.values()) for y in groupedErrors.values()]
+    plotting_helper.plotDistribution(groupedErrors.keys(), normalisedY, groupWidth, 'Point error', 'Relative number of players', 'Distribution of the point error over a 9 round tournament', filename=filename)
 
 
 if __name__ == '__main__':
@@ -573,13 +656,19 @@ if __name__ == '__main__':
     # for t in tournaments:
         # print(comparePredictedAndActualPoints(t))
 
-    # print(calculatePointMSE(tournaments))
+    errors = calculatePredictionPointError(tournaments)
+    plotPredictionPointErrors(errors)
 
     wijk = '../resources/tournaments/wijkMasters2026.pgn'
     players = getPlayersFromPGN(wijk)
     pairings = getPairingsFromPGN(wijk)
-    ts = simulateTournament(players, pairings)
-    print(getPlaceProbabilities(ts))
+    # ts = simulateTournament(players, pairings, simulations=50000)
+    # placings = getPlaceProbabilities(ts)
+    # plotPlaceProbabilities(placings)
+    # print(getAveragePoints(ts))
+
+    # plotSimulationPointErrorPerPlayer(wijk, 100000, 1000)
+
     # df = extractResultData(pgn)
     # print(df)
     # df.to_pickle('../out/all2500games.pkl')

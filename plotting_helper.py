@@ -299,3 +299,30 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+
+
+def plotDistribution(xValues: list, yValues: list, barWidth: float, xLabel: str, yLabel: str, title: str, color = None, outline: bool = True, filename: str = None):
+    if not color:
+        color = getColor('blue')
+
+    if outline:
+        linewidth = 0.5
+    else:
+        linewidth = 0
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+
+    ax.bar(xValues, yValues, width=barWidth, color=color, edgecolor='black', linewidth=linewidth)
+
+    ax.set_xlim(min(xValues)-barWidth/2, max(xValues)+barWidth/2)
+
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+    plt.title(title)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
