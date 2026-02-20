@@ -283,7 +283,7 @@ def predictResult(whiteRating: int, blackRating: int) -> list:
         [winProbability, drawProb, lossProb] from white's perspective
     """
     ratingDiff = abs(whiteRating-blackRating)
-    if whiteRating >= blackRating:
+    if whiteRating+35 >= blackRating:
         expectedScore = eloFormula(whiteRating+35, blackRating)
         baseDrawRate = getBaseDrawRate(whiteRating)
         k = -0.002359
@@ -298,7 +298,7 @@ def predictResult(whiteRating: int, blackRating: int) -> list:
     wins = expectedScore - 0.5*draws
     losses = 1 - draws - wins
 
-    if whiteRating >= blackRating:
+    if whiteRating+35 >= blackRating:
         return [wins, draws, losses]
     return [losses, draws, wins]
 
@@ -417,6 +417,23 @@ def getColorResults(pgnPath: str) -> dict:
     return results
 
 
+def getFirstPlace(pgnPath: str) -> list:
+    """
+    This function gets the first place from a tournament. If first place is shared, all names will be in the list
+    """
+    playerResults = getPlayerResults(pgnPath)
+    playerPoints = dict()
+    for player, results in playerResults.items():
+        playerPoints[player] = results[0] + results[1]*0.5
+
+    firstPlace = list()
+    maxPoints = max(playerPoints.values())
+    for player, points in playerPoints.items():
+        if points == maxPoints:
+            firstPlace.append(player)
+    return firstPlace
+
+
 def evaluateResultPrediction(pgnPaths: list):
     """
     This function compares the predicted results to the actual ones in the given PGNs
@@ -457,7 +474,6 @@ def calculatePredictionPointError(pgnPaths: str) -> list:
     This function calculates the mean squared error of the predicted points in the PGNs
     """
     errors = list()
-    nGames = 0
     for pgnPath in pgnPaths:
         players = comparePredictedAndActualPoints(pgnPath)
         for player, points in players.items():
@@ -529,7 +545,7 @@ def simulateTournament(players: dict, pairings: list, simulations: int = 10000) 
     return results
 
 
-def getPlaceProbabilities(tournamentSim: dict) -> dict:
+def getPlaceProbabilities(tournamentSim: dict, nSims: int = None) -> dict:
     """
     This function calculates the probability of each placings from the tournament simulation
     tournamentSim: dict
@@ -539,7 +555,8 @@ def getPlaceProbabilities(tournamentSim: dict) -> dict:
     for player in tournamentSim.keys():
         placings[player] = [0] * (len(tournamentSim) + 1)   # extra space for shared first places
 
-    nSims = len(list(tournamentSim.values())[0])
+    if nSims is None:
+        nSims = len(list(tournamentSim.values())[0])
 
     for i in range(nSims):
         points = list(reversed(sorted([v[i] for v in tournamentSim.values()])))
@@ -562,6 +579,35 @@ def getPlaceProbabilities(tournamentSim: dict) -> dict:
         placings[player] = [x / nSims for x in placings[player]]
 
     return placings
+
+
+def evaluateTournamentSimulation(pgnPaths: list, nSims: int):
+    avgWinProb = 0
+    tournaments = 0
+    for pgnPath in pgnPaths:
+        firstPlace = getFirstPlace(pgnPath)
+        if len(firstPlace) > 1:
+            continue
+
+        tournaments += 1
+
+        players = getPlayersFromPGN(pgnPath)
+        pairings = getPairingsFromPGN(pgnPath)
+        tournamentSimulation = simulateTournament(players, pairings, nSims)
+        placeProbabilities = getPlaceProbabilities(tournamentSimulation)
+
+        maxWinProb = 0
+        predictedWinner = None
+        for player, placeProbs in placeProbabilities.items():
+            if placeProbs[0] > maxWinProb:
+                maxWinProb = placeProbs[0]
+                predictedWinner = player
+
+        avgWinProb += maxWinProb
+        print(f'Prediction: {predictedWinner} {round(maxWinProb, 2)}, actual: {firstPlace[0]}')
+    
+    avgWinProb /= tournaments
+    return avgWinProb
 
 
 def getAveragePoints(tournamentSim: dict, nSims: int = None) -> dict:
@@ -644,6 +690,29 @@ def plotPredictionPointErrors(errors: list, filename: str = None):
     plotting_helper.plotDistribution(groupedErrors.keys(), normalisedY, groupWidth, 'Point error', 'Relative number of players', 'Distribution of the point error over a 9 round tournament', filename=filename)
 
 
+def plotFirstPlaceChancesBySimulationCount(pgnPath: str, nSims: int, simStepSize: int, filename: str = None):
+    players = getPlayersFromPGN(pgnPath)
+    pairings = getPairingsFromPGN(pgnPath)
+    simulation = simulateTournament(players, pairings, nSims)
+
+    firstPlaceProbs = dict()
+    for player in players:
+        firstPlaceProbs[player] = list()
+
+    for sims in range(simStepSize, nSims+simStepSize, simStepSize):
+        placeProbs = getPlaceProbabilities(simulation, sims)
+        for player in players:
+            firstPlaceProbs[player].append(placeProbs[player][0])
+
+    plotData = list()
+    for probs in firstPlaceProbs.values():
+        plotData.append(probs)
+
+    xValues = [list(range(simStepSize, nSims+simStepSize, simStepSize))] * len(firstPlaceProbs)
+    print(len(firstPlaceProbs))
+    plotting_helper.plotLineChart(xValues, plotData, 'Number of simulations', 'Probability of first place', 'First place probability with simulations', list(players.keys()), filename=filename)
+
+
 if __name__ == '__main__':
     pgn = '../resources/2500+gamesUTF8.pgn'
     directory = os.fsencode('../resources/tournaments')
@@ -656,12 +725,15 @@ if __name__ == '__main__':
     # for t in tournaments:
         # print(comparePredictedAndActualPoints(t))
 
-    errors = calculatePredictionPointError(tournaments)
-    plotPredictionPointErrors(errors)
+    # print(evaluateTournamentSimulation(tournaments, 50000))
+    # errors = calculatePredictionPointError(tournaments)
+    # print(np.quantile(errors, [0.25, 0.5, 0.75]))
+    # plotPredictionPointErrors(errors)
 
     wijk = '../resources/tournaments/wijkMasters2026.pgn'
     players = getPlayersFromPGN(wijk)
     pairings = getPairingsFromPGN(wijk)
+    plotFirstPlaceChancesBySimulationCount(wijk, 100000, 1000)
     # ts = simulateTournament(players, pairings, simulations=50000)
     # placings = getPlaceProbabilities(ts)
     # plotPlaceProbabilities(placings)
