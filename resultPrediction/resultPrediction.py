@@ -687,13 +687,21 @@ def plotPredictionPointErrors(errors: list, filename: str = None):
                 break
 
     normalisedY = [y/sum(groupedErrors.values()) for y in groupedErrors.values()]
-    plotting_helper.plotDistribution(groupedErrors.keys(), normalisedY, groupWidth, 'Point error', 'Relative number of players', 'Distribution of the point error over a 9 round tournament', filename=filename)
+    plotting_helper.plotDistribution(groupedErrors.keys(), normalisedY, groupWidth, 'Point error', 'Relative number of players', 'Distribution of the error between predicted and actual points over a 9 round tournament', filename=filename)
 
 
-def plotFirstPlaceChancesBySimulationCount(pgnPath: str, nSims: int, simStepSize: int, filename: str = None):
+def plotFirstPlaceChancesBySimulationCount(pgnPath: str, nSims: int, simStepSize: int, numberOfPlayers: int = None, filename: str = None):
     players = getPlayersFromPGN(pgnPath)
     pairings = getPairingsFromPGN(pgnPath)
     simulation = simulateTournament(players, pairings, nSims)
+
+    if numberOfPlayers is not None:
+        placeProbs = getPlaceProbabilities(simulation)
+        placeProbs = dict(reversed(sorted(placeProbs.items(), key=lambda x: x[1][0])))
+        newPlayers = dict()
+        for player in list(placeProbs.keys())[:numberOfPlayers]:
+            newPlayers[player] = players[player]
+        players = newPlayers
 
     firstPlaceProbs = dict()
     for player in players:
@@ -709,8 +717,14 @@ def plotFirstPlaceChancesBySimulationCount(pgnPath: str, nSims: int, simStepSize
         plotData.append(probs)
 
     xValues = [list(range(simStepSize, nSims+simStepSize, simStepSize))] * len(firstPlaceProbs)
-    print(len(firstPlaceProbs))
-    plotting_helper.plotLineChart(xValues, plotData, 'Number of simulations', 'Probability of first place', 'First place probability with simulations', list(players.keys()), filename=filename)
+    legend = list()
+    print(players)
+    for player in players.keys():
+        if ',' in player:
+            legend.append(player.split(',')[0])
+        else:
+            legend.append(player.split(' ')[0])
+    plotting_helper.plotLineChart(xValues, plotData, 'Number of simulations', 'Probability of first place', 'Winning chances in Wijk aan Zee 2026 for different numbers of simulations', legend, filename=filename)
 
 
 if __name__ == '__main__':
@@ -726,14 +740,16 @@ if __name__ == '__main__':
         # print(comparePredictedAndActualPoints(t))
 
     # print(evaluateTournamentSimulation(tournaments, 50000))
-    # errors = calculatePredictionPointError(tournaments)
+    errors = calculatePredictionPointError(tournaments)
     # print(np.quantile(errors, [0.25, 0.5, 0.75]))
-    # plotPredictionPointErrors(errors)
+    # plotPredictionPointErrors(errors, filename='../out/predictionPointError.png')
 
     wijk = '../resources/tournaments/wijkMasters2026.pgn'
-    players = getPlayersFromPGN(wijk)
-    pairings = getPairingsFromPGN(wijk)
-    plotFirstPlaceChancesBySimulationCount(wijk, 100000, 1000)
+    candidates = '../resources/tournaments/candidates2024.pgn'
+    plotFirstPlaceChancesBySimulationCount(wijk, 50000, 100, numberOfPlayers=6, filename='../out/wijk2026WinnerPrediction.png')
+
+    # players = getPlayersFromPGN(wijk)
+    # pairings = getPairingsFromPGN(wijk)
     # ts = simulateTournament(players, pairings, simulations=50000)
     # placings = getPlaceProbabilities(ts)
     # plotPlaceProbabilities(placings)
