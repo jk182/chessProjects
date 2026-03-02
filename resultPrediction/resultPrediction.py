@@ -514,7 +514,7 @@ def getPairingsFromPGN(pgnPath: str) -> list:
     return pairings
 
 
-def simulateTournament(players: dict, pairings: list, simulations: int = 10000) -> dict:
+def simulateTournament(players: dict, pairings: list, simulations: int = 10000, startPoints: dict = None) -> dict:
     """
     This function simulates a tournament to figure out the placings of the players
     players: dict
@@ -524,11 +524,17 @@ def simulateTournament(players: dict, pairings: list, simulations: int = 10000) 
         The names have to be exactly the same as in players
     simulations: int
         The number of simulations
-
+    startPoints: dict
+        {playerName: points}
+        The points players have already scored
     """
     results = dict()
-    for player in players.keys():
-        results[player] = [0] * simulations
+    if startPoints is None:
+        for player in players.keys():
+            results[player] = [0] * simulations
+    else:
+        for player in players.keys():
+            results[player] = [startPoints[player]] * simulations
 
     for i in range(simulations):
         for white, black in pairings:
@@ -727,26 +733,62 @@ def plotFirstPlaceChancesBySimulationCount(pgnPath: str, nSims: int, simStepSize
     plotting_helper.plotLineChart(xValues, plotData, 'Number of simulations', 'Probability of first place', 'Winning chances in Wijk aan Zee 2026 for different numbers of simulations', legend, filename=filename)
 
 
+def plotRoundByRoundWinProbabilities(players: dict, pairings: list, playerPoints: dict, nRounds: int, nSims: int = 50000, filename: str = None):
+    """
+    This plots the winning probability for each player after each played round
+    playerPoints: dict
+        {playerName: [pointsAfterRound1, pointsAfterRound2, ...]}
+    nRounds: int
+        The total number of rounds
+    """
+    plotData = dict()
+    for player in players.keys():
+        plotData[player] = list()
+
+    # TODO
+
+
 if __name__ == '__main__':
+    """
     pgn = '../resources/2500+gamesUTF8.pgn'
     directory = os.fsencode('../resources/tournaments')
     tournaments = list()
     for file in os.listdir(directory):
         filename = os.fsdecode(file)
         tournaments.append(os.path.join('../resources/tournaments/', filename))
+    """
 
     # print(evaluateResultPrediction(tournaments))
     # for t in tournaments:
         # print(comparePredictedAndActualPoints(t))
 
     # print(evaluateTournamentSimulation(tournaments, 50000))
-    errors = calculatePredictionPointError(tournaments)
+    # errors = calculatePredictionPointError(tournaments)
     # print(np.quantile(errors, [0.25, 0.5, 0.75]))
     # plotPredictionPointErrors(errors, filename='../out/predictionPointError.png')
 
-    wijk = '../resources/tournaments/wijkMasters2026.pgn'
-    candidates = '../resources/tournaments/candidates2024.pgn'
-    plotFirstPlaceChancesBySimulationCount(wijk, 50000, 100, numberOfPlayers=6, filename='../out/wijk2026WinnerPrediction.png')
+    # wijk = '../resources/tournaments/wijkMasters2026.pgn'
+    # candidates = '../resources/tournaments/candidates2024.pgn'
+    # plotFirstPlaceChancesBySimulationCount(wijk, 50000, 100, numberOfPlayers=6, filename='../out/wijk2026WinnerPrediction.png')
+
+    # Prague masters
+    p = ['Van Foreest', 'Niemann', 'Navara', 'Yakubboev', 'Abdusattorov', 
+         'Gukesh', 'Arvindh', 'Anton Guijarro', 'Maghsoodloo', 'Keymer']
+    ratings = [2705, 2725, 2628, 2691, 2751, 2754, 2700, 2666, 2708, 2776]
+    points = [3, 1.5, 2.5, 2, 2.5, 1.5, 1.5, 2, 1.5, 2]
+    praguePairings = [(p[0], p[1]), (p[2], p[3]), (p[4], p[5]), (p[6], p[7]), (p[8], p[9]), 
+                      (p[1], p[9]), (p[7], p[8]), (p[5], p[6]), (p[3], p[4]), (p[0], p[2]), 
+                      (p[2], p[1]), (p[4], p[0]), (p[6], p[3]), (p[8], p[5]), (p[9], p[7]), 
+                      (p[1], p[7]), (p[5], p[9]), (p[3], p[8]), (p[0], p[6]), (p[2], p[4]), 
+                      (p[4], p[1]), (p[6], p[2]), (p[8], p[0]), (p[9], p[3]), (p[7], p[5])]
+    playerRatings = dict()
+    playerPoints = dict()
+    for i, player in enumerate(p):
+        playerRatings[player] = ratings[i]
+        playerPoints[player] = points[i]
+
+    pragueSim = simulateTournament(playerRatings, praguePairings, 50000, playerPoints)
+    print(getPlaceProbabilities(pragueSim))
 
     # players = getPlayersFromPGN(wijk)
     # pairings = getPairingsFromPGN(wijk)
