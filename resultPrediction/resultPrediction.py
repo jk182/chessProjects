@@ -587,6 +587,39 @@ def getPlaceProbabilities(tournamentSim: dict, nSims: int = None) -> dict:
     return placings
 
 
+def getWinProbabilities(tournamentSim: dict) -> dict:
+    """
+    This function calculates the win porbability of each player in a tournament
+    """
+    # TODO: add tiebreaks
+    nSims = len(list(tournamentSim.values())[0])
+    wins = dict()
+    for player in tournamentSim.keys():
+        wins[player] = 0
+
+    for i in range(nSims):
+        winnerPoints = 0
+        winners = list()
+        for player, points in tournamentSim.items():
+            if points[i] > winnerPoints:
+                winnerPoints = points[i]
+                winners = [player]
+            elif points[i] == winnerPoints:
+                winners.append(player)
+
+        if len(winners) == 1:
+            wins[winners[0]] += 1
+        else:
+            index = int(random.random() * len(winners)) # TODO: Just choosing the winner randomly right now
+            wins[winners[index]] += 1
+
+    winProb = dict()
+    for player, w in wins.items():
+        winProb[player] = w/nSims
+
+    return winProb
+
+
 def evaluateTournamentSimulation(pgnPaths: list, nSims: int):
     avgWinProb = 0
     tournaments = 0
@@ -745,7 +778,19 @@ def plotRoundByRoundWinProbabilities(players: dict, pairings: list, playerPoints
     for player in players.keys():
         plotData[player] = list()
 
-    # TODO
+    tournamentSim = simulateTournament(players, pairings, nSims)
+    for player, winProb in getWinProbabilities(tournamentSim).items():
+        plotData[player].append(winProb)
+
+    for i in range(len(list(playerPoints.values())[0])):
+        currentPoints = dict()
+        for player, p in playerPoints.items():
+            currentPoints[player] = p[i]
+        tournamentSim = simulateTournament(players, pairings[i+1:], nSims, currentPoints)
+        for player, winProb in getWinProbabilities(tournamentSim).items():
+            plotData[player].append(winProb)
+
+    plotting_helper.plotLineChart([list(range(len(list(plotData.values())[0])))] * len(plotData.keys()), list(plotData.values()), 'Round', 'Win probability', 'Win probability after each round in the Prague masters', list(plotData.keys()), filename='../out/pragueWinProb.png')
 
 
 if __name__ == '__main__':
@@ -776,7 +821,14 @@ if __name__ == '__main__':
          'Gukesh', 'Arvindh', 'Anton Guijarro', 'Maghsoodloo', 'Keymer']
     ratings = [2705, 2725, 2628, 2691, 2751, 2754, 2700, 2666, 2708, 2776]
     points = [3, 1.5, 2.5, 2, 2.5, 1.5, 1.5, 2, 1.5, 2]
-    praguePairings = [(p[0], p[1]), (p[2], p[3]), (p[4], p[5]), (p[6], p[7]), (p[8], p[9]), 
+    praguePoints = dict()
+    points = [[1, 1, 2, 3, 4], [0.5, 0.5, 1, 1.5, 1.5], [1, 1.5, 2, 2.5, 3.5], [1, 1.5, 2, 2, 2], [1, 1.5, 2, 2.5, 3.5], 
+              [0.5, 1, 1, 1.5, 1.5], [0, 1, 1.5, 1.5, 1.5], [0, 1, 1.5, 2, 3], [0, 0.5, 1, 1.5, 2.5], [0, 0.5, 1, 2, 2]]
+    praguePairings = [(p[5], p[1]), (p[3], p[7]), (p[0], p[9]), (p[2], p[8]), (p[4], p[6]), 
+                      (p[1], p[6]), (p[8], p[4]), (p[9], p[2]), (p[7], p[0]), (p[5], p[3]), 
+                      (p[3], p[1]), (p[0], p[5]), (p[2], p[7]), (p[4], p[9]), (p[6], p[8]), 
+                      (p[1], p[8]), (p[9], p[6]), (p[7], p[4]), (p[5], p[2]), (p[3], p[0]), 
+                      (p[0], p[1]), (p[2], p[3]), (p[4], p[5]), (p[6], p[7]), (p[8], p[9]), 
                       (p[1], p[9]), (p[7], p[8]), (p[5], p[6]), (p[3], p[4]), (p[0], p[2]), 
                       (p[2], p[1]), (p[4], p[0]), (p[6], p[3]), (p[8], p[5]), (p[9], p[7]), 
                       (p[1], p[7]), (p[5], p[9]), (p[3], p[8]), (p[0], p[6]), (p[2], p[4]), 
@@ -787,8 +839,9 @@ if __name__ == '__main__':
         playerRatings[player] = ratings[i]
         playerPoints[player] = points[i]
 
-    pragueSim = simulateTournament(playerRatings, praguePairings, 50000, playerPoints)
-    print(getPlaceProbabilities(pragueSim))
+    plotRoundByRoundWinProbabilities(playerRatings, praguePairings, playerPoints, 9, nSims=20000)
+    # pragueSim = simulateTournament(playerRatings, praguePairings, 50000, playerPoints)
+    # print(getPlaceProbabilities(pragueSim))
 
     # players = getPlayersFromPGN(wijk)
     # pairings = getPairingsFromPGN(wijk)
