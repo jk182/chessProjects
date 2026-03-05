@@ -23,6 +23,7 @@ def searchPositions(pgn: str, script: str, db: str) -> tuple:
     return -> tuple
         Tuple containing dictionaries with the novelties and book moves
     """
+    # TODO: The output format of the TCL script has changed
     novelties = dict()
     # dictionary to count the book moves, values are lists with the number of moves with more than 10000, 1000, 100, 10, 1 games
     bookMoves = dict()
@@ -167,7 +168,8 @@ def getClockTimesByPlayer(pgnPath: str, minutes: bool = True, startTime: int = 5
     minutes: bool
         If this is set, the time will be calculated in minutes
     return -> dict
-        A dictionary indexed by player names containing a list of lists of clock times for each game
+        {playerName: [[colorIndex, whiteTimeGame1, blackTimeGame1], [Game2Data], ... ]}
+        where colorIndex is 1 for white and 2 for black and indicates the color of the player
     """
     times = dict()
 
@@ -178,9 +180,9 @@ def getClockTimesByPlayer(pgnPath: str, minutes: bool = True, startTime: int = 5
 
             # The first index indicates the color of the player
             if minutes:
-                c = [[0, startTime/60], [1, startTime/60]]
+                c = [[startTime/60], [startTime/60]]
             else:
-                c = [[0, startTime], [1, startTime]]
+                c = [[startTime], [startTime]]
 
             node = game
             while not node.is_end():
@@ -198,13 +200,13 @@ def getClockTimesByPlayer(pgnPath: str, minutes: bool = True, startTime: int = 5
                     c[1].append(time)
             
             if white in times.keys():
-                times[white].append(c[0])
+                times[white].append([1, c[0], c[1]])
             else:
-                times[white] = [c[0]]
+                times[white] = [[1, c[0], c[1]]]
             if black in times.keys():
-                times[black].append(c[1])
+                times[black].append([2, c[0], c[1]])
             else:
-                times[black] = [c[1]]
+                times[black] = [[2, c[0], c[1]]]
     return times
 
 
@@ -380,23 +382,57 @@ def plotBookMoveReductions(bookMoveData: dict, players: list = None):
     plt.show()
 
 
+def analyseTimeUsage(clockTimes: dict):
+    for player, clock in clockTimes.items():
+        print(player)
+        for game in clock:
+            print(game[0])
+            print([(game[1][i]-game[1][i+1])/game[1][0] for i in range(len(game[1])-1)])
+            print([(game[2][i]-game[2][i+1])/game[2][0] for i in range(len(game[2])-1)])
+
+
+def getNumberOfGames(pgnPath: str, script: str, database: str):
+    """
+    This function gets the number of games after each move in every game
+    """
+    bookMoves = list()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            date = game.headers["Date"]
+            bm = list()
+            board = game.board()
+            for move in game.mainline_moves():
+                n = int(subprocess.run(['tkscid', script, database, board.fen(), date], stdout=subprocess.PIPE, text=True).stdout.strip())
+                bm.append(n)
+                if n == 0:
+                    break
+                board.push(move)
+            print(bm)
+            bookMoves.append(bm)
+    return bookMoves
+
+
 if __name__ == '__main__':
     # db = '/home/julian/chess/database/gameDB/novelties'
     db = '/Users/julian/Desktop/gameDB/chessDB'
+    db = '/Users/julian/Library/Mobile Documents/com~apple~CloudDocs/chessDB'
     player = 'Carlsen, M.'
     script = 'searchPosition.tcl'
     pgn = '../out/candidates2024-WDL+CP.pgn'
     usChamps = '../resources/usChamps2025.pgn'
     fen = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
+
+    print(getNumberOfGames('../resources/vanForeest-gukesh.pgn', script, db))
+    
     # numGames = numberOfGames(usChamps, script, db)
     # with open('../out/usChampsBook.pkl', 'wb+') as f:
     #     pickle.dump(numGames, f)
 
-    with open('../out/usChampsBook.pkl', 'rb+') as f:
-        numGames = pickle.load(f)
-    print(numGames)
+    # with open('../out/usChampsBook.pkl', 'rb+') as f:
+        # numGames = pickle.load(f)
+    # print(numGames)
     # print(getClockTimesByPlayer(usChamps))
-    plotBookMoveReductions(numGames, ['Sevian, Samuel'])
+    # plotBookMoveReductions(numGames, ['Sevian, Samuel'])
 
     # print(o)
     # print(gamesFromSearchOutput(str(o)))
@@ -404,6 +440,8 @@ if __name__ == '__main__':
     # arjunC = '../out/arjun_closed.pgn'
     # arjunO = '../out/arjun_open-5000-30.pgn'
 
+    # clockTimes = getClockTimesByPlayer('../resources/ding-gukesh-clocks.pgn', startTime=7200)
+    # analyseTimeUsage(clockTimes)
     """
     novC, bookC = searchPositions(arjunC, script, db)
     plotNovelties(novC)
