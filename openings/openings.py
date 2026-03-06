@@ -412,6 +412,8 @@ def getNumberOfGames(pgnPath: str, script: str, database: str):
     return bookMoves
 
 
+
+
 if __name__ == '__main__':
     # db = '/home/julian/chess/database/gameDB/novelties'
     db = '/Users/julian/Desktop/gameDB/chessDB'
