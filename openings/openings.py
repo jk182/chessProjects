@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
+import plotting_helper
 import evalDB
 
 
@@ -412,19 +413,147 @@ def getNumberOfGames(pgnPath: str, script: str, database: str):
     return bookMoves
 
 
+def getMoveStatistics(db: str, moveScript: str, positionFEN: str, startDate: str, endDate: str) -> dict:
+    """
+    This function runs a tkscid script to determine how often each move was played in a given position
+    """
+    moveData = dict()
+    moveStats = subprocess.run(['tkscid', moveScript, db, positionFEN, endDate, startDate], stdout=subprocess.PIPE, text=True).stdout.strip()
+    for line in moveStats.split('\n'):
+        if line.strip()[0].isnumeric():
+            splitLine = line.split(':')[1].split()
+            moveData[splitLine[0]] = int(splitLine[1])
+    return moveData
+
+
+def getMovesYearByYear(positionFEN: str, db: str, script: str, startYear: int, endYear: int) -> dict:
+    yearlyMoves = dict()
+    for year in range(startYear, endYear+1):
+        moveStats = getMoveStatistics(db, script, positionFEN, f"{year-1}.12.31", f"{year}.12.31")
+        yearlyMoves[year] = moveStats
+    return yearlyMoves
+
+
+def plotMovesByYear(positionFEN: str, db: str, script: str, startYear: int, endYear: int, movesToPlot: list, title: str, legend: list = None, filename: str = None):
+    yearlyData = getMovesYearByYear(positionFEN, db, script, startYear, endYear)
+    plotData = dict()
+    for move in movesToPlot:
+        plotData[move] = list()
+
+    for moveData in yearlyData.values():
+        total = sum(moveData.values())
+        for move in movesToPlot:
+            if move in moveData:
+                plotData[move].append(moveData[move]/total)
+            else:
+                plotData[move].append(0)
+
+    xValues = [list(yearlyData.keys())] * len(movesToPlot)
+    if legend is None:
+        moveNr = positionFEN.split()[-1]
+        if positionFEN.split()[1] == 'w':
+            moveNr = f'{moveNr}.'
+        else:
+            moveNr = f'{moveNr}...'
+        legend = [f'{moveNr}{move}' for move in movesToPlot]
+
+    plotting_helper.plotLineChart(xValues, list(plotData.values()), 'Year', 'Relative number of games', title, legend, filename=filename)
+
+
+def plotPositionFrequencies(positions: list, db: str, script: str, startYear: int, endYear: int, referencePos: str, title: str, legend: list, combinedPositions: list = None, filename: str = None):
+    """
+    This function plots how often each position in the positions list was played relative to a reference position.
+    The idea is to be able to compare different variations of an opening
+    combinedPoistions: list
+        Multiple positions that should be counted together
+        [[pos11, pos12, ...], [...]]
+    """
+    plotData = list()
+    referenceTotals = [int(subprocess.run(['tkscid', script, db, referencePos, f"{year-1}.12.31", f"{year}.12.31"], stdout=subprocess.PIPE, text=True).stdout.strip()) for year in range(startYear, endYear+1)]
+    for fen in positions:
+        posData = list()
+        for year in range(startYear, endYear+1):
+            if referenceTotals[year-startYear] == 0:
+                posData.append(0)
+                continue
+            freq = int(subprocess.run(['tkscid', script, db, fen, f"{year-1}.12.31", f"{year}.12.31"], stdout=subprocess.PIPE, text=True).stdout.strip())
+            posData.append(freq/referenceTotals[year-startYear])
+        plotData.append(posData)
+
+    if combinedPositions is not None:
+        for positions in combinedPositions:
+            posData = list()
+            for year in range(startYear, endYear+1):
+                if referenceTotals[year-startYear] == 0:
+                    posData.append(0)
+                    continue
+                total = 0
+                for fen in positions:
+                    freq = int(subprocess.run(['tkscid', script, db, fen, f"{year-1}.12.31", f"{year}.12.31"], stdout=subprocess.PIPE, text=True).stdout.strip())
+                    total += freq
+                posData.append(total/referenceTotals[year-startYear])
+            plotData.append(posData)
+
+
+    xValues = [list(range(startYear, endYear+1))] * len(plotData)
+    plotting_helper.plotLineChart(xValues, plotData, 'Year', 'Relative number of games', title, legend, filename=filename)
 
 
 if __name__ == '__main__':
     # db = '/home/julian/chess/database/gameDB/novelties'
     db = '/Users/julian/Desktop/gameDB/chessDB'
     db = '/Users/julian/Library/Mobile Documents/com~apple~CloudDocs/chessDB'
+    classicalDB = '/Users/julian/Library/Mobile Documents/com~apple~CloudDocs/classicalGames'
     player = 'Carlsen, M.'
     script = 'searchPosition.tcl'
     pgn = '../out/candidates2024-WDL+CP.pgn'
     usChamps = '../resources/usChamps2025.pgn'
     fen = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
+    moveScript = 'getMoveFrequencies.tcl'
+    e4Pos = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1'
+    sicilian = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2'
+    preNajdorf = 'rnbqkb1r/pp2pppp/3p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R b KQkq - 2 5'
+    # Sicilian variations
+    najdorf = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
+    classicalSicilian = 'r1bqkb1r/pp2pppp/2np1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 3 6'
+    dragon = 'rnbqkb1r/pp2pp1p/3p1np1/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
+    sveshnikov = 'r1bqkb1r/pp1p1ppp/2n2n2/4p3/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
+    kalashnikov = 'r1bqkbnr/pp3ppp/2np4/1N2p3/4P3/8/PPP2PPP/RNBQKB1R w KQkq - 0 6'
+    lowenthal = 'r1bqkbnr/1p1p1ppp/p1n5/1N2p3/4P3/8/PPP2PPP/RNBQKB1R w KQkq - 0 6'
+    taimanov = 'r1bqkbnr/pp1p1ppp/2n1p3/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 1 5'
+    kan = 'rnbqkbnr/1p1p1ppp/p3p3/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 0 5'
+    accDragon = ['rnbqkbnr/pp1ppp1p/6p1/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3', 'rnbqkbnr/pp2pp1p/3p2p1/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 0 5']
 
-    print(getNumberOfGames('../resources/vanForeest-gukesh.pgn', script, db))
+    # Bg5 Najdorf variations
+    Bg5Start = 'rnbqkb1r/1p2pppp/p2p1n2/6B1/3NP3/2N5/PPP2PPP/R2QKB1R b KQkq - 1 6'
+    poisonedPawn = 'rnb1kb1r/1p3ppp/pq1ppn2/6B1/3NPP2/2N5/PPP3PP/R2QKB1R w KQkq - 1 8'
+    e6f4Be7 = 'rnbqk2r/1p2bppp/p2ppn2/6B1/3NPP2/2N5/PPP3PP/R2QKB1R w KQkq - 1 8'
+    Nbd7 = 'r1bqkb1r/1p1npppp/p2p1n2/6B1/3NP3/2N5/PPP2PPP/R2QKB1R w KQkq - 2 7'
+    e6f4h6 = 'rnbqkb1r/1p3pp1/p2ppn1p/6B1/3NPP2/2N5/PPP3PP/R2QKB1R w KQkq - 0 8'
+    e6f4Nbd7 = 'r1bqkb1r/1p1n1ppp/p2ppn2/6B1/3NPP2/2N5/PPP3PP/R2QKB1R w KQkq - 1 8'
+    e6f4Qc7 = 'rnb1kb1r/1pq2ppp/p2ppn2/6B1/3NPP2/2N5/PPP3PP/R2QKB1R w KQkq - 1 8'
+
+    # move 2 alternatives for White
+    closedSicilian = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2'
+    alapin = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR b KQkq - 0 2'
+    smithMorra = 'rnbqkbnr/pp1ppppp/8/2p5/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2'
+    openSicilians = ['rnbqkbnr/pp2pppp/3p4/2p5/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3', 'r1bqkbnr/pp1ppppp/2n5/2p5/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3', 'rnbqkbnr/pp1p1ppp/4p3/2p5/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3', 'rnbqkbnr/pp1ppp1p/6p1/2p5/3PP3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 3']
+    delayedAlapin = ['r1bqkbnr/pp1ppppp/2n5/2p5/4P3/2P2N2/PP1P1PPP/RNBQKB1R b KQkq - 0 3', 'rnbqkbnr/pp2pppp/3p4/2p5/4P3/2P2N2/PP1P1PPP/RNBQKB1R b KQkq - 0 3', alapin]
+    moscow = 'rnbqkbnr/pp2pppp/3p4/1Bp5/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 3'
+    rossolimo = 'r1bqkbnr/pp1ppppp/2n5/1Bp5/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3'
+
+    e4c5Nf3 = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2'
+    # getMovesYearByYear(e4Pos, classicalDB, moveScript, 1900, 2000)
+    # plotMovesByYear(e4Pos, classicalDB, moveScript, 1850, 2026, ['e5', 'c5', 'e6', 'c6', 'd6', 'g6', 'd5', 'Nf6'], 'Relative number of games with different responses to 1.e4', filename='../out/openingFreqPlots/e4.png')
+    # plotMovesByYear(preNajdorf, classicalDB, moveScript, 1900, 2026, ['a6', 'Nc6', 'g6', 'e6'])
+    plotMovesByYear(najdorf, classicalDB, moveScript, 1950, 2026, ['Be3', 'Bg5', 'Bc4', 'h3', 'f3', 'Rg1', 'Be2', 'Bd3', 'g3', 'f4'], 'Popularity of different 6th moves for white in the Najdorf variation' , filename='../out/openingFreqPlots/najdorf.png')
+    # plotMovesByYear(e4c5Nf3, classicalDB, moveScript, 1850, 2026, ['d6', 'Nc6', 'e6', 'g6', 'Nf6', 'a6', 'Qc7'])
+
+    # plotPositionFrequencies([najdorf, classicalSicilian, dragon, sveshnikov, kalashnikov, taimanov, kan], classicalDB, script, 1920, 2026, e4c5Nf3, 'Relative number of games in different open Sicilian variations', ['Naidorf Variation', 'Classical Sicilian', 'Dragon Variation', 'Sveshnikov Variation', 'Kalashnikov Variation', 'Taimanov Variation', 'Kan Variation', '(Hyper-)accelerated Dragon'], combinedPositions=[accDragon], filename='../out/openingFreqPlots/openSicilians.png')
+    # plotPositionFrequencies([closedSicilian, smithMorra, moscow, rossolimo], classicalDB, script, 1920, 2026, sicilian,  'Relative number of games after 1.e4 c5 with different Sicilian variations', ['Closed Sicilian', 'Smith-Morra Gambit', 'Moscow Variation', 'Rossolimo Variation', 'Open Sicilian', 'Alapin Variation'], combinedPositions=[openSicilians, delayedAlapin], filename='../out/openingFreqPlots/e4c5.png')
+    # plotPositionFrequencies([poisonedPawn, e6f4Be7, Nbd7, e6f4h6, e6f4Nbd7, e6f4Qc7], classicalDB, script, 1950, 2026, Bg5Start, 'Bg5 Najdorf', ['Poisoned pawn', '6...e6 7.f4 Be7', '6...Nbd7', '6...e6 7.f4 h6', '6...e6 7.f4 Nbd7', '6...e6 7.f4 Qc7'])
+
+    # print(getNumberOfGames('../resources/vanForeest-gukesh.pgn', script, db))
     
     # numGames = numberOfGames(usChamps, script, db)
     # with open('../out/usChampsBook.pkl', 'wb+') as f:

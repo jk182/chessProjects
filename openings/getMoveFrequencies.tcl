@@ -2,7 +2,8 @@
 # TODO: the tree search doesn't include the date
 set db [lindex $argv 0]
 set fen [lindex $argv 1]
-set date [lindex $argv 2]
+set endDate [lindex $argv 2]
+set startDate [lindex $argv 3]
 
 sc_base open $db
 
@@ -14,8 +15,11 @@ sc_game new
 sc_game startBoard $fen
 
 # searching the date has to be done before the board, as there are no filter options
-if {$date ne ""} {
-	sc_search header -date "1000.01.01 $date"
+if {$endDate ne ""} {
+	if {$startDate eq ""} {
+		set startDate "1000.01.01"
+	}
+	sc_search header -date "$startDate $endDate"
 }
 
 sc_search board 0 E false false

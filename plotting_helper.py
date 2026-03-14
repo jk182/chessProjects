@@ -64,7 +64,7 @@ def getDefaultColors() -> list:
     """
     This returns a list of default colors
     """
-    return getColors(['blue', 'orange', 'green', 'purple', 'violet', 'rosa', 'darkgreen', 'red', 'grey', 'darkred'])
+    return getColors(['blue', 'orange', 'green', 'purple', 'violet', 'rosa', 'red', 'grey', 'yellow', 'darkblue'])
 
 
 def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, legendUnderPlot: bool = False, yTicks: list = None, filename: str = None):
@@ -286,7 +286,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
         xVals = [xMin + i/steps*(xMax-xMin) for i in range(steps+1)]
         ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1], linewidth=2)
 
-    ax.set_xlim(xMin, 9)
+    ax.set_xlim(xMin, xMax)
     ax.set_ylim(yMin*0.95, yMax*1.05)
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)

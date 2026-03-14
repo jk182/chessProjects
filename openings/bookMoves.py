@@ -2,6 +2,12 @@ import chess
 import chess.pgn
 import subprocess
 
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import plotting_helper
+
+import matplotlib.pyplot as plt
+
 
 def getPlayerTimes(game: chess.pgn.Game, startTime: int = 5430, increment: int = 30) -> list:
     """
@@ -154,12 +160,51 @@ def getBookMoves(pgnPath: str, script: str, db: str, startTime: int = 5430, incr
                 moveNr += 1
 
 
+def plotTimeSpentPerPlayer(pgnPath: str, maxMove: int = None):
+    times = dict()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            colorTimes = getPlayerTimes(game)
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            if white in times:
+                times[white].append(colorTimes[0])
+            else:
+                times[white] = [colorTimes[0]]
+
+            if black in times:
+                times[black].append(colorTimes[1])
+            else:
+                times[black] = [colorTimes[1]]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(plotting_helper.getColor('background'))
+
+    colors = plotting_helper.getDefaultColors()
+
+    colorIndex = 0
+    for player, t in times.items():
+        for i, yValues in enumerate(t):
+            if maxMove is not None:
+                yValues = yValues[:maxMove]
+            if i == 0:
+                ax.plot(list(range(1, len(yValues)+1)), yValues, color=colors[colorIndex], label=player)
+            else:
+                ax.plot(list(range(1, len(yValues)+1)), yValues, color=colors[colorIndex])
+        colorIndex += 1
+    
+    ax.legend()
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    plt.show()
 
 if __name__ == '__main__':
     db = '/Users/julian/Library/Mobile Documents/com~apple~CloudDocs/chessDB'
     script = 'searchPosition.tcl'
     pgn = '../resources/vanForeest-gukesh.pgn'
     moveScript = 'getMoveFrequencies.tcl'
-    getBookMoves(pgn, moveScript, db)
+    # getBookMoves(pgn, moveScript, db)
     najdorf = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
     # print(getMoveStatistics(db, moveScript, najdorf, '2025.01.01'))
+    prague = '../resources/tournaments/prague2026.pgn'
+    plotTimeSpentPerPlayer(prague, 40)
