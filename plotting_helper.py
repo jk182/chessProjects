@@ -23,7 +23,8 @@ def getAllColors() -> dict:
     colors['darkblue'] = '#434E78'
     # colors['darkgreen'] = '#B0D9B1'
     colors['darkorange'] = '#F39E60'
-    colors['darkred'] = '#E16A54'
+    # colors['darkred'] = '#E16A54'
+    colors['darkred'] = '#ad351e'
     colors['rosa'] = '#F0A8D0'
     colors['black'] = '#111111'
 
@@ -67,7 +68,7 @@ def getDefaultColors() -> list:
     return getColors(['blue', 'orange', 'green', 'purple', 'violet', 'rosa', 'red', 'grey', 'yellow', 'darkblue'])
 
 
-def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, legendUnderPlot: bool = False, yTicks: list = None, filename: str = None):
+def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, legend: list, colors: list = None, xlabel: str = None, legendUnderPlot: bool = False, yTicks: list = None, filename: str = None, **legendKwargs):
     """
     A general function to create bar charts, where each player (or group of players) gets multiple bars.
     data: list
@@ -86,6 +87,8 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     filename: str
         The name to save the plot to.
         If no name is given, the plot will be shown instead of saved.
+    **legendKwargs:
+        Kwargs to adjust the legend
     """
     if not colors:
         colors = getDefaultColors()
@@ -108,16 +111,22 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         yMax = max(yMax, max([d[j] for d in data]))
         yMin = min(yMin, min([d[j] for d in data]))
 
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     if legendUnderPlot:
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.04), ncol=5)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=5)
+        fig.subplots_adjust(bottom=0.15, top=0.95, left=0.1, right=0.95)
+    elif legendKwargs:
+        ax.legend(**legendKwargs)
     else:
         ax.legend()
+
     if yTicks:
         ax.set_yticks(yTicks)
+
+    ax.set_xlim(1+2*offset, len(data)-2*offset)
     ax.set_ylim(yMin*1.05, yMax * 1.05)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=300)
@@ -266,7 +275,7 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
         plt.show()
 
 
-def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, filename: str = None):
+def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, linewidth: float = 2, filename: str = None):
     if not colors:
         colors = getDefaultColors()
 
@@ -284,7 +293,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
     if refFunction:
         steps = 100
         xVals = [xMin + i/steps*(xMax-xMin) for i in range(steps+1)]
-        ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1], linewidth=2)
+        ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1], linewidth=linewidth)
 
     ax.set_xlim(xMin, xMax)
     ax.set_ylim(yMin*0.95, yMax*1.05)

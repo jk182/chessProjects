@@ -683,17 +683,7 @@ def commandLine():
 
 
 if __name__ == '__main__':
-    # commandLine()
-    op = {'WeightsFile': '/home/julian/Desktop/largeNet', 'UCI_ShowWDL': 'true'}
-    leela = configureEngine('lc0', op)
-    sf = configureEngine('stockfish', {'Threads': '10', 'Hash': '8192'})
-
-    analyseGames('../resources/candidates2020.pgn', '../out/candidates2020_analysed.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/candidates2022.pgn', '../out/candidates2022_analysed.pgn', sf, leela, 4, 10000)
-    analyseGames('../resources/candidates2024.pgn', '../out/candidates2024_analysed.pgn', sf, leela, 4, 10000)
-
-    sf.quit()
-    leela.quit()
+    commandLine()
     """
     info = leela.analyse(Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'), chess.engine.Limit(nodes=5000))
     wdl = []
