@@ -288,7 +288,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
     yMax = max([max(y) for y in yValues])
 
     for i in range(len(xValues)):
-        ax.plot(xValues[i], yValues[i], color=colors[i%len(colors)], label=legend[i])
+        ax.plot(xValues[i], yValues[i], color=colors[i%len(colors)], label=legend[i], linewidth=linewidth)
 
     if refFunction:
         steps = 100
@@ -297,8 +297,10 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
 
     ax.set_xlim(xMin, xMax)
     ax.set_ylim(yMin*0.95, yMax*1.05)
+    # ax.set_ylim(0, yMax*1.05)
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
+    ax.set_yticks(range(10))
 
     ax.legend()
     plt.title(title)

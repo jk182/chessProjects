@@ -269,7 +269,7 @@ def getPlayerOpportunities(pgnPath: str) -> dict:
     """
     This function counts how often players got opportunities with a better position during the tournament
     return -> dict:
-        {playerNames: [[totalOpp, gamesWithOpp, wonGames], [opponentTotalOpp, gamesWithOpponentOpp, lostGames]], ...}
+        {playerNames: [[[totalWhiteOpp, totalBlackOpp], [whiteGamesWithOpp, blackGamesWithOpp], [whiteWonGames, blackWonGames]], [[opponentTotalOppWhite, opponentTotalOppBlack], [whiteGamesWithOpponentOpp, blackGamesWithOpponentOpp], [whiteLostGames, blackLostGames]]], ...}
     """
     opportunities = dict()
     cpThreshold = 100
@@ -282,9 +282,9 @@ def getPlayerOpportunities(pgnPath: str) -> dict:
             result = game.headers["Result"]
 
             if white not in opportunities:
-                opportunities[white] = [[0, 0, 0], [0, 0, 0]]
+                opportunities[white] = [[[0, 0], [0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]]]
             if black not in opportunities:
-                opportunities[black] = [[0, 0, 0], [0, 0, 0]]
+                opportunities[black] = [[[0, 0], [0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]]]
 
             node = game
             whiteAdvantage = False
@@ -305,28 +305,28 @@ def getPlayerOpportunities(pgnPath: str) -> dict:
                 elif cpEval >= cpThreshold and not whiteAdvantage:
                     whiteAdvantage = True
                     blackAdvantage = False
-                    opportunities[white][0][0] += 1
-                    opportunities[black][1][0] += 1
+                    opportunities[white][0][0][0] += 1
+                    opportunities[black][1][0][1] += 1
                     if not wGameCounted:
                         wGameCounted = True
-                        opportunities[white][0][1] += 1
-                        opportunities[black][1][1] += 1
+                        opportunities[white][0][1][0] += 1
+                        opportunities[black][1][1][1] += 1
                 elif cpEval <= -cpThreshold and not blackAdvantage:
                     whiteAdvantage = False
                     blackAdvantage = True
-                    opportunities[white][1][0] += 1
-                    opportunities[black][0][0] += 1
+                    opportunities[white][1][0][0] += 1
+                    opportunities[black][0][0][1] += 1
                     if not bGameCounted:
                         bGameCounted = True
-                        opportunities[white][1][1] += 1
-                        opportunities[black][0][1] += 1
+                        opportunities[white][1][1][0] += 1
+                        opportunities[black][0][1][1] += 1
 
             if result == '1-0':
-                opportunities[white][0][2] += 1
-                opportunities[black][1][2] += 1
+                opportunities[white][0][2][0] += 1
+                opportunities[black][1][2][1] += 1
             elif result == '0-1':
-                opportunities[white][1][2] += 1
-                opportunities[black][0][2] += 1
+                opportunities[white][1][2][0] += 1
+                opportunities[black][0][2][1] += 1
 
     return opportunities
 
@@ -400,7 +400,15 @@ def plotPointsScoredAgainstSeeds(pgnPaths: list, xTickLabels: list, nPlayers: in
     for i in range(len(seeds)):
         avgData.append([sum([v[i][j] for v in plotData if v[i][j] is not None])/max(1, len([v[i][j] for v in plotData if v[i][j] is not None])) for j in range(nPlayers)]) # entries with None would be games by the player against themselves, which are excluded from the average
 
-    plotting_helper.plotPlayerBarChart(avgData, [i+1 for i in range(len(seeds))], 'Number of points', 'Average number of points scored by the top 3 finishers against the different seeds per tournament', ['Winner', 'Second place', 'Third place'], xlabel='Opponent seed by rating', legendUnderPlot=True, filename=filename)
+    colors = plotting_helper.getColors(['blue', 'orange', 'violet'])
+    if useFinalRankings:
+        title = 'Average number of points scored by the top 3 finishers against players based on the final standings'
+        xlabel = 'Opponent final ranking in the tournament'
+    else:
+        title = 'Average number of points scored by the top 3 finishers against players based on the ratings'
+        xlabel = 'Opponent seed by rating'
+
+    plotting_helper.plotPlayerBarChart(avgData, [i+1 for i in range(len(seeds))], 'Number of points', title, ['Winner', 'Second place', 'Third place'], xlabel=xlabel, loc='upper center', ncol=3, filename=filename, colors=colors)
 
 
 def plotRoundByRoundScores(pgnPaths: list, nPlayers: int = 3, useCurrentHighestRanking: bool = True, filename: str = None):
@@ -439,8 +447,9 @@ def plotRoundByRoundScores(pgnPaths: list, nPlayers: int = 3, useCurrentHighestR
     for i in range(nPlayers):
         avgData.append([sum([d[i][j] for d in plotData])/len(plotData) for j in range(len(plotData[0][i]))])
 
+    colors = plotting_helper.getColors(['blue', 'orange', 'violet'])
     xValues = [list(range(1, len(avgData[0])+1))] * nPlayers
-    plotting_helper.plotLineChart(xValues, avgData, 'Round', 'Points', 'Average points after each round for the top 3 players', ['Winner', 'Second place', 'Third place'], linewidth=3, filename=filename)
+    plotting_helper.plotLineChart(xValues, avgData, 'Round', 'Points', 'Average points after each round for the top 3 players', ['Winner', 'Second place', 'Third place'], linewidth=2.5, filename=filename, colors=colors)
 
 
 def plotWinsDrawsLossesByRankings(pgnPaths: list, totalPlayers: int = 8, nRounds: int = 14, filename: str = None):
@@ -475,8 +484,9 @@ def plotWinsDrawsLossesByRankings(pgnPaths: list, totalPlayers: int = 8, nRounds
     ax.set_xlabel('Final ranking in the tournament')
     ax.set_ylabel('Relative number of games')
     ax.set_xlim(1+2*offset, totalPlayers-2*offset)
-    fig.subplots_adjust(bottom=0.15, top=0.95, left=0.1, right=0.95)
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=6)
+    ax.set_ylim(0, max([(d[0]+d[1]) / (nRounds * len(pgnPaths)) for data in plotData for d in data]) * 1.13)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.legend(loc='upper center', ncol=3)
 
     if filename:
         plt.savefig(filename, dpi=300)
@@ -501,31 +511,55 @@ def plotAverageAccuraciesByRanking(pgnPaths: list):
     plotting_helper.plotPlayerBarChart(plotData, [i+1 for i in range(len(plotData))], 'Accuracy', 'Accuracy based on finishing position', ['Player accuracy', 'Opponent accuracy'])
 
 
-def plotOpportunitiesByRanking(pgnPaths: list, filename: str = None):
-    rawData = list()
+def plotOpportunitiesByRanking(pgnPaths: list, nPlayers: int = 8, filename: str = None):
+    whiteData = list()
+    blackData = list()
+    for i in range(nPlayers):
+        whiteData.append([[0, 0, 0], [0, 0, 0]])
+        blackData.append([[0, 0, 0], [0, 0, 0]])
     for pgnPath in pgnPaths:
         playerResults = getPlayerResults(pgnPath)
         rankings = getPlayerRankings(playerResults)
         opportunities = getPlayerOpportunities(pgnPath)
-        if not rawData:
-            for player in rankings:
-                rawData.append(opportunities[player])
-        else:
-            for rank, player in enumerate(rankings):
-                opp = opportunities[player]
-                for j in range(len(opp)):
-                    for k in range(len(opp[j])):
-                        rawData[rank][j][k] += opp[j][k]
-    
-    plotData = list()
-    for data in rawData:
-        plotData.append([data[0][1], data[0][2], data[1][1], data[1][2]])
-        for i in range(len(plotData[-1])):
-            plotData[-1][i] /= len(pgnPaths)
+        for rank, player in enumerate(rankings):
+            opp = opportunities[player]
+            for j in range(len(opp)):
+                for k in range(len(opp[j])):
+                    whiteData[rank][j][k] += opp[j][k][0]
+                    blackData[rank][j][k] += opp[j][k][1]
 
-    colors = plotting_helper.getColors(['blue', 'green', 'orange', 'red'])
+    wPlotData = list()
+    bPlotData = list()
+    for white, black in zip(whiteData, blackData):
+        wPlotData.append([white[i][j]/len(pgnPaths) for i in range(2) for j in range(1, 3)])
+        bPlotData.append([black[i][j]/len(pgnPaths) for i in range(2) for j in range(1, 3)])
 
-    plotting_helper.plotPlayerBarChart(plotData, [i+1 for i in range(len(plotData))], 'Number of games', 'Number of chances', ['Better games', 'Won games', 'Worse games', 'Lost games'], loc='upper center', ncol=4, filename=filename, colors=colors, xLabel='Finishing position')
+    colors = plotting_helper.getColors(['blue', 'darkblue', 'slightly better', 'much better', 'yellow', 'darkorange', 'red', 'darkred'])
+    legend = ['Better games w/ white', 'Better games w/ black', 'White wins', 'Black wins', 'Worse games w/ white', 'Worse games w/ black', 'White losses', 'Black losses']
+    nBars = len(wPlotData[0])
+
+    width = 0.8/nBars
+    offset = width * (1/2 - nBars/2)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor('#e6f7f2')
+    for bar in range(nBars):
+        white = [data[bar] for data in wPlotData]
+        black = [data[bar]for data in bPlotData]
+        xValues = [i+1+offset+(width*bar) for i in range(nPlayers)]
+        ax.bar(xValues, white, color=colors[2*bar], width=width, edgecolor='black', linewidth=0.5, label=legend[2*bar])
+        ax.bar(xValues, black, color=colors[2*bar+1], bottom=white, width=width, edgecolor='black', linewidth=0.5, label=legend[2*bar+1])
+
+    plt.title('Average number of better/worse games, wins and losses based on final tournament standings')
+    ax.set_xlabel('Final ranking in the tournament')
+    ax.set_ylabel('Number of games per tournament')
+    ax.set_xlim(1+2*offset, nPlayers-2*offset)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.09, right=0.95)
+    ax.legend(loc='upper center', ncol=4)
+
+    if filename:
+        plt.savefig(filename, dpi=300)
+    else:
+        plt.show()
 
 
 def plotGameResultsPerRound(pgnPaths: list, nRounds: int = 14, nGames: int = 4, filename: str = None):
@@ -539,7 +573,7 @@ def plotGameResultsPerRound(pgnPaths: list, nRounds: int = 14, nGames: int = 4, 
             for j in range(len(r)):
                 plotData[i][j] += r[j] / (len(pgnPaths) * nGames)
 
-    plotting_helper.plotPlayerBarChart(plotData, [i+1 for i in range(nRounds)], 'Number of games', 'Number of white wins, draws and black wins per round', ['White wins', 'Draws', 'Black wins'], xlabel='Round number', colors=['#ffffff', plotting_helper.getColor('orange'), 'black'], filename=filename)
+    plotting_helper.plotPlayerBarChart(plotData, [i+1 for i in range(nRounds)], 'Relative umber of games', 'Relative number of white wins, draws and black wins per round', ['White wins', 'Draws', 'Black wins'], xlabel='Round number', colors=['#ffffff', plotting_helper.getColor('purple'), 'black'], filename=filename)
 
 
 def plotSharpnessChangeByRanking(pgnPaths: list, nPlayers: int = 8):
@@ -571,9 +605,10 @@ if __name__ == '__main__':
     # results = getPlayerResults(can)
     # print(getPlayerRankings(results))
     # opps = getPlayerOpportunities(can)
-    # plotPointsScoredAgainstSeeds(allCandidates, years, useFinalRankings=True)
+    # plotPointsScoredAgainstSeeds(allCandidates, years, useFinalRankings=False, filename=f'{outFolder}/scoreVsSeeds.png')
+    # plotPointsScoredAgainstSeeds(allCandidates, years, useFinalRankings=True, filename=f'{outFolder}/scoreVsRankings.png')
     # plotRoundByRoundScores(allCandidates, filename=f'{outFolder}/roundScores.png')
     # plotWinsDrawsLossesByRankings(allCandidates, filename=f'{outFolder}/rankingsWDL.png')
-    plotOpportunitiesByRanking(allCandidates)
+    # plotOpportunitiesByRanking(allCandidates, filename=f'{outFolder}/opportunities.png')
     # plotGameResultsPerRound(allCandidates, filename=f'{outFolder}/roundResults.png')
     # plotSharpnessChangeByRanking(allCandidates)
