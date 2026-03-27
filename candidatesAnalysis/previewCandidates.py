@@ -107,6 +107,7 @@ def getPlayerOpenings(players: list, pgnFolder: str) -> dict:
                     print(f'Player {lastName} not found in {game.headers["White"]}-{game.headers["Black"]}')
 
                 opening = game.headers["Opening"]
+                opening = opening.split('(')[0].split(',')[0].strip()
 
                 if opening not in openings[player]:
                     openings[player][opening] = [0, 0]
@@ -116,24 +117,60 @@ def getPlayerOpenings(players: list, pgnFolder: str) -> dict:
     return openings
 
 
+def getWhiteFirstMoves(players: list, pgnFolder: str) -> dict:
+    firstMoves = dict()
+    for player in players:
+        firstMoves[player] = dict()
+        lastName = player.split(',')[0].split()[0]
+        with open(f'{pgnFolder}/{lastName.lower()}.pgn', 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if lastName in game.headers["White"]:
+                    board = game.board()
+
+                    firstMove = board.san(list(game.mainline_moves())[0])
+                    if firstMove not in firstMoves[player]:
+                        firstMoves[player][firstMove] = 1
+                    else:
+                        firstMoves[player][firstMove] += 1
+    return firstMoves
+
+
 def plotRatingProgression(ratingData: dict, startDate: str, filename: str = None):
     """
     This generates a rating plot for each player, where the other players are included in smaller grey lines
     """
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    xTickGap = 4
+    totalMonths = len(list(ratingData.values())[0])
+    startYear = int(startDate.split('-')[0])
+    startMonth = int(startDate.split('-')[1])
+    xTickLabels = [f'{months[startMonth]}-{startYear}']
+    for i in range(xTickGap, totalMonths, xTickGap):
+        currentMonth = startMonth + i
+        currentYear = startYear + currentMonth // 12
+        xTickLabels.append(f'{months[currentMonth%12]}-{currentYear}')
+
     for player, ratings in ratingData.items():
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig, ax = plt.subplots(figsize=(5, 1))
         ax.set_facecolor(plotting_helper.getColor('background'))
 
-        ax.plot(range(len(ratings)), ratings, linewidth=2, color=plotting_helper.getColor('blue'))
         for p, r in ratingData.items():
             if p != player:
                 ax.plot(range(len(r)), r, linewidth=1, color='grey')
+        ax.plot(range(len(ratings)), ratings, linewidth=2, color=plotting_helper.getColor('blue'))
 
-        plt.title(player)
+        ax.grid()
+        ax.set_xticks(range(0, totalMonths, xTickGap))
+        ax.set_xticklabels(xTickLabels)
+        ax.set_xlim(0, len(ratings)-1)
+        ax.tick_params(axis='both', which='major', labelsize=8)
+        ax.tick_params(axis='both', which='minor', labelsize=8)
         if filename:
-            plt.savefig(f'{filename}_{player.split(",")[0].split()[0]}.png', dpi=400)
+            plt.savefig(f'{filename}_{player.split(",")[0].split()[0]}.png', dpi=300)
         else:
             plt.show()
+
+        break
 
 
 if __name__ == '__main__':
@@ -142,8 +179,12 @@ if __name__ == '__main__':
     players = list(openCandidates.keys())
     pgnFolder = '../resources/candidatesGames'
     ratingData = getFideRatingData(openCandidates, 2024, 'May')
-    plotRatingProgression(ratingData, '2024-05')
+    plotRatingProgression(ratingData, '2024-05')#, filename='/Users/julian/Desktop/test')
     # print(getPlayerWDL(players, pgnFolder))
+    openingNames = {'Enlgish': ['English opening'], 'Italian Game': ['Two knights defence', 'Giuoco Pianissimo', 'Giuoco Piano'], 'Sicilian': ['Sicilian defence'], 'Reti': ['Reti opening']}
     # openings = getPlayerOpenings(players, pgnFolder)
     # for player, d in openings.items():
         # print(player, dict(reversed(sorted(d.items(), key=lambda x: x[1][0]))))
+    # firstMoves = getWhiteFirstMoves(players, pgnFolder)
+    # for player, d in firstMoves.items():
+        # print(player, d)
