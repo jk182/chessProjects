@@ -58,6 +58,8 @@ def getColors(names: list) -> list:
     for name in names:
         if name in colorsDict.keys():
             colors.append(colorsDict[name])
+        else:
+            colors.append(colorsDict['blue'])
     return colors
 
 
