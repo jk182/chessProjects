@@ -510,7 +510,7 @@ def getPairingsFromPGN(pgnPath: str) -> list:
             white = game.headers["White"]
             black = game.headers["Black"]
 
-            pairings.append((white, black))
+            pairings.append([white, black])
     return pairings
 
 
@@ -793,7 +793,61 @@ def plotRoundByRoundWinProbabilities(players: dict, pairings: list, playerPoints
     plotting_helper.plotLineChart([list(range(len(list(plotData.values())[0])))] * len(plotData.keys()), list(plotData.values()), 'Round', 'Win probability', 'Win probability after each round in the Prague masters', list(plotData.keys()), filename='../out/pragueWinProb.png')
 
 
+def testResultPrediction(pgnPaths: list, minRating: int = 2500):
+    data = dict()
+    data['Actual Results'] = [0, 0, 0]
+    data['Predicted Results'] = [0, 0, 0]
+    data['Correct results'] = [0, 0, 0]
+    onlineGames = 0
+    rapidBlitzGames = 0
+
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r', encoding='latin-1') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                if 'chess.com' in game.headers["Site"].lower() or 'lichess' in game.headers["Site"].lower():
+                    onlineGames += 1
+                    continue
+                if 'blitz' in game.headers["Event"].lower() or 'rapid' in game.headers["Event"].lower():
+                    rapidBlitzGames += 1
+                    continue
+
+                if "WhiteElo" not in game.headers or "BlackElo" not in game.headers:
+                    continue
+
+                wElo = int(game.headers["WhiteElo"])
+                bElo = int(game.headers["BlackElo"])
+
+                if wElo < minRating or bElo < minRating:
+                    continue
+
+                result = game.headers["Result"]
+                predictedResult = predictResult(wElo, bElo)
+                maxIndex = predictedResult.index(max(predictedResult))
+
+                if result == "1-0":
+                    data['Actual Results'][0] += 1
+                    if maxIndex == 0:
+                        data['Correct results'][0] += 1
+                elif result == "1/2-1/2":
+                    data['Actual Results'][1] += 1
+                    if maxIndex == 1:
+                        data['Correct results'][1] += 1
+                elif result == "0-1":
+                    data['Actual Results'][2] += 1
+                    if maxIndex == 2:
+                        data['Correct results'][2] += 1
+                else:
+                    print('Result not found')
+                    continue
+                for i in range(3):
+                    data['Predicted Results'][i] += predictedResult[i]
+
+    print(onlineGames, rapidBlitzGames)
+    return data
+            
+
 if __name__ == '__main__':
+    print(testResultPrediction(['../resources/twic1630.pgn', '../resources/twic1631.pgn', '../resources/twic1632.pgn', '../resources/twic1633.pgn', '../resources/twic1634.pgn', '../resources/twic1635.pgn'], minRating=2300))
     """
     pgn = '../resources/2500+gamesUTF8.pgn'
     directory = os.fsencode('../resources/tournaments')
@@ -839,7 +893,7 @@ if __name__ == '__main__':
         playerRatings[player] = ratings[i]
         playerPoints[player] = points[i]
 
-    plotRoundByRoundWinProbabilities(playerRatings, praguePairings, playerPoints, 9, nSims=20000)
+    # plotRoundByRoundWinProbabilities(playerRatings, praguePairings, playerPoints, 9, nSims=20000)
     # pragueSim = simulateTournament(playerRatings, praguePairings, 50000, playerPoints)
     # print(getPlaceProbabilities(pragueSim))
 

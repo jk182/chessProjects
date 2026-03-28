@@ -3,10 +3,12 @@ import chess.pgn
 import random
 import resultPrediction
 import matplotlib.pyplot as plt
+import yaml
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import plotting_helper
+import argparse
 
 
 def eloFormula(playerRating: int, oppRating: int) -> float:
@@ -174,10 +176,14 @@ def simulateTournament(players: dict, pairings: list, simulations: int = 20000, 
     for n in range(simulations):
         players['Nakamura, Hikaru'] = 2775 + 30*random.random()
         for white, black in pairings:
-            if len(data[white]) <= n:
-                data[white].append([[0, 0, 0], 0, False])
-            if len(data[black]) <= n:
-                data[black].append([[0, 0, 0], 0, False])
+            for player in [white, black]:
+                if len(data[player]) <= n:
+                    if startResults is not None and player in startResults:
+                        wdl = startResults[player].copy()
+                    else:
+                        wdl = [0, 0, 0]
+                    data[player].append([wdl, 0, False])
+                    
             predictedResult = predictResult(players[white], players[black])
             x = random.random()
             if x <= predictedResult[0]:
@@ -286,21 +292,73 @@ def plotWinningChances(winProbabilities: dict, filename: str = None):
     else:
         plt.show()
 
+def commandLine():
+    parser = argparse.ArgumentParser(prog='Tournament simulation', 
+                                     description='This script runs the simulation of a tournament')
+
+    parser.add_argument('--config_path', default='configFiles/config', help="Path to the YAML config files")
+    parser.add_argument('--tournament_name', default='', help='Name of the tournament for the config files')
+    parser.add_argument('--pgn', default=None, help="PGN file to generate config files")
+    parser.add_argument('-n', '--nSimulations', default=50000, help="Number of simulations to run")
+    parser.add_argument('--no_playoff_simulation', action='store_false', help="If this is set, there won't be a simulation for a tiebreak playoff")
+    parser.add_argument('--use_playoff_ratings', action='store_true', help="If this is set, separate playoff ratings will be used")
+    parser.add_argument('--use_start_results', action='store_true', help="If this is set, the players start out with points specified by a config file")
+
+    args = parser.parse_args()
+
+    if args.pgn is not None:
+        ratings = resultPrediction.getPlayersFromPGN(args.pgn)
+        pairings = resultPrediction.getPairingsFromPGN(args.pgn)
+        with open(f'{args.config_path}Ratings{args.tournament_name}.yaml', 'w+') as f:
+            print(yaml.dump(ratings), file=f)
+        with open(f'{args.config_path}Pairings{args.tournament_name}.yaml', 'w+') as f:
+            print(yaml.dump(pairings), file=f)
+    else:
+        with open(f'{args.config_path}Ratings{args.tournament_name}.yaml', 'r') as f:
+            ratings = yaml.load(f, Loader=yaml.FullLoader)
+        with open(f'{args.config_path}Pairings{args.tournament_name}.yaml', 'r') as f:
+            pairings = yaml.load(f, Loader=yaml.FullLoader)
+
+    if args.use_playoff_ratings:
+        with open(f'{args.config_path}PlayoffRatings{args.tournament_name}.yaml', 'r') as f:
+            playoffRatings = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+        playoffRatings = None
+
+    if args.use_start_results:
+        with open(f'{args.config_path}StartResults{args.tournament_name}.yaml', 'r') as f:
+            startResults = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+        startResults = None
+
+    tournamentSim = simulateTournament(ratings, pairings, 
+                                       simulations=int(args.nSimulations), 
+                                       firstPlacePlayoff=not args.no_playoff_simulation, 
+                                       playoffRatings=playoffRatings,
+                                       startResults=startResults)
+    print(tournamentSim)
+
+
 
 if __name__ == '__main__':
+    commandLine()
+    """
     playoffRatings = {'Sindarov, Javokhir': [2727, 2662], 'Wei, Yi': [2726, 2698], 'Bluebaum, Matthias': [2587, 2634], 'Esipenko, Andrey': [2657, 2652], 'Praggnanandhaa R': [2663, 2698], 'Giri, Anish': [2689, 2666], 'Caruana, Fabiano': [2727, 2769], 'Nakamura, Hikaru': [2742, 2838]}
     playoffRatingsW = {'Divya Deshmukh': [2416, 2351], 'Muzychuk, Anna': [2398, 2400], 'Vaishali, Rameshbabu': [2387, 2371], 'Assaubayeva, Bibisara': [2439, 2457], 'Goryachkina, Aleksandra': [2499, 2424], 'Lagno, Kateryna': [2435, 2414], 'Zhu, Jiner': [2479, 2411], 'Tan, Zhongyi': [2502, 2424]}
     candidatesOpen = '../resources/candidatesPairingsOpen.pgn'
     candidatesWomen = '../resources/candidatesPairingsWomen.pgn'
     ratings = resultPrediction.getPlayersFromPGN(candidatesOpen)
+    data = yaml.dump(playoffRatings)
+    print(data)
+    print(yaml.load(data, Loader=yaml.FullLoader))
     ratingsW = resultPrediction.getPlayersFromPGN(candidatesWomen)
     pairings = resultPrediction.getPairingsFromPGN(candidatesOpen)
     pairingsW = resultPrediction.getPairingsFromPGN(candidatesWomen)
-    # tournamentSim = simulateTournament(ratings, pairings, simulations=50000, firstPlacePlayoff=True, playoffRatings=playoffRatings)
+    # tournamentSim = simulateTournament(ratings, pairings, simulations=50000, firstPlacePlayoff=True, playoffRatings=playoffRatings, startResults={'Bluebaum, Matthias': [2, 1, 0]})
     ratingsW['Divya Deshmukh'] += 12.6
     ratingsW['Zhu, Jiner'] -= 23.5
-    tournamentSim = simulateTournament(ratingsW, pairingsW, simulations=50000, firstPlacePlayoff=True, playoffRatings=playoffRatingsW)
-    print(sum([1 for i in range(50000) for player in tournamentSim.keys() if any([tournamentSim[player][i][2]])])/50000)
+    # tournamentSim = simulateTournament(ratingsW, pairingsW, simulations=50000, firstPlacePlayoff=True, playoffRatings=playoffRatingsW)
+    # print(sum([1 for i in range(50000) for player in tournamentSim.keys() if any([tournamentSim[player][i][2]])])/50000)
     places = getPlaceProbabilities(tournamentSim)
     colors = plotting_helper.getColors(['much better', 'red', 'yellow', 'purple', 'darkorange', 'darkblue', 'blue', 'violet'])
     playerColors = dict()
@@ -309,9 +367,9 @@ if __name__ == '__main__':
         playerColors[player] = colors[i]
     for i, player in enumerate(list(playoffRatingsW.keys())):
         playerColorsW[player] = colors[i]
-    plotPlaceProbabilities(places, playerColorsW, filename='../out/candidatesWomenPlaces.png')
+    # plotPlaceProbabilities(places, playerColorsW, filename='../out/candidatesWomenPlaces.png')
 
     wins = getClearAndTBWins(tournamentSim)
     print(wins)
-    print(sum([sum(w) for w in wins.values()]))
-    plotWinningChances(wins, filename='../out/candidatesWomenFirst.png')
+    # plotWinningChances(wins, filename='../out/candidatesWomenFirst.png')
+    """
