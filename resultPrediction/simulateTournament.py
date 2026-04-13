@@ -3,6 +3,7 @@ import chess.pgn
 import random
 import resultPrediction
 import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 import yaml
 import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -165,7 +166,7 @@ def simulateTiebreaks(tournamentResult: dict, firstPlacePlayoff: bool = False, p
     return (playerStandings, tiedForFirst)
 
 
-def simulateTournament(players: dict, pairings: list, simulations: int = 20000, startResults: dict = None, firstPlacePlayoff: bool = False, playoffRatings: dict = None) -> dict:
+def simulateTournament(players: dict, pairings: list, simulations: int = 20000, startResults: dict = {}, firstPlacePlayoff: bool = False, playoffRatings: dict = None, playersToFollow: list = None) -> dict:
     data = dict()
     for player in players.keys():
         data[player] = list()
@@ -173,28 +174,44 @@ def simulateTournament(players: dict, pairings: list, simulations: int = 20000, 
     if playoffRatings is None and firstPlacePlayoff:
         playoffRatings = {player: [rating, rating] for player, rating in players.items()}
 
+    playedGames = sum([sum(wdl) for wdl in startResults.values()])//2
+    print(playedGames)
+    print(pairings[:playedGames])
+
+    if playersToFollow is not None:
+        playerResults = {player: list() for player in playersToFollow}
+
     for n in range(simulations):
         players['Nakamura, Hikaru'] = 2775 + 30*random.random()
-        for white, black in pairings:
+        for white, black in pairings[playedGames:]:
             for player in [white, black]:
                 if len(data[player]) <= n:
-                    if startResults is not None and player in startResults:
+                    if player in startResults:
                         wdl = startResults[player].copy()
                     else:
                         wdl = [0, 0, 0]
                     data[player].append([wdl, 0, False])
+
+                    if playersToFollow is not None and player in playersToFollow:
+                        playerResults[player].append(list())
                     
             predictedResult = predictResult(players[white], players[black])
             x = random.random()
             if x <= predictedResult[0]:
-                data[white][-1][0][0] += 1
-                data[black][-1][0][2] += 1
+                resultIndex = 0
             elif x <= predictedResult[0] + predictedResult[1]:
-                data[white][-1][0][1] += 1
-                data[black][-1][0][1] += 1
+                resultIndex = 1
             else:
-                data[white][-1][0][2] += 1
-                data[black][-1][0][0] += 1
+                resultIndex = 2
+
+            data[white][-1][0][resultIndex] += 1
+            data[black][-1][0][2-resultIndex] += 1
+
+            if playersToFollow:
+                if white in playersToFollow:
+                    playerResults[white][-1].append((2-resultIndex)/2)
+                if black in playersToFollow:
+                    playerResults[black][-1].append(resultIndex/2)
 
         lastSimWDL = {player: d[-1][0] for player, d in data.items()}
         playerStandings, tied = simulateTiebreaks(lastSimWDL, firstPlacePlayoff, playoffRatings)
@@ -202,6 +219,14 @@ def simulateTournament(players: dict, pairings: list, simulations: int = 20000, 
         for place, player in enumerate(playerStandings):
             data[player][-1][1] = place+1
             data[player][-1][2] = player in tied
+
+    with open('../out/candidatesPlayerData.yaml', 'w+') as f:
+        print(yaml.dump(playerResults), file=f)
+
+    """
+    with open('../out/candidatesSim.yaml', 'w+') as f:
+        print(yaml.dump(data), file=f)
+    """
 
     return data
 
@@ -240,29 +265,45 @@ def getClearAndTBWins(tournamentSim: dict) -> dict:
 
 
 def plotPlaceProbabilities(placeProbabilities: dict, playerColors: dict = None, filename: str = None):
+    playerColors = {'Sindarov, Javokhir': plotting_helper.getColor('much better'), 'Wei, Yi': plotting_helper.getColor('red'), 
+                    'Bluebaum, Matthias': plotting_helper.getColor('yellow'), 'Esipenko, Andrey': plotting_helper.getColor('purple'), 
+                    'Praggnanandhaa R': plotting_helper.getColor('darkorange'), 'Giri, Anish': plotting_helper.getColor('darkblue'), 
+                    'Caruana, Fabiano': plotting_helper.getColor('blue'), 'Nakamura, Hikaru': plotting_helper.getColor('violet')}
+
+    playerColors = {'Divya Deshmukh': plotting_helper.getColor('much better'), 'Muzychuk, Anna': plotting_helper.getColor('red'), 
+                      'Vaishali, Rameshbabu': plotting_helper.getColor('yellow'), 'Assaubayeva, Bibisara': plotting_helper.getColor('purple'), 
+                      'Goryachkina, Aleksandra': plotting_helper.getColor('darkorange'), 'Lagno, Kateryna': plotting_helper.getColor('darkblue'), 
+                      'Zhu, Jiner': plotting_helper.getColor('darkorange'), 'Tan, Zhongyi': plotting_helper.getColor('violet')}
     if playerColors is None:
         playerColors = dict()
         colors = plotting_helper.getDefaultColors()
         for i, player in enumerate(list(placeProbabilities.keys())):
             playerColors[player] = colors[i%len(colors)]
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_facecolor(plotting_helper.getColor('background'))
+    placeProbabilities = dict(sorted(placeProbabilities.items(), key=lambda x: sum([(i+1)*p for i, p in enumerate(x[1])])))
 
-    yMax = 0
-    for player, places in placeProbabilities.items():
+    fig, ax = plt.subplots(len(placeProbabilities), figsize=(6, 8), sharey=True)
+
+    yMax = max([max(places) for places in placeProbabilities.values()])
+    for i, (player, places) in enumerate(placeProbabilities.items()):
+        ax[i].set_facecolor(plotting_helper.getColor('background'))
         yMax = max(yMax, max(places))
-        ax.plot(range(1, len(places)), places[1:], label=player.split(',')[0].split()[0], color=playerColors[player], linewidth=2)
+        # ax.plot(range(1, len(places)), places[1:], label=player.split(',')[0].split()[0], color=playerColors[player], linewidth=2)
+        ax[i].bar(range(1, len(places)), places[1:], label=player.split(',')[0].split()[0], color=playerColors[player], width=1, edgecolor='black')
+        ax[i].set_xlim(0.5, len(places)-0.5)
+        ax[i].set_ylim(0, yMax*1.05)
+        ax[i].legend()
+        ax[i].label_outer()
 
-    ax.legend(loc='upper center', ncol=4)
-    ax.set_xlim(1, len(places)-1)
-    ax.set_ylim(0, yMax*1.05)
+    fig.text(0.03, 0.37, "Probability to finish in that position", ha='center', rotation='vertical')
+    ax[0].set_title("Probabilities of different finishing positions for each player")
+    ax[-1].set_xlabel('Finishing position')
+    # ax.legend(loc='upper center', ncol=4)
+    # ax.set_xlim(1, len(places)-1)
 
-    plt.title("Finish position probabilities for each player in the Women's Candidates tournament")
-    ax.set_xlabel('Finishing position')
-    ax.set_ylabel('Probability')
+    # plt.title("Finish position probabilities for each player in the Women's Candidates tournament")
 
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.07, top=0.95, left=0.1, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=400)
@@ -287,10 +328,46 @@ def plotWinningChances(winProbabilities: dict, filename: str = None):
     ax.set_ylabel('Win probabilitiy')
     ax.set_xlim(0-0.6, len(labels)-0.4)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
     if filename:
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+
+
+def plotTournamentStandings(wdlData: dict, filename: str = None):
+    """
+    This plots the standings in the tournament, given the number of wins, draws in losses for each player
+    wdlData: dict
+        {playerName: [wins, draws, losses], ...}
+    """
+    wdlData = dict(reversed(sorted(wdlData.items(), key=lambda x: x[1][0]+x[1][1]*0.5)))
+    plotData = dict()
+    for player, wdl in wdlData.items():
+        plotData[player.split(',')[0].split()[0]] = f'{wdl[0]+wdl[1]/2}/{sum(wdl)}'
+
+    fig, ax = plt.subplots()
+    # ax.set_facecolor(plotting_helper.getColor('background'))
+
+    fig.patch.set_visible(False)
+    ax.axis('off')
+    ax.axis('tight')
+
+    colors = [plotting_helper.getColors(['background', 'background'])] * len(plotData)
+    table = ax.table(cellText=list(plotData.items()), colLabels=['Player', 'Points'], loc='center', colLoc='left', cellLoc='left', colWidths=[0.3, 0.1], cellColours=colors, colColours=plotting_helper.getColors(['background', 'background']))
+
+    for (row, col), cell in table.get_celld().items():
+        if (row == 0) or (col == -1):
+            cell.set_text_props(fontproperties=FontProperties(weight='bold'), size='xx-large')
+            cell.set(linewidth=1.5)
+
+    fig.tight_layout()
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
 
 def commandLine():
     parser = argparse.ArgumentParser(prog='Tournament simulation', 
@@ -329,19 +406,76 @@ def commandLine():
         with open(f'{args.config_path}StartResults{args.tournament_name}.yaml', 'r') as f:
             startResults = yaml.load(f, Loader=yaml.FullLoader)
     else:
-        startResults = None
+        startResults = dict()
 
     tournamentSim = simulateTournament(ratings, pairings, 
                                        simulations=int(args.nSimulations), 
-                                       firstPlacePlayoff=not args.no_playoff_simulation, 
+                                       firstPlacePlayoff=args.no_playoff_simulation, 
                                        playoffRatings=playoffRatings,
-                                       startResults=startResults)
-    print(tournamentSim)
+                                       startResults=startResults, # playersToFollow=['Vaishali, Rameshbabu', 'Zhu, Jiner'])
+                                       playersToFollow=['Sindarov, Javokhir', 'Giri, Anish'])
+    
+    for player, wins in getClearAndTBWins(tournamentSim).items():
+        print(player, sum(wins))
 
+    """
+    placeProbs = getPlaceProbabilities(tournamentSim)
+    plotPlaceProbabilities(placeProbs, filename='../out/candidatesPlaceProbsW.png')
+
+    with open( '../out/candidatesPlayerData.yaml', 'r') as f:
+        playerData = yaml.load(f, Loader=yaml.FullLoader)
+    """
+
+    # analyseTournamentSimulation(tournamentSim, playerData)
+
+
+def analyseTournamentSimulation(simData: dict, playerData: dict):
+    focusPlayer = 'Giri, Anish'
+    # focusPlayer = 'Zhu, Jiner'
+    focusRound = 1
+    giriGameWins = dict()
+    giriTWins = dict()
+    tWinIndices = list()
+    for player in simData.keys():
+        giriGameWins[player] = list()
+
+    for player in playerData.keys():
+        giriTWins[player] = list()
+
+    for i, results in enumerate(playerData[focusPlayer]):
+        """
+        if results[focusRound] == 0:
+        # if results[1] == 0.5 and results[3] == 0.5:
+            for player in simData.keys():
+                giriGameWins[player].append(simData[player][i])
+        """
+
+        if simData[focusPlayer][i][1] == 1:
+            tWinIndices.append(i)
+            for player in simData.keys():
+                giriGameWins[player].append(simData[player][i])
+            for player in giriTWins.keys():
+                giriTWins[player].append(playerData[player][i])
+
+    for player, wins in getClearAndTBWins(giriGameWins).items():
+        print(player, sum(wins), wins[1])
+
+    for player, data in giriTWins.items():
+        print(len(data))
+        print(player)
+        print(sum([sum(d) for d in data])/len(data))
+        print(sum([sum(d) for d in playerData[player]])/len(playerData[player]))
+        
 
 
 if __name__ == '__main__':
     commandLine()
+    # print(analyseTournamentSimulation('../out/candidatesSim.yaml', '../out/candidatesPlayerData.yaml'))
+    for end in ['', 'W']:
+        with open(f'configFiles/configStartResultsCandidates{end}.yaml', 'r') as f:
+            standings = yaml.load(f, Loader=yaml.FullLoader)
+        plotTournamentStandings(standings, f'../out/standingsCandidates{end}.png')
+
     """
     playoffRatings = {'Sindarov, Javokhir': [2727, 2662], 'Wei, Yi': [2726, 2698], 'Bluebaum, Matthias': [2587, 2634], 'Esipenko, Andrey': [2657, 2652], 'Praggnanandhaa R': [2663, 2698], 'Giri, Anish': [2689, 2666], 'Caruana, Fabiano': [2727, 2769], 'Nakamura, Hikaru': [2742, 2838]}
     playoffRatingsW = {'Divya Deshmukh': [2416, 2351], 'Muzychuk, Anna': [2398, 2400], 'Vaishali, Rameshbabu': [2387, 2371], 'Assaubayeva, Bibisara': [2439, 2457], 'Goryachkina, Aleksandra': [2499, 2424], 'Lagno, Kateryna': [2435, 2414], 'Zhu, Jiner': [2479, 2411], 'Tan, Zhongyi': [2502, 2424]}
