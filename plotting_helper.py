@@ -202,7 +202,7 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
     This function plots the average values of move data
     """
     if not colors:
-        colors = ['#689bf2', '#5afa8d', '#f8a978', '#fa5a5a']
+        colors = getDefaultColors()
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor('#e6f7f2')
@@ -214,7 +214,7 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
         for i in range(maxMoves):
             l = [c[i] for c in d if len(c) > i]
             avg.append(sum(l)/len(l))
-        ax.plot(range(1, maxMoves+1), avg, color=colors[k], label=legend[k])
+        ax.plot(range(1, maxMoves+1), avg, color=colors[k%len(colors)], label=legend[k])
         yMin = min(yMin, min(avg))
         yMax = max(yMax, max(avg))
     
@@ -225,7 +225,7 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
     ax.legend()
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=400)

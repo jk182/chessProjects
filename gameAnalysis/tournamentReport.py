@@ -1042,6 +1042,65 @@ def getClockTimesByColor(pgnPath: str, minutes: bool = True) -> list:
     return times
 
 
+def getClockLead(pgnPath: str, minutes: bool = True, startTime: int = 120) -> dict:
+    """
+    This gets the clock lead for each player after every move
+    pgnPath: str
+        Path to the PGN files with the clock times
+    minutes: bool
+        If this is set, the time lead will be given in minutes, otherwise it is in seconds
+    startTime: int
+        Time at the start of the game, in minutes
+    return -> dict:
+        {playerName: [[lead after move 1 in game 1, move 2 in game 1, ...], [game 2 leads ...], ...], ...}
+    """
+    clockLeads = dict()
+
+    if not minutes:
+        startTime *= 60
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            white = game.headers["White"]
+            black = game.headers["Black"]
+
+            for player in [white, black]:
+                if player not in clockLeads:
+                    clockLeads[player] = list()
+
+            wLastTime = startTime
+            bLastTime = startTime
+
+            timeLead = list()
+
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+
+                if not node.turn():
+                    if node.clock() is None:
+                        wTime = wLastTime
+                    else:
+                        wTime = node.clock()
+                else:
+                    if node.clock() is None:
+                        bTime = bLastTime
+                    else:
+                        bTime = node.clock()
+
+                    if minutes:
+                        timeLead.append((wTime-bTime)/60)
+                    else:
+                        timeLead.append(wTime-bTime)
+                    wLastTime = wTime
+                    bLastTime = bTime
+
+            clockLeads[white].append(timeLead)
+            clockLeads[black].append([t*-1 for t in timeLead])
+
+    return clockLeads
+
+
 def plotScores(scores: dict, short: dict = None, title: str = 'Scores with White and Black', filename: str = None):
     """
     This function plots the scores of the tournament
@@ -1478,6 +1537,9 @@ def commandLine():
 
 
 if __name__ == '__main__':
+    clockLeads = getClockLead('../resources/candidates2026Clocks.pgn')
+    legend = [name.split(',')[0].split()[0] for name in clockLeads.keys()]
+    plotting_helper.plotAvgLinePlot(list(clockLeads.values()), list(clockLeads.keys()), 'Avg. clock lead in minutes', 'Avg clock lead after each move in the Candidates after 12 rounds', legend) #, filename='../out/candidatesClockLeads.png')
     # commandLine()
     # armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
     # print(armScores)
@@ -1503,8 +1565,8 @@ if __name__ == '__main__':
     masters = '../resources/wijkMasters2026.pgn'
     challengers = '../resources/wijkChallengers2026.pgn'
     # plotOpeningsByFirstMove(['e4', 'd4'], masters)
-    openings = getOpenings(challengers, shortNames=True)
-    plotPieChart(openings, 'Openings played in the Wijk aan Zee challengers', minSize=3, filename='../out/wijk2026/wijkChallengers2026-openings.png')
+    # openings = getOpenings(challengers, shortNames=True)
+    # plotPieChart(openings, 'Openings played in the Wijk aan Zee challengers', minSize=3, filename='../out/wijk2026/wijkChallengers2026-openings.png')
     """
     openings = getOpenings(masters, shortNames=True)
     print(dict(reversed(sorted(openings.items(), key=lambda item: item[1]))))
