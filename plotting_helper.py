@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import statistics
 
 
 def getAllColors() -> dict:
@@ -197,7 +198,7 @@ def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list
         plt.show()
 
 
-def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, maxMoves: int = 39, filename: str = None):
+def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, legend: list, colors: list = None, maxMoves: int = 39, useMedian: bool = False, filename: str = None):
     """
     This function plots the average values of move data
     """
@@ -211,9 +212,14 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
     yMax = 0
     for k, d in enumerate(data):
         avg = list()
+        minL = list()
+        maxL = list()
         for i in range(maxMoves):
             l = [c[i] for c in d if len(c) > i]
-            avg.append(sum(l)/len(l))
+            if useMedian:
+                avg.append(statistics.median(l))
+            else:
+                avg.append(sum(l)/len(l))
         ax.plot(range(1, maxMoves+1), avg, color=colors[k%len(colors)], label=legend[k])
         yMin = min(yMin, min(avg))
         yMax = max(yMax, max(avg))

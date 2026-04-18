@@ -17,6 +17,7 @@ import functions
 import plotting_helper
 
 import argparse
+import yaml
 
 
 def getPlayers(pgnPath: str, whiteList: list = None) -> list:
@@ -483,12 +484,28 @@ def plotRoundScores(scores: dict, players: list = None, colors: list = None, tit
     if colors is None:
         colors = ['#8D77AB', '#689bf2', '#f8a978', '#ff87ca', '#beadfa']
         colors = plotting_helper.getColors(['blue', 'orange', 'purple', 'violet'])
+        colors = plotting_helper.getDefaultColors()
     linestyles = ['-', '--', '-.', ':']
-    index = 0
     minScore = 0
     maxScore = 0
+    nPlayers = len(list(scores.keys()))
+    nRounds = len(list(scores.values())[0])
 
-    for player, score in scores.items():
+    ax.hlines(0, 0, nRounds, color='black', linewidth=0.5)
+
+    tiedScores = list()
+    tiedScores.append({0: list(range(nPlayers))})
+    for i in range(nRounds):
+        tiedScores.append(dict())
+        roundScores = [list(score)[i] for score in scores.values()]
+        for s in roundScores:
+            indices = [i for i, x in enumerate(roundScores) if x == s]
+            if len(indices) > 1 and s not in tiedScores[-1]:
+                tiedScores[-1][s] = indices
+
+
+    offset = 0.05
+    for i, (player, score) in enumerate(scores.items()):
         if players and player not in players:
             continue
         score.insert(0, 0)
@@ -501,8 +518,16 @@ def plotRoundScores(scores: dict, players: list = None, colors: list = None, tit
             p = nicknames[player]
         else:
             p = player.split(',')[0]
-        ax.plot(range(len(pScore)), pScore, label=p, alpha=1, linestyle=linestyles[index%len(linestyles)], color=colors[index%len(colors)], linewidth=3, zorder=index)
-        index += 1
+        # ax.plot(range(len(pScore)), pScore, label=p, alpha=1, linestyle=linestyles[i%len(linestyles)], color=colors[i%len(colors)], linewidth=3, zorder=i)
+        # Trying to offset tied scores, but this just looks wonky and ugly
+        offsetScores = list()
+        for roundNr, s in enumerate(score):
+            if s in tiedScores[roundNr].keys():
+                offsetScores.append(s + offset*(len(tiedScores[roundNr][s])/2 - tiedScores[roundNr][s].index(i)))
+            else:
+                offsetScores.append(s)
+
+        ax.plot(range(len(pScore)), offsetScores, label=p, alpha=1, color=colors[i%len(colors)], linewidth=2, zorder=i)
 
     if cutoffPlace is not None:
         cutoffScore = [0]
@@ -519,13 +544,13 @@ def plotRoundScores(scores: dict, players: list = None, colors: list = None, tit
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
     ax.legend()
     ax.set_xlim(0, len(pScore)-1)
-    ax.set_ylim(minScore, maxScore+0.5)
+    # ax.set_ylim(minScore-0.25, maxScore+0.25)
     if xTicks:
         ax.set_xticks(xTicks)
     ax.set_xlabel('Round')
     ax.set_ylabel('Score')
     yTicks = [y for y in range(minScore, maxScore+1)]
-    ax.set_yticks(yTicks, labels=[y if y <= 0 else f'+{y}' for y in yTicks])
+    # ax.set_yticks(yTicks, labels=[y if y <= 0 else f'+{y}' for y in yTicks])
     if title:
         plt.title(title)
     else:
@@ -910,7 +935,7 @@ def createMovePlot(moves: dict, short: dict = None, title: str = 'Percentage of 
             bottom += m[i]*factor
         noLegend = True
 
-    if len(moves.keys()) > 5:
+    if len(moves.keys()) > 8:
         plt.xticks(rotation=90)
         fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
     else:
@@ -1101,7 +1126,7 @@ def getClockLead(pgnPath: str, minutes: bool = True, startTime: int = 120) -> di
     return clockLeads
 
 
-def plotScores(scores: dict, short: dict = None, title: str = 'Scores with White and Black', filename: str = None):
+def plotScores(scores: dict, short: dict = None, title: str = 'Scores with White and Black', rotateXTickLabels: bool = False, filename: str = None):
     """
     This function plots the scores of the tournament
     filename: str
@@ -1112,8 +1137,6 @@ def plotScores(scores: dict, short: dict = None, title: str = 'Scores with White
     colors = {3: '#FFFFFF', 5: '#111111'}
 
     fig, ax = plt.subplots(figsize=(10,6))
-    plt.xticks(rotation=90)
-    plt.yticks(range(0,10))
 
     ax.set_facecolor('#e6f7f2')
     for player in sortedPlayers:
@@ -1126,10 +1149,16 @@ def plotScores(scores: dict, short: dict = None, title: str = 'Scores with White
             ax.bar(p, scores[player][i], bottom=bottom, color=colors[i], edgecolor='black', linewidth=0.7)
             bottom += scores[player][i]
 
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
+    if rotateXTickLabels:
+        plt.xticks(rotation=90)
+        fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
+    else:
+        fig.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
     plt.title(title)
     ax.set_ylabel('Tournament Score')
     ax.set_xlim(-0.5, len(sortedPlayers)-0.5)
+    maxScore = max([s[3]+s[5] for s in scores.values()])
+    ax.set_yticks(range(0, int(maxScore+0.5)+1))
 
     if filename:
         plt.savefig(filename, dpi=500)
@@ -1171,7 +1200,7 @@ def plotWorseGames(worse: dict, short: dict = None, filename: str = None):
         plt.show()
 
 
-def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict = None, filename: str = None, sortIndex: int = 0, colors: list = None) -> None:
+def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict = None, filename: str = None, sortIndex: int = 0, colors: list = None, rotateXTickLabels: bool = False) -> None:
     """
     This is a general function to create a bar chart with the players on the x-axis
     data: dict
@@ -1191,7 +1220,6 @@ def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict 
 
     fig, ax = plt.subplots(figsize=(10,6))
     ax.set_facecolor('#e6f7f2')
-    plt.xticks(rotation=90)
     # plt.yticks(range(0,10))
     plt.xticks(ticks=range(1, len(sort)+1), labels=xLabels)
     
@@ -1207,7 +1235,12 @@ def plotBarChart(data: dict, labels: list, title: str, yLabel: str, short: dict 
     plt.title(title)
     ax.set_ylabel(yLabel)
     ax.set_xlim(0.5, len(sort)+0.5)
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
+
+    if rotateXTickLabels:
+        plt.xticks(rotation=90)
+        fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
+    else:
+        fig.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=300)
@@ -1316,7 +1349,7 @@ def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, title: str = 
         plt.show()
 
 
-def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list = None, lichessAnalysis: bool = False, firstPlaceRace: list = None, eventName: str = "", minGamesPerOpening: int = 0, filename: str = None) -> None:
+def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list = None, lichessAnalysis: bool = False, firstPlaceRace: list = None, eventName: str = "", minGamesPerOpening: int = 0, pgnPathClock: str = None, playerColors: dict = None, filename: str = None) -> None:
     if players is None:
         players = getPlayers(pgnPath)
     # generateAccDistributionGraphs(pgnPath, players)
@@ -1335,6 +1368,9 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
     allGameAcc = getGameAccuracies(pgnPath, lichessAnalysis=lichessAnalysis)
     firstMoveData = getFirstMoves(pgnPath)
     openings = getOpenings(pgnPath, shortNames=True)
+    if pgnPathClock is not None:
+        allClockLeads = getClockLead(pgnPathClock)
+    roundScores = getRoundByRoundScores(pgnPath)
 
     scores = dict()
     decisive = dict()
@@ -1344,6 +1380,8 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
     sharpChange = dict()
     IMB = dict()
     gameAcc = dict()
+    clockLeads = dict()
+
     for player in players:
         scores[player] = allScores[player]
         decisive[player] = allDecisive[player]
@@ -1354,6 +1392,8 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
         gameAcc[player] = allGameAcc[player]
         if not lichessAnalysis:
             sharpChange[player] = allSharpChange[player]
+        if pgnPathClock is not None:
+            clockLeads[player] = allClockLeads[player]
 
     avgGameAcc = dict()
     for p, v in gameAcc.items():
@@ -1365,15 +1405,30 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
     worseColors = ['#f8a978', '#fa5a5a']
     IMBcolors = plotting_helper.getColors(['blue', 'yellow', 'red'])
 
-    if firstPlaceRace is not None:
-        roundScores = getRoundByRoundScores(pgnPath)
-        raceTitle = f'Fight for first place{eventName}'
-        if filename is None:
-            plotRoundScores(roundScores, players=firstPlaceRace, title=raceTitle)
+    if pgnPathClock is not None:
+        clockLegend = list()
+        for player in clockLeads.keys():
+            if nicknames and player in nicknames:
+                clockLegend.append(nicknames[player])
+            else:
+                clockLegend.append(player.split(',')[0].split()[0])
+
+        if playerColors is not None:
+            clockColors  = list()
+            for player in clockLeads.keys():
+                clockColors.append(playerColors[player])
         else:
-            plotRoundScores(roundScores, players=firstPlaceRace, title=raceTitle, filename=f'{filename}-rankings.png')
-    
+            clockColors = plotting_helper.getDefaultColors()
+
+    if playerColors is not None:
+        roundScoreColors = list()
+        for player in roundScores.keys():
+            roundScoreColors.append(playerColors[player])
+    else:
+        roundScoreColors = plotting_helper.getDefaultColors()
+
     if filename:
+        plotRoundScores(roundScores, players=players, colors=roundScoreColors, title=f'Scores after each round{eventName}', nicknames=nicknames, filename=f'{filename}-roundScores.png')
         createMovePlot(moveSit, nicknames, title=f'Percentage of moves where players were better, equal and worse{eventName}', filename=f'{filename}-movePlot.png')
         if not lichessAnalysis:
             analysis.plotSharpChange(sharpChange, short=nicknames, filename=f'{filename}-sharpChange.png')
@@ -1385,7 +1440,10 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
         plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], f'Game accuracy for each player{eventName}', 'Average game accuracy', short=nicknames, filename=f'{filename}-gameAcc.png', colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
         plotPieChart(firstMoveData, f'First moves{eventName}', filename=f'{filename}-firstMoves.png')
         plotPieChart(openings, f'Openings played{eventName}', minSize=minGamesPerOpening, filename=f'{filename}-openings.png')
+        if pgnPathClock is not None:
+            plotting_helper.plotAvgLinePlot(list(clockLeads.values()), list(clockLeads.keys()), 'Time advantage in minutes', f'Median clock lead after each move{eventName}', clockLegend, useMedian=True, colors=clockColors, filename=f'{filename}-clockLeads.png')
     else:
+        plotRoundScores(roundScores, players=players, colors=roundScoreColors, title=f'Scores after each round{eventName}', nicknames=nicknames)
         createMovePlot(moveSit, nicknames, title=f'Percentage of moves where players were better, equal and worse{eventName}')
         if not lichessAnalysis:
             analysis.plotSharpChange(sharpChange, short=nicknames)
@@ -1397,6 +1455,8 @@ def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list 
         plotBarChart(avgGameAcc, ['Player accuracy', 'Opponent accuracy'], f'Game accuracy for each player{eventName}', 'Average game accuracy', short=nicknames, colors=[plotting_helper.getColor('pink'), plotting_helper.getColor('violet')])
         plotPieChart(firstMoveData, f'First moves{eventName}')
         plotPieChart(openings, f'Openings played{eventName}', minSize=minGamesPerOpening)
+        if pgnPathClock is not None:
+            plotting_helper.plotAvgLinePlot(list(clockLeads.values()), list(clockLeads.keys()), 'Time advantage in minutes', f'Median clock lead after each move{eventName}', clockLegend, useMedian=True, colors=clockColors)
 
 
 def multipleStagePlots(firstStagePGN: str, secondStagePGNs: list, nicknames: dict = None, players: list = None, relativeGames: bool = True, firstPlaceRace: list = None, cutoffPlace: int = None, knockoutWinScore: float = None, firstStageName: str = 'Swiss', secondStageName: str = 'finals', playerColors: dict = None, roundxTicks: list = None, filename: str = None):
@@ -1531,19 +1591,41 @@ def commandLine():
 
     parser.add_argument('filename', help='Path to the analysed PGN file')
     parser.add_argument('-o', '--out-path', default=None, help='The output path for the generated plots')
+    parser.add_argument('--nicknames', default=None, help='Path to a YAML file containing nicknames for the players')
+    parser.add_argument('--players', default=None, help='Path to a YAML file containing the names of the players to include. If no path is given, all players found in the PGN will be included')
+    parser.add_argument('--is_lichess_analysis', action='store_true', help='Set this option if the PGN file contains the analysis generated by Lichess')
+    parser.add_argument('--event_name', default="", help='Optional. Name of the event used in the plot titles')
+    parser.add_argument('--min_games_per_opening', default=0, help='The minimum number of games in an opening to be shown individually in the pie chart. All openings below the minimum get grouped as "other opening"', type=int)
+    parser.add_argument('--clock_pgn_path', default=None, help='Path to the PGN file containing the clock times')
+    parser.add_argument('--player_colors_path', default=None, help='Path to a YAML file containing the colors for each player')
 
     args = parser.parse_args()
-    generateTournamentPlots(args.filename, filename=args.out_path)
+
+    if args.nicknames is not None:
+        with open(args.nicknames, 'r') as f:
+            nicknames = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+        nicknames = None
+
+    if args.players is not None:
+        with open(args.players, 'r') as f:
+            players = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+        players = None
+
+    if args.player_colors_path is not None:
+        with open(args.player_colors_path) as f:
+            playerColors = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+        playerColors = None
+
+    generateTournamentPlots(args.filename, nicknames=nicknames, players=players, lichessAnalysis=args.is_lichess_analysis, eventName=args.event_name, minGamesPerOpening=args.min_games_per_opening, pgnPathClock=args.clock_pgn_path, playerColors=playerColors, filename=args.out_path)
 
 
 if __name__ == '__main__':
-    clockLeads = getClockLead('../resources/candidates2026Clocks.pgn')
-    legend = [name.split(',')[0].split()[0] for name in clockLeads.keys()]
-    plotting_helper.plotAvgLinePlot(list(clockLeads.values()), list(clockLeads.keys()), 'Avg. clock lead in minutes', 'Avg clock lead after each move in the Candidates after 12 rounds', legend) #, filename='../out/candidatesClockLeads.png')
-    # commandLine()
+    commandLine()
     # armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
     # print(armScores)
-    # nicknames = {'Erigaisi Arjun': 'Erigaisi', 'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh', 'Divya Deshmukh': 'Divya'}
     # plotScoresArmageddon(armScores, short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-armScores.png')
     # times = getClockTimesByColor('../resources/norwayChess2025Arm.pgn')
     # plotting_helper.plotAvgLinePlot(times, ['White', 'Black'], 'Time remaining', 'Average time remaining after each move in armageddon', ["White's time", "Black's time"], colors=['#f8a978', '#111111'], maxMoves=50, filename='../out/norwayChess2025Plots/norwayChess2025-clockTimes.png')

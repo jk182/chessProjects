@@ -272,7 +272,7 @@ def sharpnessChangePerPlayer(pgnPath: str, startSharp: float = 0.468) -> dict:
         A dictionary with the player names as keys and their sharpness changes as values
     """
     sharpPlayer = dict()
-    cpl = 40
+    cpl = 100
     with open(pgnPath, 'r') as pgn:
         while (game := chess.pgn.read_game(pgn)):
             node = game
