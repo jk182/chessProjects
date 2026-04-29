@@ -4,8 +4,8 @@ import io
 import pandas as pd
 
 
-minGameNr = 30000000
-maxGames = 50000000
+minGameNr = 70000000
+maxGames = 100000000
 gameNr = 0
 pgn = ""
 timeControl = ""
@@ -82,7 +82,7 @@ while gameNr < maxGames:
                         break
 
 df = pd.DataFrame(data)
-outFile = '../out/lichessEvaluations2025-09_3.pkl'
+outFile = '../out/lichessEvaluations2025-09_5.pkl'
 df.to_pickle(outFile)
 df = pd.read_pickle(outFile)
 print(df)

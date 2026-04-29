@@ -54,8 +54,10 @@ def getHeatmapData(df: pd.DataFrame, timeGroupWidth: int = 1, maxTime: int = 180
             score = 1
         elif row["Result"] == '1/2-1/2':
             score = 0.5
-        else:
+        elif row["Result"] == '0-1':
             score = 0
+        else:
+            continue
         
         if row['Evaluation'] < 0:
             score = 1 - score
@@ -82,9 +84,9 @@ def getHeatmapData(df: pd.DataFrame, timeGroupWidth: int = 1, maxTime: int = 180
 
 def plotTimeEvaluationHeatmap(data: pd.DataFrame, timeControl: str, maxRatingDiff: int = 100, cpBandWidth: int = 10, timeBandWidth: int = 1, maxCP: int = 1000, maxTime: int = None):
     tcDF = df[df['TimeControl'] == timeControl]
-    tcDF = tcDF[(tcDF['Ply'] == 30) | (tcDF['Ply'] == 40) | (tcDF['Ply'] == 50) | (tcDF['Ply'] == 60) | (tcDF['Ply'] == 70)]
+    # tcDF = tcDF[(tcDF['Ply'] == 30) | (tcDF['Ply'] == 40) | (tcDF['Ply'] == 50) | (tcDF['Ply'] == 60) | (tcDF['Ply'] == 70)]
 
-    nSamples = 256
+    nSamples = 6
     colorMap = mpl.colormaps['plasma'].resampled(nSamples)
     newColors = colorMap(np.linspace(0, 1, nSamples))
     newColors[0] = [0, 0, 0, 1]
@@ -93,7 +95,7 @@ def plotTimeEvaluationHeatmap(data: pd.DataFrame, timeControl: str, maxRatingDif
     fig, axs = plt.subplots(3, 3, figsize=(6, 8))
     for i, rating in enumerate([1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600]):
         if rating < 2600:
-            nDF = tcDF[(abs(tcDF['WhiteElo'] - rating) <= 100) & (abs(tcDF['BlackElo'] - rating) <= 100) & (abs(tcDF['WhiteElo'] - tcDF['BlackElo']) <= 50)]
+            nDF = tcDF[(abs(tcDF['WhiteElo'] - rating) <= 100) & (abs(tcDF['BlackElo'] - rating) <= 100) & (abs(tcDF['WhiteElo'] - tcDF['BlackElo']) <= 100)]
         else:
             nDF = tcDF[(tcDF['WhiteElo'] >= rating-50) & (tcDF['BlackElo'] >= rating-50) & (abs(tcDF['WhiteElo'] - tcDF['BlackElo']) <= 150)]
         plotData = getHeatmapData(nDF, timeBandWidth, maxTime, cpBandWidth, maxCP, discardHigherCPs=True)
@@ -137,8 +139,10 @@ def getScoresByEvalFromDataFrame(df: pd.DataFrame, maxCP: int = 1000, cpGroupWid
             score = 1
         elif row["Result"] == '1/2-1/2':
             score = 0.5
-        else:
+        elif row["Result"] == '0-1':
             score = 0
+        else:
+            continue
 
         cpIndex = cpGroupWidth * ((min(maxCP, abs(row["Evaluation"])) + cpGroupWidth/2) // cpGroupWidth)
         if row["Evaluation"] < 0:
@@ -154,11 +158,53 @@ def getScoresByEvalFromDataFrame(df: pd.DataFrame, maxCP: int = 1000, cpGroupWid
     return {k: (v[0]/v[1] if v[1] != 0 else 0) for k, v in data.items()}
 
 
+def getScoreByTimeAdvantageFromDataFrame(df: pd.DataFrame, timeAdvGroupWidth: int = 5) -> dict:
+    data = dict()
+
+    for i, row in df.iterrows():
+        timeDiff = row['WhiteTimeLeft'] - row['BlackTimeLeft']
+        if abs(timeDiff) > 180:
+            continue
+        timeAdv = abs(timeDiff) // timeAdvGroupWidth
+
+        if row["Result"] == '1-0':
+            score = 1
+        elif row["Result"] == '1/2-1/2':
+            score = 0.5
+        elif row["Result"] == '0-1':
+            score = 0
+        else:
+            continue
+
+        if timeDiff < 0:
+            score = 1 - score
+
+        if timeAdv not in data:
+            data[timeAdv] = [score, 1]
+        else:
+            data[timeAdv][0] += score
+            data[timeAdv][1] += 1
+
+    retData = dict(sorted({k*timeAdvGroupWidth: (v[0]/v[1] if v[1] > 0 else 0) for k, v in data.items()}.items()))
+    return retData
+
+
 def plotScoreAndEval(df: pd.DataFrame, maxCP: int = 1000, cpBandWidth: int = 20, whitePerspective: bool = True):
-    df = df[(df['WhiteElo'] > 2000) & (df['BlackElo'] > 2000)]
+    rating = 2200
+    df = df[(abs(df['WhiteElo'] - rating) <= 100) & (abs(df['BlackElo'] - rating) <= 100) & (abs(df['WhiteElo'] - df['BlackElo']) <= 50)]
     fig, axs = plt.subplots(3, 2, figsize=(10, 6))
-    for i, ply in enumerate([30, 40, 50, 60, 70, 80]):
-        nDF = df[df['Ply'] == ply]
+    times = [20, 40, 60, 90, 120, 180]
+    for i, timeLeft in enumerate(times):
+        if i == 0:
+            lastTime = 0
+        else:
+            lastTime = times[i-1]
+        if whitePerspective:
+            nDF = df[(df['WhiteTimeLeft'] > lastTime) & (df['WhiteTimeLeft'] <= timeLeft)]
+        else:
+            # nDF = df[((df['Evaluation'] >= 0) & (df['WhiteTimeLeft'] > lastTime) & (df['WhiteTimeLeft'] <= timeLeft)) | ((df['Evaluation'] < 0) & (df['BlackTimeLeft'] > lastTime) & (df['BlackTimeLeft'] <= timeLeft))]
+            nDF = df[(df['WhiteTimeLeft'] > lastTime) & (df['WhiteTimeLeft'] <= timeLeft) & (df['BlackTimeLeft'] > lastTime) & (df['BlackTimeLeft'] <= timeLeft)]
+        # nDF = nDF[nDF['WhiteTimeLeft'] > 30]
         plotData = getScoresByEvalFromDataFrame(nDF, maxCP, cpBandWidth, whitePerspective=whitePerspective)
         xVals = list(plotData.keys())
         yVals = list(plotData.values())
@@ -169,7 +215,7 @@ def plotScoreAndEval(df: pd.DataFrame, maxCP: int = 1000, cpBandWidth: int = 20,
         x = np.linspace(-maxCP, maxCP)
         y = (x+maxCP)/(maxCP*2)
         cAX.plot(x, y, zorder=-1)
-        cAX.set_title(f'Ply {ply}')
+        cAX.set_title(f'{lastTime}-{timeLeft}')
         cAX.set_facecolor(plotting_helper.getColor('background'))
         cAX.hlines(0.5, -maxCP, maxCP, color='black', linewidth=0.5, zorder=-1)
         cAX.vlines(0, 0, 1, color='black', linewidth=0.5, zorder=-1)
@@ -182,6 +228,26 @@ def plotScoreAndEval(df: pd.DataFrame, maxCP: int = 1000, cpBandWidth: int = 20,
     plt.show()
 
 
+def plotScoreByTimeAdvantage(df: pd.DataFrame, timeAdvGroupWidth: int = 5):
+    fig, axs = plt.subplots(3, 3, figsize=(10, 6))
+    for i, rating in enumerate([1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600]):
+        if rating < 2600:
+            nDF = df[(abs(df['WhiteElo'] - rating) <= 100) & (abs(df['BlackElo'] - rating) <= 100) & (abs(df['WhiteElo'] - df['BlackElo']) <= 100)]
+        else:
+            nDF = df[(df['WhiteElo'] >= rating-50) & (df['BlackElo'] >= rating-50) & (abs(df['WhiteElo'] - df['BlackElo']) <= 150)]
+
+        plotData = getScoreByTimeAdvantageFromDataFrame(nDF, timeAdvGroupWidth)
+        xVals = list(plotData.keys())
+        yVals = list(plotData.values())
+
+        cAX = axs[i//3][i%3]
+        cAX.plot(xVals, yVals)
+        cAX.set_title(rating)
+        cAX.set_facecolor(plotting_helper.getColor('background'))
+        cAX.set_xlim(0, 180)
+
+    plt.show()
+
 
 if __name__ == '__main__':
     dataPath = '../out/lichessEvaluationsPlys2.pkl'
@@ -191,9 +257,16 @@ if __name__ == '__main__':
     df1 = pd.read_pickle(allPath)
     df2 = pd.read_pickle('../out/lichessEvaluations2025-09.pkl')
     df3 = pd.read_pickle('../out/lichessEvaluations2025-09_2.pkl')
-    df = pd.concat([df1, df2, df3])
+    df4 = pd.read_pickle('../out/lichessEvaluations2025-09_3.pkl')
+    df5 = pd.read_pickle('../out/lichessEvaluations2025-09_4.pkl')
+    df6 = pd.read_pickle('../out/lichessEvaluations2025-09_5.pkl')
+    df = pd.concat([df1, df2, df3, df4, df5, df6])
     # getWinsByCP(df, '180+0')
-    plotTimeEvaluationHeatmap(df, '180+0', timeBandWidth=3, maxTime=171, maxCP=750, cpBandWidth=10)
+    # plotTimeEvaluationHeatmap(df, '60+0', timeBandWidth=1, maxTime=60, maxCP=750, cpBandWidth=10)
+    # plotTimeEvaluationHeatmap(df, '180+0', timeBandWidth=3, maxTime=171, maxCP=750, cpBandWidth=10)
     # plotTimeEvaluationHeatmap(df, '300+0', timeBandWidth=3, maxTime=300, maxCP=1000, cpBandWidth=10)
-    # tcDF = df[df['TimeControl'] == '180+0']
-    # plotScoreAndEval(tcDF, cpBandWidth=10, maxCP=750, whitePerspective=False)
+    tcDF = df[df['TimeControl'] == '180+0']
+    tcDF = tcDF[tcDF['Ply'] == 40]
+    # tcDF = tcDF[(tcDF['Evaluation'] < 100) & (tcDF['Evaluation'] > -100)]
+    # plotScoreAndEval(tcDF, cpBandWidth=20, maxCP=1000, whitePerspective=False)
+    plotScoreByTimeAdvantage(tcDF)
