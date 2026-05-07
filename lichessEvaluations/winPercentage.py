@@ -4,8 +4,8 @@ import io
 import pandas as pd
 
 
-minGameNr = 70000000
-maxGames = 100000000
+minGameNr = 0
+maxGames = 30000000
 gameNr = 0
 pgn = ""
 timeControl = ""
@@ -14,7 +14,11 @@ blackElo = 0
 evalCutoff = 100
 whiteEval = 0
 timeLeft = 0
-includedPlys = [20, 30, 40, 50, 60, 70, 80]
+includedPlys = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+
+minRating = 1400
+usedTC = '180+0'
+useGame = True
 
 data = dict()
 
@@ -37,12 +41,23 @@ while gameNr < maxGames:
 
     if 'WhiteElo' in ls[0]:
         whiteElo = int(ls[1])
+        if whiteElo < minRating:
+            useGame = False
     elif 'BlackElo' in ls[0]:
         blackElo = int(ls[1])
+        if whiteElo < minRating:
+            useGame = False
     elif 'TimeControl' in ls[0]:
         timeControl = ls[1]
+        if timeControl != usedTC:
+            useGame = False
 
     if line[0] == '1':
+        if not useGame:
+            useGame = True
+            continue
+
+        useGame = True
         gameNr += 1
         if gameNr < minGameNr:
             continue
@@ -82,7 +97,7 @@ while gameNr < maxGames:
                         break
 
 df = pd.DataFrame(data)
-outFile = '../out/lichessEvaluations2025-09_5.pkl'
+outFile = '../out/lichessEvaluations2026-04.pkl'
 df.to_pickle(outFile)
 df = pd.read_pickle(outFile)
 print(df)
