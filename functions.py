@@ -126,6 +126,14 @@ def readComment(node, wdl: bool, cp: bool) -> tuple:
         return (wdlList)
     if cp and not wdl:
         return (int(float(node.comment)))
+
+    if ';' not in node.comment:
+        if '[' in node.comment:
+            wdlList = [ int(w) for w in node.comment.replace('[', '').replace(']', '').strip().split(',') ]
+            return (wdlList, None)
+
+        return (None, int(float(node.comment)))
+
     sp = node.comment.split(';')
     wdlList = [ int(w) for w in sp[0].replace('[', '').replace(']', '').strip().split(',') ]
     return (wdlList, int(float(sp[1])))

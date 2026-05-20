@@ -13,6 +13,7 @@ from scipy import integrate
 import numpy as np
 import scipy
 import plotting_helper
+import polars as pl
 
 
 def readMoveData(pgnPaths: list, is_chess960: bool = False, lichessAnalysis: bool = False) -> pd.DataFrame:
@@ -38,6 +39,7 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False, lichessAnalysis: boo
                 result = game.headers["Result"]
 
                 if is_chess960:
+                    # analysing the starting position if it is a 960 game
                     board = game.board()
                     pos = board.fen()
                     posDB = functions.modifyFEN(pos)
@@ -91,6 +93,8 @@ def readMoveData(pgnPaths: list, is_chess960: bool = False, lichessAnalysis: boo
                             wdl = [0, 0, 0]
                         else:
                             wdl, cp = functions.readComment(node, True, True)
+                            if wdl is None:
+                                wdl = [0, 0, 0]
                         move = node.move
                         data["GameID"].append(gameID)
                         data["Color"].append(board.turn)
@@ -647,28 +651,34 @@ if __name__ == '__main__':
     classical = ['../resources/germanBundesliga2025.pgn', '../resources/candidatesL.pgn', '../resources/olympiad2024.pgn', '../resources/wijk2025.pgn', '../resources/grandSwiss2023.pgn', '../resources/sharjah2024.pgn', '../resources/sharjah2025.pgn']
     # classicalDF = readMoveData(classical, lichessAnalysis=True)
     # classicalDF.to_pickle('../out/classicalDF')
-    classicalDF = pd.read_pickle('../out/classicalDF')
+    # classicalDF = pd.read_pickle('../out/classicalDF')
+
+    carlsen = ['../out/carlsenClassicalAnalysed.pgn']
+    df = readMoveData(carlsen)
+    print(df)
     
+    # xsDrops = getGameExpectedScoreDrops(classicalDF, (expectedScore, 0.007851))
+    # plotAccuracies([xsDrops], ['GMs'], 'Move accuracy', ('Expected score loss', 'Percentage of moves'))
 
     blitz = ['../resources/worldBlitz2023.pgn', '../resources/worldBlitz2024.pgn', '../resources/worldBlitz2022.pgn', '../resources/teamBlitz2025.pgn']
     # blitzDF = readMoveData(blitz, lichessAnalysis=True)
     # blitzDF.to_pickle('../out/blitzDF')
 
-    blitzDF = pd.read_pickle('../out/blitzDF')
+    # blitzDF = pd.read_pickle('../out/blitzDF')
 
     rapid = ['../resources/worldRapid2023.pgn', '../resources/worldRapid2024.pgn', '../resources/worldRapid2022.pgn', '../resources/teamRapid2025.pgn']
     # rapidDF = readMoveData(rapid, lichessAnalysis=True)
     # rapidDF.to_pickle('../out/rapidDF')
-    rapidDF = pd.read_pickle('../out/rapidDF')
+    # rapidDF = pd.read_pickle('../out/rapidDF')
 
-    bGM = filterGamesByRating(blitzDF, (2500, 3000), 150, True)
-    rGM = filterGamesByRating(rapidDF, (2500, 3000), 150, True)
-    cGM = filterGamesByRating(classicalDF, (2500, 3000), 150, True)
+    # bGM = filterGamesByRating(blitzDF, (2500, 3000), 150, True)
+    # rGM = filterGamesByRating(rapidDF, (2500, 3000), 150, True)
+    # cGM = filterGamesByRating(classicalDF, (2500, 3000), 150, True)
 
     # Inaccuracies, mistakes, blunders
-    cGMdrops = getxScoreDrops(cGM)
-    bGMdrops = getxScoreDrops(bGM)
-    rGMdrops = getxScoreDrops(rGM)
+    # cGMdrops = getxScoreDrops(cGM)
+    # bGMdrops = getxScoreDrops(bGM)
+    # rGMdrops = getxScoreDrops(rGM)
     # imb = getInaccMistakesBlunders([bGMdrops, rGMdrops, cGMdrops])
     # plotting_helper.plotPlayerBarChart(imb, ['Blitz', 'Rapid', 'Classical'], 'Relative number of moves', 'Relative number of inaccuracies, mistakes and blunders in different time controls', ['Inaccuracies', 'Mistakes', 'Blunders'], colors=plotting_helper.getColors(['blue', 'yellow', 'red']), filename='../out/rapidBlitz/imb.png')
 
@@ -687,6 +697,7 @@ if __name__ == '__main__':
     # plotAccuracies([CBGD, CRGD, CCGD], ['Blitz', 'Rapid', 'Classical'], 'Game accuracy in different time controls', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange']), filename='../out/rapidBlitz/accuracyGM.png')
 
     # Ratings
+    """
     blitz2500 = filterGamesByRating(blitzDF, (2500, 2700), 150, False)
     blitz2700 = filterGamesByRating(blitzDF, (2700, 3000), 150, False)
     bDrops25 = getGameExpectedScoreDrops(blitz2500, (expectedScore, 0.007851))
@@ -703,6 +714,7 @@ if __name__ == '__main__':
     crd25 = getCumulativeDrop(rDrops25)
     rDrops27 = getGameExpectedScoreDrops(rapid2700, (expectedScore, 0.007851))
     crd27 = getCumulativeDrop(rDrops27)
+    """
 
     """
     classical2500 = filterGamesByRating(classicalDF, (2500, 2700), 100, False)
@@ -713,7 +725,7 @@ if __name__ == '__main__':
     ccd27 = getCumulativeDrop(cDrops27)
     """
 
-    plotAccuracies([cbd25, cbd27, crd25, crd27, crd24], ['2500-2700 Blitz', '2700+ Blitz', '2500-2700 Rapid', '2700+ Rapid', '2400 Rapid'], 'Game accuracy in rapid and blitz for different rating ranges', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange', 'red', 'pink'])) #, filename='../out/rapidBlitz/accuracyRatings.png')
+    # plotAccuracies([cbd25, cbd27, crd25, crd27, crd24], ['2500-2700 Blitz', '2700+ Blitz', '2500-2700 Rapid', '2700+ Rapid', '2400 Rapid'], 'Game accuracy in rapid and blitz for different rating ranges', ('Maximum expected score loss per move', 'Percentage of games'), colors=plotting_helper.getColors(['violet', 'blue', 'orange', 'red', 'pink'])) #, filename='../out/rapidBlitz/accuracyRatings.png')
     # plotAccuracies([cDrops2700, cDrops2600, cDrops2500, cbDrops, crDrops], ['2700', '2600', '2500', 'Blitz', 'Rapid'], 'Move accuracy', ('Expected score loss', 'Percentage of moves'))
 
     # Analysis of accuracy in different time controls
