@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import statistics
+import math
 
 
 def getAllColors() -> dict:
@@ -308,7 +309,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
     # ax.set_ylim(0, yMax*1.05)
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
-    ax.set_yticks(range(10))
+    # ax.set_yticks(range(10))
 
     ax.legend()
     plt.title(title)
@@ -320,7 +321,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
         plt.show()
 
 
-def plotDistribution(xValues: list, yValues: list, barWidth: float, xLabel: str, yLabel: str, title: str, color = None, outline: bool = True, filename: str = None):
+def plotDistribution(xValues: list, yValues: list, barWidth: float, xLabel: str, yLabel: str, title: str, color = None, outline: bool = True, xMin: float = None, xMax: float = None, referenceFunction = None, logScale: bool = False, filename: str = None):
     if not color:
         color = getColor('blue')
 
@@ -332,12 +333,23 @@ def plotDistribution(xValues: list, yValues: list, barWidth: float, xLabel: str,
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
 
+    if xMin is None:
+        xMin = min(xValues) - barWidth/2
+    if xMax is None:
+        xMax = max(xValues) + barWidth/2
+
+    if referenceFunction:
+        xVals = [x*barWidth for x in range(math.floor(xMin), math.ceil(xMax/barWidth))]
+        ax.plot(xVals, [referenceFunction(x) for x in xVals], color=getColor('orange'))
+
     ax.bar(xValues, yValues, width=barWidth, color=color, edgecolor='black', linewidth=linewidth)
 
-    ax.set_xlim(min(xValues)-barWidth/2, max(xValues)+barWidth/2)
+    ax.set_xlim(xMin, xMax)
 
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
+    if logScale:
+        ax.set_yscale('log')
     plt.title(title)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 

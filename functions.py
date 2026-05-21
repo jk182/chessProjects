@@ -4,6 +4,7 @@ import numpy as np
 import subprocess
 import re
 import math
+import statistics
 
 
 def configureEngine(engineName: str, uci_options: dict) -> engine:
@@ -183,3 +184,47 @@ def gameAccuracy(AXSL: float) -> float:
     if AXSL <= offset:
         return 100
     return 100 * np.exp(-(AXSL-offset)**2/(2*sigma**2))
+
+
+def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, moveAccuracyFunction = accuracy) -> tuple:
+    """
+    This calculates the game accuracy as used by Lichess (as of May 2026)
+    """
+    expectedScores = [expectedScoreFunction(cp) for cp in moveEvaluations]
+
+    # Compute the size of the sliding windows used for the volatility
+    windowSize = int(len(moveEvaluations) / 10)
+    windowSize = max(2, min(windowSize, 8))
+
+    # Get the win percentages for the windows
+    prefixCount = windowSize - 2
+    windows = [expectedScores[:windowSize] for _ in range(prefixCount)]
+    windows.extend([expectedScores[i:i+windowSize] for i in range(len(expectedScores) - windowSize + 1)])
+    
+    stDevs = [statistics.stdev(window) for window in windows]
+
+    weightedAccuraciesWhite = list()
+    weightedAccuraciesBlack = list()
+
+    for i in range(len(expectedScores)-1):
+        xsBefore = expectedScores[i]
+        xsAfter = expectedScores[i+1]
+        weight = stDevs[i]
+        weight = max(0.5, min(weight, 12)) # Limits as per Lichess
+
+        if i % 2 == 0:
+            accuracy = moveAccuracyFunction(xsBefore, xsAfter)
+            weightedAccuraciesWhite.append((accuracy, weight))
+        else:
+            accuracy = moveAccuracyFunction(-xsBefore, -xsAfter)
+            weightedAccuraciesBlack.append((accuracy, weight))
+
+
+    weightedMeanWhite = sum([accuracy * weight for accuracy, weight in weightedAccuraciesWhite]) / sum([weight for _, weight in weightedAccuraciesWhite])
+    weightedMeanBlack = sum([accuracy * weight for accuracy, weight in weightedAccuraciesBlack]) / sum([weight for _, weight in weightedAccuraciesBlack])
+
+    harmonicMeanWhite = len(weightedAccuraciesWhite) / sum([1/accuracy for accuracy, _ in weightedAccuraciesWhite])
+    harmonicMeanBlack = len(weightedAccuraciesBlack) / sum([1/accuracy for accuracy, _ in weightedAccuraciesBlack])
+
+    return (float((weightedMeanWhite + harmonicMeanWhite)/2), float((weightedMeanBlack+harmonicMeanBlack)/2))
+

@@ -126,7 +126,7 @@ def getExpectedScoreDropsPerGame(df: pl.DataFrame, xsdWidth: float = 0.5) -> dic
     """
     gameDrops = dict()
     gameID = None
-    gameAvg = [0, 0]
+    gameAvg = [[0, 0], [0, 0]]
     xsFunction = functions.expectedScore
     for row in df.rows(named=True):
         if gameID is None:
@@ -134,43 +134,61 @@ def getExpectedScoreDropsPerGame(df: pl.DataFrame, xsdWidth: float = 0.5) -> dic
 
         if gameID != row["GameID"]:
             gameID = row["GameID"]
-            if gameAvg[1] != 0:
-                avgDrop = gameAvg[0] / gameAvg[1]
-                avgDrop = (avgDrop + xsdWidth/2) // xsdWidth * xsdWidth
-                if avgDrop in gameDrops:
-                    gameDrops[avgDrop] += 1
-                else:
-                    gameDrops[avgDrop] = 1
+            for i in range(2):
+                if gameAvg[i][1] != 0:
+                    avgDrop = gameAvg[i][0] / gameAvg[i][1]
+                    avgDrop = (avgDrop + xsdWidth/2) // xsdWidth * xsdWidth
+                    if avgDrop in gameDrops:
+                        gameDrops[avgDrop] += 1
+                    else:
+                        gameDrops[avgDrop] = 1
 
-                gameAvg = [0, 0]
+                gameAvg = [[0, 0], [0, 0]]
 
         factor = 1 if row["Color"] else -1
         drop = (xsFunction(row["EvalBefore"]) - xsFunction(row["EvalAfter"])) * factor
         drop = max(0, drop)
 
-        gameAvg[0] += drop
-        gameAvg[1] += 1
+        index = max(factor, 0)
+        gameAvg[index][0] += drop
+        gameAvg[index][1] += 1
 
-    if gameAvg[1] != 0:
-        avgDrop = gameAvg[0] / gameAvg[1]
-        avgDrop = (avgDrop + xsdWidth/2) // xsdWidth * xsdWidth
-        if avgDrop in gameDrops:
-            gameDrops[avgDrop] += 1
-        else:
-            gameDrops[avgDrop] = 1
+    for i in range(2):
+        if gameAvg[i][1] != 0:
+            avgDrop = gameAvg[i][0] / gameAvg[i][1]
+            avgDrop = (avgDrop + xsdWidth/2) // xsdWidth * xsdWidth
+            if avgDrop in gameDrops:
+                gameDrops[avgDrop] += 1
+            else:
+                gameDrops[avgDrop] = 1
 
     return gameDrops
 
 
+def lichessAccuracy(expectedScoreDrop: float):
+    return functions.accuracy(expectedScoreDrop, 0)/100
+
+
 if __name__ == '__main__':
     carlsen = ['../out/carlsenClassicalAnalysed.pgn']
-    # df = getMoveData(carlsen)
-    # df.write_parquet('../out/carlsenClassicalDF.parquet')
-    df = pl.read_parquet('../out/carlsenClassicalDF.parquet')
+    pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn', '../out/games/candidates2026_analysed.pgn', '../out/games/candidatesW2026_analysed.pgn']
+    testScores = [0, 50, 75, 100, 125, 150, 175, 200, 225, 250]
+    testScores2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 250]
+    testScores = [20, -20, 40, -30, -40, -60, -30, -30, -20, -30, 0, 0, 50, 20, 110, 140, 370, 200, 280, 180, 240, 100, 100, -10, 10, 20, 120, 70, 340, 10, 300, 100, 170, 180, 150, 160, 190, -80, 0, 0, 0, -30, 20, -50, 140, 30, 40, -140, -80, -160, -200, -180, -120, -90, -20, -150, -140, -120, -40, -260, -240, -260, -260, -570, -560, -550, -520, -510, -450, -470, -440, -420, -370, -420, -380, -430, -450, -430, -430, -490, -480, -500, -440]
+    print(functions.lichessGameAccuracy(testScores))
+    # df = getMoveData(pgns)
+    # df.write_parquet('../out/classicalDF.parquet')
+    """
+    df = pl.read_parquet('../out/classicalDF.parquet')
+    print(df)
     groupWidth = 0.2
     drops = getExpectedScoreDropsPerMove(df, xsdWidth=groupWidth)
     drops = dict(sorted(drops.items()))
     total = sum(list(drops.values()))
-    gameDrops = getExpectedScoreDropsPerGame(df, groupWidth)
-    # plotting_helper.plotDistribution(list(drops.keys())[1:], list(drops.values())[1:], groupWidth, 'Expected score drop', 'Number of moves', 'Expected score drops')
-    plotting_helper.plotDistribution(list(gameDrops.keys()), list(gameDrops.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
+    drops = {k: v/total for k, v in drops.items()}
+    distributionFunction = {k: 1-sum(list(drops.values())[:i+1]) for i, k in enumerate(list(drops.keys()))}
+    """
+    # gameDrops = getExpectedScoreDropsPerGame(df, groupWidth)
+    # plotting_helper.plotLineChart([list(distributionFunction.keys())], [list(distributionFunction.values())], 'Expected score drop', 'Relative number of moves', 'Move accuracy', legend=['My data', 'Lichess'], refFunction=lichessAccuracy)
+    # plotting_helper.plotDistribution(list(drops.keys())[1:], list(drops.values())[1:], groupWidth, 'Expected score drop', 'Number of moves', 'Expected score drops', xMax=80, referenceFunction=lichessAccuracy, logScale=True)
+    # plotting_helper.plotDistribution(list(gameDrops.keys()), list(gameDrops.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
