@@ -1,12 +1,14 @@
 import chess
 import polars as pl
 import scipy.stats
+import scipy.optimize
 
 import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import plotting_helper
+import numpy as np
 
 
 def getMoveData(pgnPaths: list, lichessAnalysis: bool = False, startEval: int = 20, startWDL: list = [205, 614, 181]) -> pl.DataFrame:
@@ -199,8 +201,54 @@ def getGameEvaluationsFromDF(df: pl.DataFrame) -> list:
     return gameEvaluations
 
 
+def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, expectedScoreFunction = functions.expectedScore, p: float = 1, normalised: float = True) -> dict:
+    """
+    This gets the density of the mean game expected score loss
+    """
+    density = dict()
+    for gameData in gameEvals:
+        if len(gameData) < 2:
+            continue
+        expectedScoreDropsWhite = [max(0, expectedScoreFunction(gameData[i]) - expectedScoreFunction(gameData[i+1])) for i in range(0, len(gameData)-1, 2)]
+        expectedScoreDropsBlack = [max(0, expectedScoreFunction(-gameData[i]) - expectedScoreFunction(-gameData[i+1])) for i in range(1, len(gameData)-1, 2)]
+        meanWhite = scipy.stats.pmean(expectedScoreDropsWhite, p)
+        meanBlack = scipy.stats.pmean(expectedScoreDropsBlack, p)
+
+        meanWhite = float((meanWhite + groupWidth/2) // groupWidth * groupWidth)
+        meanBlack = float((meanBlack + groupWidth/2) // groupWidth * groupWidth)
+
+        for m in [meanWhite, meanBlack]:
+            if m not in density:
+                density[m] = 1
+            else:
+                density[m] += 1
+
+    density = dict(sorted(density.items()))
+
+    if normalised:
+        return {k: v/sum(list(density.values())) for k, v in density.items()}
+    return density
+
+
+def getDistributionFromDensity(density: dict) -> dict:
+    return {k: 1-sum(list(density.values())[:i+1]) for i, k in enumerate(list(density.keys()))}
+
+
 def lichessAccuracy(expectedScoreDrop: float):
     return functions.accuracy(expectedScoreDrop, 0)/100
+
+
+def gameAccuracy(expectedScoreDrop: float, sigma: float, offset: float) -> float:
+    """
+    if expectedScoreDrop <= offset:
+        return 1
+    """
+
+    return np.exp(-(expectedScoreDrop-offset)**2/(2*sigma**2))
+
+
+def fitGameAccuracyToData(distribution: dict, accuracyFunction):
+    return scipy.optimize.curve_fit(accuracyFunction, list(distribution.keys()), list(distribution.values()))
 
 
 def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: int = 3000) -> pl.DataFrame:
@@ -229,19 +277,27 @@ if __name__ == '__main__':
     ndf = filterDFByRating(2500, 2520)
     with pl.Config(tbl_cols=-1):
         print(ndf)
-    evals = getGameEvaluationsFromDF(ndf)
-    print([functions.lichessGameAccuracy(x) for x in evals])
+    evals = getGameEvaluationsFromDF(df)
     groupWidth = 0.1
     drops = getExpectedScoreDropsPerMove(df, xsdWidth=groupWidth)
     drops = dict(sorted(drops.items()))
     total = sum(list(drops.values()))
     drops = {k: v/total for k, v in drops.items()}
     distributionFunction = {k: 1-sum(list(drops.values())[:i+1]) for i, k in enumerate(list(drops.keys()))}
+    density = getMeanDensityFromGameEvaluations(evals)
+    dist = getDistributionFromDensity(density)
+    params, x = fitGameAccuracyToData(dist, gameAccuracy)
+    plotting_helper.plotLineChart([list(dist.keys())], [list(dist.values())], 'XS drop', 'Percentile', 'Fitting the curve', ['Data', 'Function'], refFunction=lambda d: gameAccuracy(d, params[0], params[1]))
+    # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
+    """
     gameDrops = getExpectedScoreDropsPerGame(df, groupWidth)
     gameDrops2 = getExpectedScoreDropsPerGame(df, groupWidth, p=2)
+    gameDrops3 = getExpectedScoreDropsPerGame(df, groupWidth, p=3)
+    gameDrops1 = getExpectedScoreDropsPerGame(df, groupWidth, p=0)
     # plotting_helper.plotLineChart([list(distributionFunction.keys())], [list(distributionFunction.values())], 'Expected score drop', 'Relative number of moves', 'Move accuracy', legend=['My data', 'Lichess'], refFunction=lichessAccuracy)
     # plotting_helper.plotDistribution(list(drops.keys())[1:], list(drops.values())[1:], groupWidth, 'Expected score drop', 'Number of moves', 'Expected score drops', xMax=80, referenceFunction=lichessAccuracy, logScale=True)
     # plotting_helper.plotDistribution(list(gameDrops.keys()), list(gameDrops.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
-    xVals = [list(gameDrops.keys()), list(gameDrops2.keys())]
-    yVals = [list(gameDrops.values()), list(gameDrops2.values())]
-    plotting_helper.plotMultipleDistributions(xVals, yVals, groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop', xMax=15, legend=['p=1', 'p=2'])
+    xVals = [list(gameDrops.keys()), list(gameDrops2.keys()), list(gameDrops3.keys())] #, list(gameDrops1.keys())]
+    yVals = [list(gameDrops.values()), list(gameDrops2.values()), list(gameDrops3.values())] #, list(gameDrops1.values())]
+    plotting_helper.plotMultipleDistributions(xVals, yVals, groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop', xMax=25, legend=['p=1', 'p=2', 'p=3', 'p=-1'])
+    """
