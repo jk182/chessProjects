@@ -357,3 +357,65 @@ def plotDistribution(xValues: list, yValues: list, barWidth: float, xLabel: str,
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+
+
+def plotMultipleDistributions(xValues: list, yValues: list, barWidth: float, xLabel: str, yLabel: str, title: str, legend: list = None, multipleBars: bool = False, colors: list = None, outline: bool = True, xMin: float = None, xMax: float = None, referenceFunction = None, logScale: bool = False, filename: str = None):
+    """
+    This is used to plot multiple distibutins in one graph
+    xValues: list
+        A list of lists where each list is the x-data for one distribution
+    yValues: list
+        A lsit of lists where each list is the y-data for one distribution
+    mutlipleBars: bool
+        If this is true, the data will be shown as mutliple smaller bars next to each other
+        Otherwise the distributions will be opaue and overlap each other
+    """
+    if not colors:
+        colors = getDefaultColors()
+
+    if outline:
+        linewidth = 0.5
+    else:
+        linewidth = 0
+
+    if multipleBars:
+        barWidth /= len(xValues)
+        offset = barWidth * (1/2 - len(xValues)/2)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+
+    if xMin is None:
+        xMin = min([min(x) for x in xValues]) - barWidth/2
+    if xMax is None:
+        xMax = max([max(x) for x in xValues]) + barWidth/2
+
+    if referenceFunction:
+        xVals = [x*barWidth for x in range(math.floor(xMin), math.ceil(xMax/barWidth))]
+        ax.plot(xVals, [referenceFunction(x) for x in xVals], color=colors[-1])
+
+    for i in range(len(xValues)):
+        label = legend[i] if legend else ''
+        if multipleBars:
+            ax.bar([x+1+offset+(barWidth*i) for x in xValues[i]], yValues[i], width=barWidth, color=colors[i], edgecolor='black', linewidth=linewidth, label=label)
+        else:
+            ax.bar(xValues[i], yValues[i], width=barWidth, color=colors[i], edgecolor='black', linewidth=linewidth, label=label, alpha=0.5)
+
+    ax.set_xlim(xMin, xMax)
+
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+
+    if logScale:
+        ax.set_yscale('log')
+
+    if legend:
+        ax.legend()
+        
+    plt.title(title)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()

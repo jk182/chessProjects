@@ -238,6 +238,10 @@ if __name__ == '__main__':
     drops = {k: v/total for k, v in drops.items()}
     distributionFunction = {k: 1-sum(list(drops.values())[:i+1]) for i, k in enumerate(list(drops.keys()))}
     gameDrops = getExpectedScoreDropsPerGame(df, groupWidth)
+    gameDrops2 = getExpectedScoreDropsPerGame(df, groupWidth, p=2)
     # plotting_helper.plotLineChart([list(distributionFunction.keys())], [list(distributionFunction.values())], 'Expected score drop', 'Relative number of moves', 'Move accuracy', legend=['My data', 'Lichess'], refFunction=lichessAccuracy)
     # plotting_helper.plotDistribution(list(drops.keys())[1:], list(drops.values())[1:], groupWidth, 'Expected score drop', 'Number of moves', 'Expected score drops', xMax=80, referenceFunction=lichessAccuracy, logScale=True)
-    plotting_helper.plotDistribution(list(gameDrops.keys()), list(gameDrops.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
+    # plotting_helper.plotDistribution(list(gameDrops.keys()), list(gameDrops.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
+    xVals = [list(gameDrops.keys()), list(gameDrops2.keys())]
+    yVals = [list(gameDrops.values()), list(gameDrops2.values())]
+    plotting_helper.plotMultipleDistributions(xVals, yVals, groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop', xMax=15, legend=['p=1', 'p=2'])
