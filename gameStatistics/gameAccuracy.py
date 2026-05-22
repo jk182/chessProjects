@@ -239,16 +239,40 @@ def lichessAccuracy(expectedScoreDrop: float):
 
 
 def gameAccuracy(expectedScoreDrop: float, sigma: float, offset: float) -> float:
-    """
-    if expectedScoreDrop <= offset:
-        return 1
-    """
+    x = np.maximum(expectedScoreDrop - offset, 0)
 
-    return np.exp(-(expectedScoreDrop-offset)**2/(2*sigma**2))
+    return np.exp(-(x)**2/(2*sigma**2))
 
 
 def fitGameAccuracyToData(distribution: dict, accuracyFunction):
-    return scipy.optimize.curve_fit(accuracyFunction, list(distribution.keys()), list(distribution.values()))
+    return scipy.optimize.curve_fit(accuracyFunction, list(distribution.keys()), list(distribution.values()), bounds=(0, 10))
+
+
+def calculateGameAccuracies(evals: list, expectedScoreFunction = functions.expectedScore, gameAccuracyFunction = lambda x: gameAccuracy(x, 1.5, 0.2), p: float = 1, scale: float = 100) -> tuple:
+    """
+    This function calculates the accuracies for both colors in a game
+    evals: list
+        List of centipawn evaluations
+    expectedScoreFunction
+        The function used to convert the centipawns into an expected score
+    gameAccuracyFunction
+        The function used to calculate the accuracy of a game
+    p: float
+        The p-value for the generalised mean
+    scale: float
+        A value to rescale the accuracy
+    return -> tuple
+        (whiteAccuracy, blackAccuracy)
+    """
+
+    expectedScores = [expectedScoreFunction(e) for e in evals]
+    expectedScoreDropsWhite = [max(0, expectedScores[i] - expectedScores[i+1]) for i in range(0, len(expectedScores)-1, 2)]
+    expectedScoreDropsBlack = [max(0, expectedScores[i+1] - expectedScores[i]) for i in range(1, len(expectedScores)-1, 2)]
+
+    meanWhite = scipy.stats.pmean(expectedScoreDropsWhite, p)
+    meanBlack = scipy.stats.pmean(expectedScoreDropsBlack, p)
+
+    return (float(gameAccuracyFunction(meanWhite)) * scale, float(gameAccuracyFunction(meanBlack)) * scale)
 
 
 def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: int = 3000) -> pl.DataFrame:
@@ -267,27 +291,30 @@ def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: i
 if __name__ == '__main__':
     carlsen = ['../out/carlsenClassicalAnalysed.pgn']
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn', '../out/games/candidates2026_analysed.pgn', '../out/games/candidatesW2026_analysed.pgn', '../out/games/grandSwiss2025Analysed.pgn']
-    testScores = [0, 50, 75, 100, 125, 150, 175, 200, 225, 250]
-    testScores2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 250]
-    testScores = [20, -20, 40, -30, -40, -60, -30, -30, -20, -30, 0, 0, 50, 20, 110, 140, 370, 200, 280, 180, 240, 100, 100, -10, 10, 20, 120, 70, 340, 10, 300, 100, 170, 180, 150, 160, 190, -80, 0, 0, 0, -30, 20, -50, 140, 30, 40, -140, -80, -160, -200, -180, -120, -90, -20, -150, -140, -120, -40, -260, -240, -260, -260, -570, -560, -550, -520, -510, -450, -470, -440, -420, -370, -420, -380, -430, -450, -430, -430, -490, -480, -500, -440]
-    print(functions.lichessGameAccuracy(testScores))
     # df = getMoveData(pgns)
     # df.write_parquet('../out/classicalDF.parquet')
     df = pl.read_parquet('../out/classicalDF.parquet')
-    ndf = filterDFByRating(2500, 2520)
+
+    ndf = filterDFByRating(2500)
     with pl.Config(tbl_cols=-1):
         print(ndf)
-    evals = getGameEvaluationsFromDF(df)
     groupWidth = 0.1
-    drops = getExpectedScoreDropsPerMove(df, xsdWidth=groupWidth)
-    drops = dict(sorted(drops.items()))
-    total = sum(list(drops.values()))
-    drops = {k: v/total for k, v in drops.items()}
-    distributionFunction = {k: 1-sum(list(drops.values())[:i+1]) for i, k in enumerate(list(drops.keys()))}
-    density = getMeanDensityFromGameEvaluations(evals)
+
+    evals = functions.getEvalsFromPGN('/Users/julian/Downloads/lichess_study_wdl-graphs_mikhail-tal-alexander-koblents_by_jk_182_2024.03.15.pgn', lichessAnalysis=True)
+    evals = functions.getEvalsFromPGN('/Users/julian/Downloads/lichess_study_wdl-graphs_ponomariov-ruslan-carlsen-magnus_by_jk_182_2024.03.12.pgn', lichessAnalysis=True)
+    print(functions.lichessGameAccuracy(evals))
+    print(functions.lichessGameAccuracy(evals, expectedScoreFunction=functions.expectedScore))
+    print(calculateGameAccuracies(evals)) #, gameAccuracyFunction=lambda x: gameAccuracy(x, 0.83, 0), p=0.5))
+
+    # Getting parameters for an accuracy function
+    """
+    referenceEvals = getGameEvaluationsFromDF(ndf)
+    density = getMeanDensityFromGameEvaluations(referenceEvals, p=1)
     dist = getDistributionFromDensity(density)
     params, x = fitGameAccuracyToData(dist, gameAccuracy)
+    print(params)
     plotting_helper.plotLineChart([list(dist.keys())], [list(dist.values())], 'XS drop', 'Percentile', 'Fitting the curve', ['Data', 'Function'], refFunction=lambda d: gameAccuracy(d, params[0], params[1]))
+    """
     # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
     """
     gameDrops = getExpectedScoreDropsPerGame(df, groupWidth)

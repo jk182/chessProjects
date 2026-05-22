@@ -24,6 +24,7 @@ def configureEngine(engineName: str, uci_options: dict) -> engine:
 
     return eng
 
+
 def formatWDL(wdl: engine.Wdl) -> list:
     """
     This function takes an engine.wdl and turns it into a list of the WDL from
@@ -228,3 +229,32 @@ def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, mov
 
     return (float((weightedMeanWhite + harmonicMeanWhite)/2), float((weightedMeanBlack+harmonicMeanBlack)/2))
 
+
+def getEvalsFromPGN(pgnPath: str, lichessAnalysis: bool = False, startEval: int = 20) -> list:
+    """
+    This function extracts the evaluations from a PGN file
+    """
+    evaluations = []
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            gameEvals = [startEval]
+
+            node = game
+            while not node.is_end():
+                node = node.variations[0]
+                if lichessAnalysis:
+                    if node.eval():
+                        gameEvals.append(node.eval().white().score(mate_score=1000))
+                    else:
+                        print("Evaluation not found")
+                        gameEvals.append(gameEvals[-1])
+                else:
+                    if c := readComment(node, True, True):
+                        gameEvals.append(c[1])
+
+            evaluations.append(gameEvals)
+
+    if len(evaluations) == 1:
+        return evaluations[0]
+
+    return evaluations
