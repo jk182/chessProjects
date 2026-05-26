@@ -89,7 +89,7 @@ def accuracy(winPercentBefore: float, winPercentAfter: float) -> float:
     return -> float:
         The accuracy of the move (0-100)
     """
-    return min(103.1668 * np.exp(-0.04354 * (winPercentBefore - winPercentAfter)) - 3.1669, 100)
+    return min(103.1668100711649 * np.exp(-0.04354415386753951 * (winPercentBefore - winPercentAfter)) - 3.166924740191411 + 1, 100) # the +1 is added in the Lichess formula to account for imperfect analysis
 
 
 def winP(centipawns: int) -> float:
@@ -191,41 +191,45 @@ def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, mov
     """
     This calculates the game accuracy as used by Lichess (as of May 2026)
     """
+    minWinSize = 2
+    maxWinSize = 8
+    nWindows = 10
+    minStDev = 0.5
+    maxStDev = 12
+
     expectedScores = [expectedScoreFunction(cp) for cp in moveEvaluations]
 
     # Compute the size of the sliding windows used for the volatility
-    windowSize = int(len(moveEvaluations) / 10)
-    windowSize = max(2, min(windowSize, 8))
+    windowSize = int(len(moveEvaluations) / nWindows)
+    windowSize = max(minWinSize, min(windowSize, maxWinSize))
 
     # Get the win percentages for the windows
     prefixCount = windowSize - 2
     windows = [expectedScores[:windowSize] for _ in range(prefixCount)]
     windows.extend([expectedScores[i:i+windowSize] for i in range(len(expectedScores) - windowSize + 1)])
     
-    stDevs = [statistics.stdev(window) for window in windows]
+    stDevs = [max(minStDev, min(statistics.pstdev(window), maxStDev)) for window in windows] # Lichess uses the population standard deviation
 
-    weightedAccuraciesWhite = list()
-    weightedAccuraciesBlack = list()
+    accuraciesWhite = list()
+    accuraciesBlack = list()
 
     for i in range(len(expectedScores)-1):
         xsBefore = expectedScores[i]
         xsAfter = expectedScores[i+1]
         weight = stDevs[i]
-        weight = max(0.5, min(weight, 12)) # Limits as per Lichess
 
         if i % 2 == 0:
             accuracy = moveAccuracyFunction(xsBefore, xsAfter)
-            weightedAccuraciesWhite.append((accuracy, weight))
+            accuraciesWhite.append((accuracy, weight))
         else:
             accuracy = moveAccuracyFunction(-xsBefore, -xsAfter)
-            weightedAccuraciesBlack.append((accuracy, weight))
+            accuraciesBlack.append((accuracy, weight))
 
+    weightedMeanWhite = sum([accuracy * weight for accuracy, weight in accuraciesWhite]) / sum([weight for _, weight in accuraciesWhite])
+    weightedMeanBlack = sum([accuracy * weight for accuracy, weight in accuraciesBlack]) / sum([weight for _, weight in accuraciesBlack])
 
-    weightedMeanWhite = sum([accuracy * weight for accuracy, weight in weightedAccuraciesWhite]) / sum([weight for _, weight in weightedAccuraciesWhite])
-    weightedMeanBlack = sum([accuracy * weight for accuracy, weight in weightedAccuraciesBlack]) / sum([weight for _, weight in weightedAccuraciesBlack])
-
-    harmonicMeanWhite = len(weightedAccuraciesWhite) / sum([1/accuracy for accuracy, _ in weightedAccuraciesWhite])
-    harmonicMeanBlack = len(weightedAccuraciesBlack) / sum([1/accuracy for accuracy, _ in weightedAccuraciesBlack])
+    harmonicMeanWhite = len(accuraciesWhite) / sum([1/accuracy for accuracy, _ in accuraciesWhite])
+    harmonicMeanBlack = len(accuraciesBlack) / sum([1/accuracy for accuracy, _ in accuraciesBlack])
 
     return (float((weightedMeanWhite + harmonicMeanWhite)/2), float((weightedMeanBlack+harmonicMeanBlack)/2))
 

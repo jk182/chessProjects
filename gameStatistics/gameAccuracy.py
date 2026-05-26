@@ -339,6 +339,7 @@ if __name__ == '__main__':
     print(evals)
     xsDrops = getExpectedScoreDropsFromEvaluations(evals)
     print(xsDrops)
+    print(functions.lichessGameAccuracy(evals))
     carlsen = ['../out/carlsenClassicalAnalysed.pgn']
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn', '../out/games/candidates2026_analysed.pgn', '../out/games/candidatesW2026_analysed.pgn', '../out/games/grandSwiss2025Analysed.pgn']
     # df = getMoveData(pgns)
