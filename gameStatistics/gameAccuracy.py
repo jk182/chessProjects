@@ -60,6 +60,7 @@ def getMoveData(pgnPaths: list, lichessAnalysis: bool = False, startEval: int = 
                     if node.comment:
                         if lichessAnalysis:
                             if not node.eval():
+                                print(f'No evaluation found in {game.headers["White"]}-{game.headers["Black"]}, {game.headers["Date"]} on ply {ply}')
                                 break
                             cp = int(node.eval().white().score(mate_score=10000))
                             wdl = [0, 0, 0]
@@ -67,6 +68,8 @@ def getMoveData(pgnPaths: list, lichessAnalysis: bool = False, startEval: int = 
                             wdl, cp = functions.readComment(node, True, True)
                             if wdl is None:
                                 wdl = [0, 0, 0]
+                            if cp is None:
+                                print(f'No evaluation found in {game.headers["White"]}-{game.headers["Black"]}, {game.headers["Date"]} on ply {ply}')
                         move = node.move
                         data["GameID"].append(gameID)
                         data["Color"].append(board.turn)
@@ -86,6 +89,8 @@ def getMoveData(pgnPaths: list, lichessAnalysis: bool = False, startEval: int = 
                         data["Ply"].append(ply)
                         evalBefore = cp
                         wdlBefore = wdl
+                    else:
+                        print(f'No comment found in {game.headers["White"]}-{game.headers["Black"]}, {game.headers["Date"]} on ply {ply}')
                 gameID += 1
     df = pl.DataFrame(data)
     return df
@@ -154,7 +159,7 @@ def getExpectedScoreDropsPerGame(df: pl.DataFrame, xsdWidth: float = 0.1, xsFunc
         drop = (xsFunction(row["EvalBefore"]) - xsFunction(row["EvalAfter"])) * factor
         drop = max(0, drop)
 
-        index = max(factor, 0)
+        index = 1-max(factor, 0)
         gameAvg[index].append(drop)
 
     for i in range(2):
@@ -180,12 +185,14 @@ def getGameEvaluationsFromDF(df: pl.DataFrame) -> list:
     evals = list()
     gameID = None
     lastPly = 0
+    finalEval = None
     
     for row in df.rows(named=True):
         if gameID is None:
             gameID = row["GameID"]
 
         if gameID != row["GameID"]:
+            evals.append(finalEval)
             gameEvaluations.append(evals)
             evals = list()
             gameID = row["GameID"]
@@ -196,41 +203,75 @@ def getGameEvaluationsFromDF(df: pl.DataFrame) -> list:
 
         lastPly = row["Ply"]
         evals.append(row["EvalBefore"])
+        finalEval = row["EvalAfter"]
 
+    evals.append(finalEval)
     gameEvaluations.append(evals)
+
     return gameEvaluations
 
 
 def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, expectedScoreFunction = functions.expectedScore, p: float = 1, normalised: float = True) -> dict:
     """
     This gets the density of the mean game expected score loss
+    gameEvals: list
+        A list containing a list of eavluations for each game
+    groupWidth: float
+        The means will get grouped together, this determines the size of the individual groups
+    expectedScoreFunction:
+        The function used to calcualte the expected score from the evaluation
+    p: float
+        The p-value for the generalised mean
+    normalised: bool
+        If this is set, the sum of all means will be 1
+        Otherwise, it will be the total number of games
+    return -> dict
+        Dictionary indexed by the mean expected score drop for each game, containing the (relative) number of games with this drop
     """
     density = dict()
     for gameData in gameEvals:
         if len(gameData) < 2:
             continue
-        expectedScoreDropsWhite = [max(0, expectedScoreFunction(gameData[i]) - expectedScoreFunction(gameData[i+1])) for i in range(0, len(gameData)-1, 2)]
-        expectedScoreDropsBlack = [max(0, expectedScoreFunction(-gameData[i]) - expectedScoreFunction(-gameData[i+1])) for i in range(1, len(gameData)-1, 2)]
-        meanWhite = scipy.stats.pmean(expectedScoreDropsWhite, p)
-        meanBlack = scipy.stats.pmean(expectedScoreDropsBlack, p)
 
-        meanWhite = float((meanWhite + groupWidth/2) // groupWidth * groupWidth)
-        meanBlack = float((meanBlack + groupWidth/2) // groupWidth * groupWidth)
+        expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(gameData, expectedScoreFunction)
 
-        for m in [meanWhite, meanBlack]:
-            if m not in density:
-                density[m] = 1
+        for xsDrop in [expectedScoreDropsWhite, expectedScoreDropsBlack]:
+            mean = scipy.stats.pmean(xsDrop, p)
+            mean = float((mean + groupWidth/2) // groupWidth * groupWidth)
+
+            if mean not in density:
+                density[mean] = 1
             else:
-                density[m] += 1
+                density[mean] += 1
 
     density = dict(sorted(density.items()))
 
     if normalised:
         return {k: v/sum(list(density.values())) for k, v in density.items()}
+
     return density
 
 
+def getExpectedScoreDropsFromEvaluations(evals: list, expectedScoreFunction = functions.expectedScore) -> tuple:
+    """
+    This function calculates the expected score drops for both colors from a list of evaluations
+    evals: list
+        The evaluations before each move
+    expectedScoreFunction
+        The functions to calculate the expected score from an evaluation
+    return -> tuple(list(), list())
+        The expected score drops for white and black
+    """
+    expectedScoreDropsWhite = [max(0, expectedScoreFunction(evals[i]) - expectedScoreFunction(evals[i+1])) for i in range(0, len(evals)-1, 2)]
+    expectedScoreDropsBlack = [max(0, expectedScoreFunction(-evals[i]) - expectedScoreFunction(-evals[i+1])) for i in range(1, len(evals)-1, 2)]
+
+    return (expectedScoreDropsWhite, expectedScoreDropsBlack)
+
+
 def getDistributionFromDensity(density: dict) -> dict:
+    """
+    This calculates the distribution function, given a normalised density as a dict
+    """
     return {k: 1-sum(list(density.values())[:i+1]) for i, k in enumerate(list(density.keys()))}
 
 
@@ -264,10 +305,7 @@ def calculateGameAccuracies(evals: list, expectedScoreFunction = functions.expec
     return -> tuple
         (whiteAccuracy, blackAccuracy)
     """
-
-    expectedScores = [expectedScoreFunction(e) for e in evals]
-    expectedScoreDropsWhite = [max(0, expectedScores[i] - expectedScores[i+1]) for i in range(0, len(expectedScores)-1, 2)]
-    expectedScoreDropsBlack = [max(0, expectedScores[i+1] - expectedScores[i]) for i in range(1, len(expectedScores)-1, 2)]
+    expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(evals, expectedScoreFunction)
 
     meanWhite = scipy.stats.pmean(expectedScoreDropsWhite, p)
     meanBlack = scipy.stats.pmean(expectedScoreDropsBlack, p)
@@ -289,10 +327,23 @@ def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: i
 
 
 if __name__ == '__main__':
+    # Basic testing
+    pgn = ['../resources/Carlsen-Ponomariov.pgn']
+    pgn = ['../resources/Caruana-Wei.pgn']
+    df = getMoveData(pgn, lichessAnalysis=True)
+    with pl.Config(tbl_cols=-1, tbl_rows=-1):
+        print(df)
+
+    print(list(df.get_column('EvalBefore')))
+    evals = functions.getEvalsFromPGN(pgn[0], lichessAnalysis=True)
+    print(evals)
+    xsDrops = getExpectedScoreDropsFromEvaluations(evals)
+    print(xsDrops)
     carlsen = ['../out/carlsenClassicalAnalysed.pgn']
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn', '../out/games/candidates2026_analysed.pgn', '../out/games/candidatesW2026_analysed.pgn', '../out/games/grandSwiss2025Analysed.pgn']
     # df = getMoveData(pgns)
     # df.write_parquet('../out/classicalDF.parquet')
+    """
     df = pl.read_parquet('../out/classicalDF.parquet')
 
     ndf = filterDFByRating(2500)
@@ -305,6 +356,7 @@ if __name__ == '__main__':
     print(functions.lichessGameAccuracy(evals))
     print(functions.lichessGameAccuracy(evals, expectedScoreFunction=functions.expectedScore))
     print(calculateGameAccuracies(evals)) #, gameAccuracyFunction=lambda x: gameAccuracy(x, 0.83, 0), p=0.5))
+    """
 
     # Getting parameters for an accuracy function
     """
