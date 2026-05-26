@@ -284,15 +284,17 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
         plt.show()
 
 
-def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, linewidth: float = 2, filename: str = None):
+def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, linewidth: float = 2, xMin: float = None, xMax: float = None, filename: str = None):
     if not colors:
         colors = getDefaultColors()
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
 
-    xMin = min([min(x) for x in xValues])
-    xMax = max([max(x) for x in xValues])
+    if xMin is None:
+        xMin = min([min(x) for x in xValues])
+    if xMax is None:
+        xMax = max([max(x) for x in xValues])
     yMin = min([min(y) for y in yValues])
     yMax = max([max(y) for y in yValues])
 
@@ -302,7 +304,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
     if refFunction:
         steps = 100
         xVals = [xMin + i/steps*(xMax-xMin) for i in range(steps+1)]
-        ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1], linewidth=linewidth)
+        ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1], linewidth=linewidth, color=colors[1])
 
     ax.set_xlim(xMin, xMax)
     ax.set_ylim(yMin*0.95, yMax*1.05)
