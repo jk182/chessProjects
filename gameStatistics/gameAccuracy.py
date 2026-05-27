@@ -222,17 +222,31 @@ def getGameEvaluationsFromDF(df: pl.DataFrame) -> list:
     return gameEvaluations
 
 
-def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, expectedScoreFunction = functions.expectedScore, p: float = 1, normalised: float = True) -> dict:
+def calculateGeneralisedMean(evaluations: list, expectedScoreFunction=functions.expectedScore, p: float = 1) -> tuple:
+    if len(evaluations) < 3:
+        return None
+
+    expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(evaluations, expectedScoreFunction)
+
+    if p < 0:
+        expectedScoreDropsWhite = [max(0.1, xsDrop) for xsDrop in expectedScoreDropsWhite]
+        expectedScoreDropsBlack = [max(0.1, xsDrop) for xsDrop in expectedScoreDropsBlack]
+
+    whiteMean = scipy.stats.pmean(expectedScoreDropsWhite, p)
+    blackMean = scipy.stats.pmean(expectedScoreDropsBlack, p)
+
+    return (whiteMean, blackMean)
+
+
+def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, meanFunction=calculateGeneralisedMean, normalised: float = True) -> dict:
     """
     This gets the density of the mean game expected score loss
     gameEvals: list
         A list containing a list of eavluations for each game
     groupWidth: float
         The means will get grouped together, this determines the size of the individual groups
-    expectedScoreFunction:
-        The function used to calcualte the expected score from the evaluation
-    p: float
-        The p-value for the generalised mean
+    meanFunction:
+        The function used to calculate the mean. It has to return a tuple with the white and black mean
     normalised: bool
         If this is set, the sum of all means will be 1
         Otherwise, it will be the total number of games
@@ -244,12 +258,7 @@ def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, 
         if len(gameData) < 3:
             continue
 
-        expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(gameData, expectedScoreFunction)
-
-        for xsDrop in [expectedScoreDropsWhite, expectedScoreDropsBlack]:
-            if p < 0:
-                xsDrop = [max(0.1, xs) for xs in xsDrop]
-            mean = scipy.stats.pmean(xsDrop, p)
+        for mean in meanFunction(gameData):
             mean = float((mean + groupWidth/2) // groupWidth * groupWidth)
 
             if mean not in density:
@@ -404,8 +413,6 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
             else:
                 accuraciesBlack.append((xsDrop, volatility))
 
-        print(i%2, xsDrop, volatility)
-
     weightedMeanWhite = sum([accuracy * volatility for accuracy, volatility in accuraciesWhite]) / sum([volatility for _, volatility in accuraciesWhite])
     weightedMeanBlack = sum([accuracy * volatility for accuracy, volatility in accuraciesBlack]) / sum([volatility for _, volatility in accuraciesBlack])
 
@@ -451,16 +458,16 @@ if __name__ == '__main__':
     """
 
     # Getting parameters for a game accuracy function
-    """
-    p = 0.5
+    p = 1
+    pMean = lambda x: calculateGeneralisedMean(x, p=p)
+    weightedMean = lambda x: calculateVolatilityWeightedMean(x)
     referenceEvals = getGameEvaluationsFromDF(ndf)
-    density = getMeanDensityFromGameEvaluations(referenceEvals, p=p, groupWidth=groupWidth)
+    density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=weightedMean, groupWidth=groupWidth)
     dist = getDistributionFromDensity(density, addZero=True)
     print(dist)
     params, x = fitFunctionToDistribution(dist, gameAccuracy, bounds=(0, 10))
     print(params)
-    plotting_helper.plotLineChart([list(dist.keys())], [[1-v for v in dist.values()]], 'XS drop', 'Percentile', 'Fitting the curve', ['Data', 'Function'], refFunction=lambda d: gameAccuracy(d, params[0], params[1]), xMin=0)
-    """
+    plotting_helper.plotLineChart([list(dist.keys())], [[1-v for v in dist.values()]], 'XS drop', 'Percentile', 'Fitting the curve', ['Data', 'Function'], refFunction=lambda d: gameAccuracy(d, *params), xMin=0)
     # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
     """
     gameDrops = getExpectedScoreDropsPerGame(df, groupWidth)
