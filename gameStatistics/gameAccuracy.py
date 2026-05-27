@@ -3,6 +3,7 @@ import polars as pl
 import scipy.stats
 from scipy.stats import beta
 import scipy.optimize
+import statistics
 
 import os, sys
 
@@ -246,6 +247,8 @@ def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, 
         expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(gameData, expectedScoreFunction)
 
         for xsDrop in [expectedScoreDropsWhite, expectedScoreDropsBlack]:
+            if p < 0:
+                xsDrop = [max(0.1, xs) for xs in xsDrop]
             mean = scipy.stats.pmean(xsDrop, p)
             mean = float((mean + groupWidth/2) // groupWidth * groupWidth)
 
@@ -278,10 +281,13 @@ def getExpectedScoreDropsFromEvaluations(evals: list, expectedScoreFunction = fu
     return (expectedScoreDropsWhite, expectedScoreDropsBlack)
 
 
-def getDistributionFromDensity(density: dict) -> dict:
+def getDistributionFromDensity(density: dict, addZero: bool = False) -> dict:
     """
     This calculates the distribution function, given a normalised density as a dict
     """
+    if addZero and 0 not in density:
+        density[0] = 0
+        density = dict(sorted(density.items()))
     return {k: sum(list(density.values())[:i+1]) for i, k in enumerate(list(density.keys()))}
 
 
@@ -298,15 +304,17 @@ def moveAccuracy(expectedScoreDrop: float, k: float, l: float) -> float:
 def mixtureDistribution(expectedScoreDrop: float, a1: float, b1: float, a2: float, b2: float):
     return 1 - (0.5 * beta.cdf(expectedScoreDrop/100, a1, b1) + 0.5 * beta.cdf(expectedScoreDrop/100, a2, b2))
 
+
 def gameAccuracy(expectedScoreDrop: float, sigma: float, offset: float) -> float:
     x = np.maximum(expectedScoreDrop - offset, 0)
 
-    return np.exp(-(x)**2/(2*sigma**2))
+    return np.exp(-(x**2)/(2*sigma**2))
 
 
 def fitFunctionToDistribution(distribution: dict, function, bounds: tuple = None):
     if bounds is None:
         return scipy.optimize.curve_fit(function, list(distribution.keys()), [1-v for v in distribution.values()])
+
     return scipy.optimize.curve_fit(function, list(distribution.keys()), [1-v for v in distribution.values()], bounds=bounds)
 
 
@@ -348,6 +356,62 @@ def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: i
     return ndf
 
 
+def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=functions.expectedScore, moveAccuracyFunction=None, minWindowSize: int = 2, maxWindowSize: int = 8, nWindows: int = 10, minVolatility: float = 0.5, maxVolatility: float = 12) -> tuple:
+    """
+    This calculates the volatility weighted mean of the move accuracy (or expected score drops) for both colors
+    evaluations: list
+        The evaluations of a game
+    expectedScoreFunction
+        The function used to calculate the expected score
+    moveAccuracyFunction
+        The function used to calculate the move accuracy
+        If no function is given, the expected score drop will be used as move accuracy
+    minWindowSize, maxWindowSize, nWindows:
+        Minimum and maximimum window size and the number of windows (if this doesn't lead to window sizes outside of the ranges)
+    minVolatility, maxVolatility:
+        Lower and upper bounds for the volatility
+    return -> tuple
+        (whiteMean, blackMean)
+    """
+    expectedScores = [expectedScoreFunction(evaluation) for evaluation in evaluations]
+    windowSize = int(len(expectedScores) / nWindows)
+    windwoSize = min(maxWindowSize, max(minWindowSize, windowSize))
+
+    prefixCount = windowSize - 2
+    windows = [expectedScores[:windowSize] for _ in range(prefixCount)]
+    windows.extend([expectedScores[i:i+windowSize] for i in range(len(expectedScores) - windowSize + 1)])
+
+    volatilities = [max(minVolatility, min(maxVolatility, statistics.pstdev(window))) for window in windows]
+
+    accuraciesWhite = list()
+    accuraciesBlack = list()
+
+    for i in range(len(expectedScores)-1):
+        xsBefore = expectedScores[i]
+        xsAfter = expectedScores[i+1]
+        volatility = volatilities[i]
+
+        if i % 2 == 0:
+            xsDrop = max(0, xsBefore - xsAfter)
+            if moveAccuracyFunction is not None:
+                accuraciesWhite.append((moveAccuracyFunction(xsDrop), volatility))
+            else:
+                accuraciesWhite.append((xsDrop, volatility))
+        else:
+            xsDrop = max(0, xsAfter - xsBefore)
+            if moveAccuracyFunction is not None:
+                accuraciesBlack.append((moveAccuracyFunction(xsDrop), volatility))
+            else:
+                accuraciesBlack.append((xsDrop, volatility))
+
+        print(i%2, xsDrop, volatility)
+
+    weightedMeanWhite = sum([accuracy * volatility for accuracy, volatility in accuraciesWhite]) / sum([volatility for _, volatility in accuraciesWhite])
+    weightedMeanBlack = sum([accuracy * volatility for accuracy, volatility in accuraciesBlack]) / sum([volatility for _, volatility in accuraciesBlack])
+
+    return (weightedMeanWhite, weightedMeanBlack)
+
+
 if __name__ == '__main__':
     # Basic testing
     pgn = ['../resources/Carlsen-Ponomariov.pgn']
@@ -362,8 +426,13 @@ if __name__ == '__main__':
     with pl.Config(tbl_cols=-1):
         print(ndf)
     groupWidth = 0.05
+    
+    evals = functions.getEvalsFromPGN(pgn[0], lichessAnalysis=True)
+    print(calculateVolatilityWeightedMean(evals))
+    print(getMeanDensityFromGameEvaluations([evals]))
 
     # Move accuracy function
+    """
     moveDensity = getExpectedScoreDropsPerMove(ndf, groupWidth, excludePerfectMoves=True)
     normalisedDensity = {k: v/sum(list(moveDensity.values())) for k, v in moveDensity.items()}
     normalisedDensity[-groupWidth] = 0
@@ -379,15 +448,18 @@ if __name__ == '__main__':
     print(functions.lichessGameAccuracy(evals))
     print(functions.lichessGameAccuracy(evals, expectedScoreFunction=functions.expectedScore, moveAccuracyFunction=lambda a, b: moveAccuracy(a-b, *params)*100))
     print(calculateGameAccuracies(evals)) #, gameAccuracyFunction=lambda x: gameAccuracy(x, 0.83, 0), p=0.5))
-
-    # Getting parameters for an accuracy function
     """
+
+    # Getting parameters for a game accuracy function
+    """
+    p = 0.5
     referenceEvals = getGameEvaluationsFromDF(ndf)
-    density = getMeanDensityFromGameEvaluations(referenceEvals, p=1)
-    dist = getDistributionFromDensity(density)
+    density = getMeanDensityFromGameEvaluations(referenceEvals, p=p, groupWidth=groupWidth)
+    dist = getDistributionFromDensity(density, addZero=True)
+    print(dist)
     params, x = fitFunctionToDistribution(dist, gameAccuracy, bounds=(0, 10))
     print(params)
-    plotting_helper.plotLineChart([list(dist.keys())], [[1-v for v in dist.values()]], 'XS drop', 'Percentile', 'Fitting the curve', ['Data', 'Function'], refFunction=lambda d: gameAccuracy(d, params[0], params[1]))
+    plotting_helper.plotLineChart([list(dist.keys())], [[1-v for v in dist.values()]], 'XS drop', 'Percentile', 'Fitting the curve', ['Data', 'Function'], refFunction=lambda d: gameAccuracy(d, params[0], params[1]), xMin=0)
     """
     # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', 'Avg expected score drop')
     """
