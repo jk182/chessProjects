@@ -235,7 +235,15 @@ def calculateGeneralisedMean(evaluations: list, expectedScoreFunction=functions.
     whiteMean = scipy.stats.pmean(expectedScoreDropsWhite, p)
     blackMean = scipy.stats.pmean(expectedScoreDropsBlack, p)
 
-    return (whiteMean, blackMean)
+    """
+    print(f'p={p}')
+    print(round(whiteMean, 3), round(blackMean, 3))
+    print(round(sum(expectedScoreDropsWhite), 3), round(sum(expectedScoreDropsBlack), 3))
+    print([round(xs, 2) for xs in expectedScoreDropsWhite])
+    print([round(xs, 2) for xs in expectedScoreDropsBlack])
+    """
+
+    return (float(whiteMean), float(blackMean))
 
 
 def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, meanFunction=calculateGeneralisedMean, normalised: float = True) -> dict:
@@ -351,7 +359,7 @@ def calculateGameAccuracies(evals: list, expectedScoreFunction = functions.expec
     return (float(gameAccuracyFunction(meanWhite)) * scale, float(gameAccuracyFunction(meanBlack)) * scale)
 
 
-def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: int = 3000, minPly: int = 0) -> pl.DataFrame:
+def filterDFByRating(df: pl.DataFrame, minRating: int = 0, maxRating: int = 3000, maxRatingDiff: int = 3000, minPly: int = 0) -> pl.DataFrame:
     """
     This function filters a given polars DataFrame and returns a new DataFrame with the filters applied
     """
@@ -361,6 +369,36 @@ def filterDFByRating(minRating: int = 0, maxRating: int = 3000, maxRatingDiff: i
                     pl.col("WhiteElo") <= maxRating,
                     abs(pl.col("WhiteElo")-pl.col("BlackElo")) <= maxRatingDiff, 
                     pl.col("Ply") >= minPly)
+
+    return ndf
+
+
+def removeShortGames(df: pl.DataFrame, maxMoves: int, removeDecisiveGames: bool = False) -> pl.DataFrame:
+    """
+    This function filters out all short games from a data frame
+    """
+    gameIDs = list()
+    gameID = None
+    lastPly = 0
+    for row in df.rows(named=True):
+        if gameID is None:
+            gameID = row["GameID"]
+
+        if gameID != row["GameID"]:
+            if lastPly <= 2*maxMoves:
+                if removeDecisiveGames:
+                    gameIDs.append(gameID)
+                elif row["Result"] == "1/2-1/2":
+                    gameIDs.append(gameID)
+
+            gameID = row["GameID"]
+            lastPly = 1
+
+        lastPly += 1
+
+    ndf = df.clone()
+    for gameID in gameIDs:
+        ndf = ndf.remove(pl.col("GameID") .eq(gameID))
 
     return ndf
 
@@ -419,7 +457,7 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
     return (weightedMeanWhite, weightedMeanBlack)
 
 
-def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalysis: bool = True, plotEvaluations: bool = True):
+def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalysis: bool = True, plotEvaluations: bool = True, functionNames: list = None):
     """
     This is a function to test different accuracy function
     pgnPaths: list
@@ -429,6 +467,8 @@ def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalys
         Each function should just take the evaluations of a game as an input
     lichessAnalysis: bool
         If this is true, the PGNs are assumed to be analysed by Lichess
+    functionNames: list
+        Names for functions so that the output becomes more legible
     plotEvaluations: bool
         If this is true, a plot with the evaluations of all games will be shown in the end
     """
@@ -437,9 +477,14 @@ def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalys
         evals = functions.getEvalsFromPGN(pgnPath, lichessAnalysis=lichessAnalysis)
         evaluations.append(evals)
 
+        print(evals)
+
         print(pgnPath.split('/')[-1][:-4])
-        for accFunction in accuracyFunctions:
-            print(accFunction(evals))
+        for i, accFunction in enumerate(accuracyFunctions):
+            if functionNames:
+                print(functionNames[i], accFunction(evals))
+            else:
+                print(accFunction(evals))
 
     if plotEvaluations:
         plotting_helper.plotLineChart([list(range(1, len(evals)+1)) for evals in evaluations], evaluations, 'Move number', 'Game evaluation', 'Game evaluations', [pgnPath.split('/')[-1][:-4] for pgnPath in pgnPaths])
@@ -448,48 +493,68 @@ def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalys
 def calculateAccuracyFromDistribution(evals: list, distribution: dict, meanFunction) -> tuple:
     whiteMean, blackMean = meanFunction(evals)
     distribution = {k: 1-v for k, v in distribution.items()}
+    whiteAcc = 0
+    blackAcc = 0
 
     for i, (k, v) in enumerate(list(distribution.items())[:-1]):
-        if k <= whiteMean < list(distribution.keys())[i+1]:
-            whiteAcc = distribution[k] * 100
-        if k <= blackMean < list(distribution.keys())[i+1]:
-            blackAcc = distribution[k] * 100
+        k1 = list(distribution.keys())[i+1]
+        if k <= whiteMean < k1:
+            interpolation = (whiteMean - k) / (k1 - k)
+            whiteAcc = distribution[k] + (distribution[k1] - distribution[k])*interpolation
+        if k <= blackMean < k1:
+            interpolation = (blackMean - k) / (k1 - k)
+            blackAcc = distribution[k] + (distribution[k1] - distribution[k])*interpolation
 
-    return (whiteAcc, blackAcc)
+    return (float(whiteAcc) * 100, float(blackAcc) * 100)
 
 
 if __name__ == '__main__':
     # Basic testing
-    pgn = ['../resources/Carlsen-Ponomariov.pgn']
-    pgn = ['../resources/Caruana-Wei.pgn']
+    pgn = ['../out/games/Carlsen-Keymer_2026.pgn']
+    # pgn = ['../resources/Caruana-Wei.pgn']
     carlsen = ['../out/carlsenClassicalAnalysed.pgn']
     pgns = ['../out/games/2700games2023-out.pgn', '../out/games/olympiad2024-out.pgn', '../out/games/grenkeOpen2024.pgn', '../out/games/wijkMasters2024-5000-30.pgn', '../out/games/shenzhen-5000-30.pgn', '../out/games/norwayChessClassical.pgn', '../out/games/candidates2024-WDL+CP.pgn', '../out/games/tepe-sigeman-5000-30.pgn', '../out/games/gukesh2022-out.pgn', '../out/games/Norway2021-classical.pgn', '../out/games/arjun_open-5000-30.pgn', '../out/games/bundesliga2500-out.pgn', '../out/games/candidates2026_analysed.pgn', '../out/games/candidatesW2026_analysed.pgn', '../out/games/grandSwiss2025Analysed.pgn']
 
     accuracyTestPGNs = ['../out/games/Esipenko-Caruana_2026.pgn', '../out/games/Bluebaum-Giri_2026.pgn', '../out/games/Caruana-Wei_2026.pgn', '../out/games/Nakamura-Caruana_2026.pgn', '../out/games/Bluebaum-Sindarov_2026.pgn', '../out/games/Pragg-Bluebaum_2026.pgn', '../out/games/Wei-Giri_2026.pgn', '../out/games/Carlsen-Keymer_2026.pgn']
+    accuracyTestPGNs = ['../out/games/Bluebaum-Sindarov_2026.pgn', '../resources/messyBlitzGame.pgn']
     # df = getMoveData(pgns)
     # df.write_parquet('../out/classicalDF.parquet')
     df = pl.read_parquet('../out/classicalDF.parquet')
 
-    ndf = filterDFByRating(2500)
+    ndf = filterDFByRating(df, 2500)
+    # ndf2 = removeShortGames(ndf, 25, removeDecisiveGames=False)
+    """
     with pl.Config(tbl_cols=-1):
         print(ndf)
+    """
+
     groupWidth = 0.05
     
+    """
+    evals = functions.getEvalsFromPGN(accuracyTestPGNs[0], lichessAnalysis=True, startEval=15)
+    print(calculateGeneralisedMean(evals, p=1))
+    print(calculateGeneralisedMean(evals, p=2))
+    """
+
+
     # evals = functions.getEvalsFromPGN(pgn[0], lichessAnalysis=True)
+    # wxs, bxs = getExpectedScoreDropsFromEvaluations(evals, lambda x: x)
     # print(calculateVolatilityWeightedMean(evals))
     # print(getMeanDensityFromGameEvaluations([evals]))
 
     # Comparing different accuracy functions
-    meanFunctions = [calculateVolatilityWeightedMean, lambda x: calculateGeneralisedMean(x, p=0.5), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=2)]
+    meanFunctions = [calculateVolatilityWeightedMean, lambda x: calculateGeneralisedMean(x, p=-1), lambda x: calculateGeneralisedMean(x, p=0.5), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=2)]
     accuracyFunctions = [functions.lichessGameAccuracy]
     referenceEvals = getGameEvaluationsFromDF(ndf)
-    for meanFunction in meanFunctions:
+    functionNames = ['Lichess', 'Weighted mean xs loss', 'p=-1', 'p=0.5', 'p=1', 'p=2']
+    for i, meanFunction in enumerate(meanFunctions):
         density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=meanFunction, groupWidth=groupWidth)
         distribution = getDistributionFromDensity(density, addZero=True)
+        # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', f'Avg expected score drop {functionNames[i+1]}')
         accuracyFunction = lambda x, d=distribution, m=meanFunction: calculateAccuracyFromDistribution(x, d, m)
         accuracyFunctions.append(accuracyFunction)
 
-    testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=True)
+    testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=False, functionNames=functionNames, lichessAnalysis=True)
 
     # Move accuracy function
     """
