@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import statistics
 import math
+import numpy as np
 
 
 def getAllColors() -> dict:
@@ -416,6 +417,51 @@ def plotMultipleDistributions(xValues: list, yValues: list, barWidth: float, xLa
         
     plt.title(title)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+        
+
+def plotFunctions(functions: list, xMin: float, xMax: float, xLabel: str, yLabel: str, title: str, colors: list = None, legend: list = None, grid: bool = False, xTicks: list = None, yTicks: list = None, yMin: float = None, yMax: float = None, filename: str = None):
+    if not colors:
+        colors = getDefaultColors()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+
+    xVals = np.linspace(xMin, xMax, 1000)
+
+    for i, function in enumerate(functions):
+        if legend:
+            label = legend[i]
+        else:
+            label = ''
+
+        ax.plot(xVals, [function(x) for x in xVals], label=label, color=colors[i%len(functions)], linewidth=2)
+
+    ax.set_xlim(xMin, xMax)
+    if yMin is not None and yMax is not None:
+        ax.set_ylim(yMin, yMax)
+
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+
+    if xTicks:
+        ax.set_xticks(xTicks)
+    if yTicks:
+        ax.set_yticks(yTicks)
+
+    plt.title(title)
+
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if grid:
+        ax.grid()
+
+    if legend:
+        ax.legend()
 
     if filename:
         plt.savefig(filename, dpi=400)

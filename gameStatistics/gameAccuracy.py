@@ -403,7 +403,7 @@ def removeShortGames(df: pl.DataFrame, maxMoves: int, removeDecisiveGames: bool 
     return ndf
 
 
-def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=functions.expectedScore, moveAccuracyFunction=None, minWindowSize: int = 2, maxWindowSize: int = 8, nWindows: int = 10, minVolatility: float = 0.5, maxVolatility: float = 12) -> tuple:
+def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=functions.expectedScore, moveAccuracyFunction=None, minWindowSize: int = 2, maxWindowSize: int = 8, nWindows: int = 10, minVolatility: float = 0.5, maxVolatility: float = 12, volatilityRescaleFactor: float = 1) -> tuple:
     """
     This calculates the volatility weighted mean of the move accuracy (or expected score drops) for both colors
     evaluations: list
@@ -417,6 +417,9 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
         Minimum and maximimum window size and the number of windows (if this doesn't lead to window sizes outside of the ranges)
     minVolatility, maxVolatility:
         Lower and upper bounds for the volatility
+    volatilityRescaleFactor: float
+        A factor to rescale the volatility for a given expected score function. 
+        More sensitive expected score functions will lead to higher volatilities, and this factor can counter that.
     return -> tuple
         (whiteMean, blackMean)
     """
@@ -428,7 +431,8 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
     windows = [expectedScores[:windowSize] for _ in range(prefixCount)]
     windows.extend([expectedScores[i:i+windowSize] for i in range(len(expectedScores) - windowSize + 1)])
 
-    volatilities = [max(minVolatility, min(maxVolatility, statistics.pstdev(window))) for window in windows]
+    volatilities = [max(minVolatility, min(maxVolatility, statistics.pstdev(window) * volatilityRescaleFactor)) for window in windows]
+    print([round(v, 3) for v in volatilities])
 
     accuraciesWhite = list()
     accuraciesBlack = list()
@@ -477,9 +481,8 @@ def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalys
         evals = functions.getEvalsFromPGN(pgnPath, lichessAnalysis=lichessAnalysis)
         evaluations.append(evals)
 
-        print(evals)
-
         print(pgnPath.split('/')[-1][:-4])
+        print([functions.expectedScore(e) for e in evals])
         for i, accFunction in enumerate(accuracyFunctions):
             if functionNames:
                 print(functionNames[i], accFunction(evals))
@@ -517,6 +520,8 @@ if __name__ == '__main__':
 
     accuracyTestPGNs = ['../out/games/Esipenko-Caruana_2026.pgn', '../out/games/Bluebaum-Giri_2026.pgn', '../out/games/Caruana-Wei_2026.pgn', '../out/games/Nakamura-Caruana_2026.pgn', '../out/games/Bluebaum-Sindarov_2026.pgn', '../out/games/Pragg-Bluebaum_2026.pgn', '../out/games/Wei-Giri_2026.pgn', '../out/games/Carlsen-Keymer_2026.pgn']
     accuracyTestPGNs = ['../out/games/Bluebaum-Sindarov_2026.pgn', '../resources/messyBlitzGame.pgn']
+
+    accuracyTestPGNs = ['../out/games/Bluebaum-Sindarov_2026.pgn', '../out/games/Esipenko-Caruana_2026.pgn', '../out/games/Abdusattorov-Maghsoodloo_2024.pgn', '../out/games/Caruana-Wei_2026.pgn', '../out/games/Sindarov-Giri_2026.pgn']
     # df = getMoveData(pgns)
     # df.write_parquet('../out/classicalDF.parquet')
     df = pl.read_parquet('../out/classicalDF.parquet')
@@ -536,17 +541,17 @@ if __name__ == '__main__':
     print(calculateGeneralisedMean(evals, p=2))
     """
 
-
     # evals = functions.getEvalsFromPGN(pgn[0], lichessAnalysis=True)
     # wxs, bxs = getExpectedScoreDropsFromEvaluations(evals, lambda x: x)
     # print(calculateVolatilityWeightedMean(evals))
     # print(getMeanDensityFromGameEvaluations([evals]))
 
     # Comparing different accuracy functions
-    meanFunctions = [calculateVolatilityWeightedMean, lambda x: calculateGeneralisedMean(x, p=-1), lambda x: calculateGeneralisedMean(x, p=0.5), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=2)]
+    """
+    meanFunctions = [lambda x: calculateVolatilityWeightedMean(x, volatilityRescaleFactor=0.5), lambda x: calculateGeneralisedMean(x, p=0.5), lambda x: calculateGeneralisedMean(x, p=0.8), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=1.2), lambda x: calculateGeneralisedMean(x, p=2)]
     accuracyFunctions = [functions.lichessGameAccuracy]
     referenceEvals = getGameEvaluationsFromDF(ndf)
-    functionNames = ['Lichess', 'Weighted mean xs loss', 'p=-1', 'p=0.5', 'p=1', 'p=2']
+    functionNames = ['Lichess', 'Weighted mean xs loss', 'p=0.5', 'p=0.8', 'p=1', 'p=1.2', 'p=2']
     for i, meanFunction in enumerate(meanFunctions):
         density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=meanFunction, groupWidth=groupWidth)
         distribution = getDistributionFromDensity(density, addZero=True)
@@ -554,7 +559,11 @@ if __name__ == '__main__':
         accuracyFunction = lambda x, d=distribution, m=meanFunction: calculateAccuracyFromDistribution(x, d, m)
         accuracyFunctions.append(accuracyFunction)
 
-    testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=False, functionNames=functionNames, lichessAnalysis=True)
+    testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=True, functionNames=functionNames, lichessAnalysis=True)
+    """
+
+    plotting_helper.plotFunctions([lambda x: functions.winP(x)/100], -800, 800, 'Evaluation', 'Expected score', 'Lichess expected score function', legend=['Lichess expected score'], grid=True, yTicks=[0, 0.25, 0.5, 0.75, 1], yMin=0, yMax=1, filename='../out/accuracyPlots/lichessExpectedScore.png')
+    plotting_helper.plotFunctions([lambda x: functions.accuracy(x*100, 0)], 0, 0.8, 'Expected score loss', 'Move accuracy', 'Lichess move accuracy function', legend=['Lichess move accuracy'], grid=True, yTicks=[0, 25, 50, 75, 100], yMin=0, yMax=100, colors=plotting_helper.getColors(['orange']), filename='../out/accuracyPlots/lichessMoveAccuracy.png')
 
     # Move accuracy function
     """
