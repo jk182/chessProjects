@@ -109,8 +109,9 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     width = 0.8/nBars
     offset = width * (1/2 - nBars/2)
 
-    yMax = 0
     yMin = 0
+    yMax = 0
+
     for j in range(nBars):
         ax.bar([i+1+offset+(width*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=width, label=legend[j])
         yMax = max(yMax, max([d[j] for d in data]))
@@ -128,7 +129,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     if yTicks:
         ax.set_yticks(yTicks)
 
-    ax.set_xlim(1+2*offset, len(data)-2*offset)
+    ax.set_xlim(0.5+2*offset, len(data)+0.5-2*offset)
     ax.set_ylim(yMin*1.05, yMax * 1.05)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)

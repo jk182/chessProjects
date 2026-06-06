@@ -964,7 +964,7 @@ def createMovePlot(moves: dict, short: dict = None, title: str = 'Percentage of 
         plt.show()
 
 
-def getArmageddonScores(classicalGameFile: str, armageddonGameFile: str, scoring: tuple) -> dict:
+def getArmageddonScores(classicalGameFile: str, armageddonGameFile: str, scoring: tuple = (3, 1, 0.5)) -> dict:
     """
     This gets the scores from classical and armageddong games for tournaments like Norway Chess
     classicalGameFile: str
@@ -1003,10 +1003,11 @@ def getArmageddonScores(classicalGameFile: str, armageddonGameFile: str, scoring
                 scores[white][2] += scoring[2]
             else:
                 scores[black][3] += scoring[2]
+
     return dict(sorted(scores.items(), key=lambda x: sum(x[1]), reverse=True))
 
 
-def plotScoresArmageddon(scores: dict, short: dict = None, filename: str = None) -> None:
+def plotScoresArmageddon(scores: dict, short: dict = None, title: str = 'Scores with white and black in classical and armageddon', filename: str = None) -> None:
     """
     Plotting scores with armageddon games (like in Norway chess)
     scores: dict
@@ -1017,10 +1018,11 @@ def plotScoresArmageddon(scores: dict, short: dict = None, filename: str = None)
         If no name is specified, the graph will be shown instead of saved
     """
     colors = ['#ffffff', '#111111']
-    patterns = ['', '', 'x', 'x']
+    patterns = ['', '', '//', '//']
+    legend = ['White classical score', 'Black classical score', 'White armageddon score', 'Black armageddon score']
 
     fig, ax = plt.subplots(figsize=(10,6))
-    plt.xticks(rotation=90)
+    # plt.xticks(rotation=90)
     
     for player in scores.keys():
         p = player.split(',')[0]
@@ -1029,17 +1031,20 @@ def plotScoresArmageddon(scores: dict, short: dict = None, filename: str = None)
                 p = short[p]
         bottom = 0
         for i, s in enumerate(scores[player]):
-            ax.bar(p, s, bottom=bottom, color=colors[i%2], edgecolor='grey', linewidth=0.7, hatch=patterns[i])
+            ax.bar(p, s, bottom=bottom, color=colors[i%2], edgecolor='grey', linewidth=0.7, hatch=patterns[i], label=legend[i])
             bottom += s
+
+        legend = [None] * 4
 
     ax.set_facecolor('#e6f7f2')
     # ax.legend()
-    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.08, right=0.95)
-    plt.title('Scores with White and Black')
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.08, right=0.95)
+    plt.title(title)
     ax.set_ylabel('Tournament Score')
+    ax.legend()
 
     if filename:
-        plt.savefig(filename, dpi=500)
+        plt.savefig(filename, dpi=400)
     else:
         plt.show()
 
@@ -1380,6 +1385,69 @@ def plotDecisiveGames(decisiveGames: dict, nicknames: dict = None, title: str = 
         plt.show()
 
 
+def getExpectedScoreLossForGameStates(pgnPath: str, groups: list, useTimeLeft: bool = False, expectedScoreFunction = functions.expectedScore) -> dict:
+    xsData = dict()
+    for g in groups:
+        xsData[g] = [0, 0]
+
+    evalBefore = 18
+
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            ply = 0
+            node = game
+
+            while not node.is_end():
+                node = node.variations[0]
+
+                if node.eval() is not None:
+                    evalAfter = node.eval().white().score(mate_score=10000)
+                else:
+                    evalAfter = evalBefore
+    
+                factor = -1 if node.turn() else 1
+
+                xsBefore = expectedScoreFunction(evalBefore * factor)
+                xsAfter = expectedScoreFunction(evalAfter * factor)
+
+                xsDrop = max(0, xsBefore - xsAfter)
+
+                evalBefore = evalAfter
+
+                if useTimeLeft:
+                    if (time := node.clock()) is not None:
+                        for i, g in enumerate(groups):
+                            if i < len(groups)-1:
+                                if g >= time > groups[i+1]:
+                                    xsData[g][0] += xsDrop
+                                    xsData[g][1] += 1
+                                    break
+                            else:
+                                xsData[g][0] += xsDrop
+                                xsData[g][1] += 1
+                else:
+                    for i, g in enumerate(groups):
+                        if i < len(groups)-1:
+                            if g <= ply//2 + 1 < groups[i+1]:
+                                xsData[g][0] += xsDrop
+                                xsData[g][1] += 1
+                                break
+                        else:
+                            xsData[g][0] += xsDrop
+                            xsData[g][1] += 1
+
+                ply += 1
+
+    avgData = dict()
+    for k, v in xsData.items():
+        if v[1] > 0:
+            avgData[k] = v[0]/v[1]
+        else:
+            avgData[k] = 0
+
+    return avgData
+
+
 def generateTournamentPlots(pgnPath: str, nicknames: dict = None, players: list = None, lichessAnalysis: bool = False, firstPlaceRace: list = None, eventName: str = "", minGamesPerOpening: int = 0, pgnPathClock: str = None, playerColors: dict = None, filename: str = None) -> None:
     if players is None:
         players = getPlayers(pgnPath)
@@ -1654,10 +1722,18 @@ def commandLine():
 
 
 if __name__ == '__main__':
-    commandLine()
-    # armScores = getArmageddonScores('../out/games/norwayChess2025-out.pgn', '../out/games/norwayChessArm2025-out.pgn', (3, 1, 0.5))
-    # print(armScores)
-    # plotScoresArmageddon(armScores, short=nicknames, filename='../out/norwayChess2025Plots/norwayChess2025-armScores.png')
+    # commandLine()
+    xsLoss = getExpectedScoreLossForGameStates('../resources/norwayChessW2026_classical.pgn', [0, 10, 20, 25, 30, 35, 40, 45, 50])
+    print(xsLoss)
+
+    print(getExpectedScoreLossForGameStates('../resources/norwayChess2026_classical.pgn', [120*60, 90*60, 60*60, 30*60, 20*60, 10*60, 5*60], useTimeLeft=True))
+
+    plotting_helper.plotPlayerBarChart([[xsl] for xsl in xsLoss.values()], ['0-10', '10-20', '20-25', '25-30', '30-35', '35-40', '40-45', '45-50', '50+'], 'Expected score loss', "Average expected score loss per move in different game phases in Norway Chess 2026 (women's section)", ['Expected score loss'], xlabel='Move number', filename='../out/norwayChess2026/women-xsLoss.png')
+    armScores = getArmageddonScores('../resources/norwayChess2026_classical.pgn', '../resources/norwayChess2026_armageddon.pgn', (3, 1, 0.5))
+    armScores = getArmageddonScores('../resources/norwayChessW2026_classical.pgn', '../resources/norwayChessW2026_armageddon.pgn', (3, 1, 0.5))
+    print(armScores)
+    # plotScoresArmageddon(armScores, title="Scores for white and black in classical and armageddon in Norway Chess 2026", short={'Praggnanandhaa R': 'Pragg', 'Gukesh D': 'Gukesh'}, filename='../out/norwayChess2026/open-armageddonScores.png')
+    plotScoresArmageddon(armScores, title="Scores for white and black in classical and armageddon in Norway Chess 2026 (women's section)", filename='../out/norwayChess2026/women-armageddonScores.png')
     # times = getClockTimesByColor('../resources/norwayChess2025Arm.pgn')
     # plotting_helper.plotAvgLinePlot(times, ['White', 'Black'], 'Time remaining', 'Average time remaining after each move in armageddon', ["White's time", "Black's time"], colors=['#f8a978', '#111111'], maxMoves=50, filename='../out/norwayChess2025Plots/norwayChess2025-clockTimes.png')
 
