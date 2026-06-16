@@ -209,7 +209,6 @@ def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, mov
     windows.extend([expectedScores[i:i+windowSize] for i in range(len(expectedScores) - windowSize + 1)])
     
     stDevs = [max(minStDev, min(statistics.pstdev(window), maxStDev)) for window in windows] # Lichess uses the population standard deviation
-    print([round(std, 3) for std in stDevs])
 
     accuraciesWhite = list()
     accuraciesBlack = list()

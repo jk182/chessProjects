@@ -254,7 +254,7 @@ def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, 
     groupWidth: float
         The means will get grouped together, this determines the size of the individual groups
     meanFunction:
-        The function used to calculate the mean. It has to return a tuple with the white and black mean
+        The function used to calculate the mean of the expected scores. It has to return a tuple with the white and black mean
     normalised: bool
         If this is set, the sum of all means will be 1
         Otherwise, it will be the total number of games
@@ -432,7 +432,7 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
     windows.extend([expectedScores[i:i+windowSize] for i in range(len(expectedScores) - windowSize + 1)])
 
     volatilities = [max(minVolatility, min(maxVolatility, statistics.pstdev(window) * volatilityRescaleFactor)) for window in windows]
-    print([round(v, 3) for v in volatilities])
+    # print([round(v, 3) for v in volatilities])
 
     accuraciesWhite = list()
     accuraciesBlack = list()
@@ -461,7 +461,7 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
     return (weightedMeanWhite, weightedMeanBlack)
 
 
-def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalysis: bool = True, plotEvaluations: bool = True, functionNames: list = None):
+def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalysis: bool = True, plotEvaluations: bool = True, functionNames: list = None, plotAccuracies: bool = True):
     """
     This is a function to test different accuracy function
     pgnPaths: list
@@ -477,24 +477,40 @@ def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalys
         If this is true, a plot with the evaluations of all games will be shown in the end
     """
     evaluations = list()
+    accuracies = list()
+
     for pgnPath in pgnPaths:
         evals = functions.getEvalsFromPGN(pgnPath, lichessAnalysis=lichessAnalysis)
         evaluations.append(evals)
+        accuracies.append(list())
 
         print(pgnPath.split('/')[-1][:-4])
-        print([functions.expectedScore(e) for e in evals])
+        # print([functions.expectedScore(e) for e in evals])
         for i, accFunction in enumerate(accuracyFunctions):
+            accs = accFunction(evals)
             if functionNames:
-                print(functionNames[i], accFunction(evals))
+                print(functionNames[i], accs)
             else:
-                print(accFunction(evals))
+                print(accs)
+
+            accuracies[-1].append(accs[0])
+            accuracies[-1].append(accs[1])
+
 
     if plotEvaluations:
         plotting_helper.plotLineChart([list(range(1, len(evals)+1)) for evals in evaluations], evaluations, 'Move number', 'Game evaluation', 'Game evaluations', [pgnPath.split('/')[-1][:-4] for pgnPath in pgnPaths])
 
+    if plotAccuracies:
+        plotting_helper.plotPlayerBarChart(accuracies, [pgnPath.split('/')[-1][:-4] for pgnPath in pgnPaths], 'Accuracy', 'Accuracy calculated by different accuracy functions', [f'{function} ({color})' for function in functionNames for color in ['white', 'black']])
+
 
 def calculateAccuracyFromDistribution(evals: list, distribution: dict, meanFunction) -> tuple:
-    whiteMean, blackMean = meanFunction(evals)
+    means = meanFunction(evals)
+    return calculateAccuracyFromMean(means, distribution)
+
+
+def calculateAccuracyFromMean(means: tuple, distribution: dict) -> tuple:
+    whiteMean, blackMean = means
     distribution = {k: 1-v for k, v in distribution.items()}
     whiteAcc = 0
     blackAcc = 0
@@ -562,8 +578,15 @@ if __name__ == '__main__':
     testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=True, functionNames=functionNames, lichessAnalysis=True)
     """
 
-    plotting_helper.plotFunctions([lambda x: functions.winP(x)/100], -800, 800, 'Evaluation', 'Expected score', 'Lichess expected score function', legend=['Lichess expected score'], grid=True, yTicks=[0, 0.25, 0.5, 0.75, 1], yMin=0, yMax=1, filename='../out/accuracyPlots/lichessExpectedScore.png')
-    plotting_helper.plotFunctions([lambda x: functions.accuracy(x*100, 0)], 0, 0.8, 'Expected score loss', 'Move accuracy', 'Lichess move accuracy function', legend=['Lichess move accuracy'], grid=True, yTicks=[0, 25, 50, 75, 100], yMin=0, yMax=100, colors=plotting_helper.getColors(['orange']), filename='../out/accuracyPlots/lichessMoveAccuracy.png')
+    # Plots for Substack post
+    # plotting_helper.plotFunctions([lambda x: functions.winP(x)/100], -800, 800, 'Evaluation', 'Expected score', 'Lichess expected score function', legend=['Lichess expected score'], grid=True, yTicks=[0, 0.25, 0.5, 0.75, 1], yMin=0, yMax=1, filename='../out/accuracyPlots/lichessExpectedScore.png')
+    # plotting_helper.plotFunctions([lambda x: functions.accuracy(x*100, 0)], 0, 0.8, 'Expected score loss', 'Move accuracy', 'Lichess move accuracy function', legend=['Lichess move accuracy'], grid=True, yTicks=[0, 25, 50, 75, 100], yMin=0, yMax=100, colors=plotting_helper.getColors(['orange']), filename='../out/accuracyPlots/lichessMoveAccuracy.png')
+    referenceEvals = getGameEvaluationsFromDF(ndf)
+    meanFunction = lambda x: calculateGeneralisedMean(x, p=1)
+    density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=meanFunction, groupWidth=groupWidth)
+    distribution = getDistributionFromDensity(density, addZero=True)
+    # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', f'Avg expected score drop')
+    plotting_helper.plotFunctions([lambda x, d=distribution: calculateAccuracyFromMean((x, x), d)[0]], 0, 7, 'Expected score drop', 'Relative number of games', 'Distribution', yMin=0, yMax=102)
 
     # Move accuracy function
     """

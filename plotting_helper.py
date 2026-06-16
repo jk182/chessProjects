@@ -129,7 +129,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     if yTicks:
         ax.set_yticks(yTicks)
 
-    ax.set_xlim(0.5+2*offset, len(data)+0.5-2*offset)
+    ax.set_xlim(1+2*offset, len(data)-2*offset)
     ax.set_ylim(yMin*1.05, yMax * 1.05)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
