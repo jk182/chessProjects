@@ -461,7 +461,7 @@ def calculateVolatilityWeightedMean(evaluations: list, expectedScoreFunction=fun
     return (weightedMeanWhite, weightedMeanBlack)
 
 
-def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalysis: bool = True, plotEvaluations: bool = True, functionNames: list = None, plotAccuracies: bool = True):
+def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalysis: bool = True, plotEvaluations: bool = True, functionNames: list = None, plotAccuracies: bool = True, filename: str = None):
     """
     This is a function to test different accuracy function
     pgnPaths: list
@@ -496,12 +496,18 @@ def testAccuracyFunctions(pgnPaths: list, accuracyFunctions: list, lichessAnalys
             accuracies[-1].append(accs[0])
             accuracies[-1].append(accs[1])
 
-
     if plotEvaluations:
-        plotting_helper.plotLineChart([list(range(1, len(evals)+1)) for evals in evaluations], evaluations, 'Move number', 'Game evaluation', 'Game evaluations', [pgnPath.split('/')[-1][:-4] for pgnPath in pgnPaths])
+        if filename is not None:
+            filename = f'{filename}-evals.png'
+
+        plotting_helper.plotLineChart([[i / 2 for i in range(1, len(evals)+1)] for evals in evaluations], [[e/100 for e in evals] for evals in evaluations], 'Move number', 'Engine evaluation', 'Evaluation graphs for the games', [pgnPath.split('/')[-1][:-4].replace('_', ', ') for pgnPath in pgnPaths], grid=True, filename=filename)
 
     if plotAccuracies:
-        plotting_helper.plotPlayerBarChart(accuracies, [pgnPath.split('/')[-1][:-4] for pgnPath in pgnPaths], 'Accuracy', 'Accuracy calculated by different accuracy functions', [f'{function} ({color})' for function in functionNames for color in ['white', 'black']])
+        if filename is not None:
+            filename = f'{filename}-accuracies.png'
+
+        colors = plotting_helper.getColors(['blue', 'darkblue', 'slightly better', 'much better', 'pink', 'violet', 'slightly worse', 'much worse'])
+        plotting_helper.plotPlayerBarChart(accuracies, [pgnPath.split('/')[-1][:-4].replace('_', '\n') for pgnPath in pgnPaths], 'Accuracy', 'Accuracy calculated by different accuracy functions', [f'{function} ({color})' for function in functionNames for color in ['white', 'black']], colors=colors, filename=filename)
 
 
 def calculateAccuracyFromDistribution(evals: list, distribution: dict, meanFunction) -> tuple:
@@ -538,6 +544,7 @@ if __name__ == '__main__':
     accuracyTestPGNs = ['../out/games/Bluebaum-Sindarov_2026.pgn', '../resources/messyBlitzGame.pgn']
 
     accuracyTestPGNs = ['../out/games/Bluebaum-Sindarov_2026.pgn', '../out/games/Esipenko-Caruana_2026.pgn', '../out/games/Abdusattorov-Maghsoodloo_2024.pgn', '../out/games/Caruana-Wei_2026.pgn', '../out/games/Sindarov-Giri_2026.pgn']
+    accuracyTestPGNs = ['../out/games/Bluebaum-Sindarov_2026.pgn', '../out/games/Caruana-Wei_2026.pgn',  '../out/games/Ding-Gukesh_2024.pgn', '../out/games/Abdusattorov-Maghsoodloo_2024.pgn']
     # df = getMoveData(pgns)
     # df.write_parquet('../out/classicalDF.parquet')
     df = pl.read_parquet('../out/classicalDF.parquet')
@@ -563,11 +570,12 @@ if __name__ == '__main__':
     # print(getMeanDensityFromGameEvaluations([evals]))
 
     # Comparing different accuracy functions
+    # meanFunctions = [lambda x: calculateVolatilityWeightedMean(x, volatilityRescaleFactor=0.5), lambda x: calculateGeneralisedMean(x, p=0.8), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=1.2)]
     """
-    meanFunctions = [lambda x: calculateVolatilityWeightedMean(x, volatilityRescaleFactor=0.5), lambda x: calculateGeneralisedMean(x, p=0.5), lambda x: calculateGeneralisedMean(x, p=0.8), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=1.2), lambda x: calculateGeneralisedMean(x, p=2)]
+    meanFunctions = [lambda x: calculateGeneralisedMean(x, p=0.8), lambda x: calculateGeneralisedMean(x, p=1), lambda x: calculateGeneralisedMean(x, p=1.2)]
     accuracyFunctions = [functions.lichessGameAccuracy]
     referenceEvals = getGameEvaluationsFromDF(ndf)
-    functionNames = ['Lichess', 'Weighted mean xs loss', 'p=0.5', 'p=0.8', 'p=1', 'p=1.2', 'p=2']
+    functionNames = ['Lichess', 'p=0.8', 'p=1', 'p=1.2']
     for i, meanFunction in enumerate(meanFunctions):
         density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=meanFunction, groupWidth=groupWidth)
         distribution = getDistributionFromDensity(density, addZero=True)
@@ -575,18 +583,28 @@ if __name__ == '__main__':
         accuracyFunction = lambda x, d=distribution, m=meanFunction: calculateAccuracyFromDistribution(x, d, m)
         accuracyFunctions.append(accuracyFunction)
 
-    testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=True, functionNames=functionNames, lichessAnalysis=True)
+    testAccuracyFunctions(accuracyTestPGNs, accuracyFunctions, plotEvaluations=True, functionNames=functionNames, lichessAnalysis=True, filename='../out/accuracyPlots')
     """
 
     # Plots for Substack post
-    # plotting_helper.plotFunctions([lambda x: functions.winP(x)/100], -800, 800, 'Evaluation', 'Expected score', 'Lichess expected score function', legend=['Lichess expected score'], grid=True, yTicks=[0, 0.25, 0.5, 0.75, 1], yMin=0, yMax=1, filename='../out/accuracyPlots/lichessExpectedScore.png')
-    # plotting_helper.plotFunctions([lambda x: functions.accuracy(x*100, 0)], 0, 0.8, 'Expected score loss', 'Move accuracy', 'Lichess move accuracy function', legend=['Lichess move accuracy'], grid=True, yTicks=[0, 25, 50, 75, 100], yMin=0, yMax=100, colors=plotting_helper.getColors(['orange']), filename='../out/accuracyPlots/lichessMoveAccuracy.png')
+    # plotting_helper.plotFunctions([lambda x: functions.winP(x)/100], -1000, 1000, 'Evaluation', 'Expected score', 'Lichess expected score function', legend=['Lichess expected score'], grid=True, yTicks=[0, 0.25, 0.5, 0.75, 1], yMin=0, yMax=1, filename='../out/lichessExpectedScore.png')
+    plotting_helper.plotFunctions([lambda x: functions.accuracy(x*100, 0)], 0, 0.8, 'Expected score loss', 'Move accuracy', 'Lichess move accuracy function', legend=['Lichess move accuracy'], grid=True, yTicks=[0, 25, 50, 75, 100], yMin=0, yMax=100, colors=plotting_helper.getColors(['orange']), filename='../out/lichessMoveAccuracy.png')
     referenceEvals = getGameEvaluationsFromDF(ndf)
+    """
     meanFunction = lambda x: calculateGeneralisedMean(x, p=1)
     density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=meanFunction, groupWidth=groupWidth)
     distribution = getDistributionFromDensity(density, addZero=True)
-    # plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop', 'Number of games', f'Avg expected score drop')
-    plotting_helper.plotFunctions([lambda x, d=distribution: calculateAccuracyFromMean((x, x), d)[0]], 0, 7, 'Expected score drop', 'Relative number of games', 'Distribution', yMin=0, yMax=102)
+    plotting_helper.plotDistribution(list(density.keys()), list(density.values()), groupWidth, 'Expected score drop per move', 'Relative number of games', 'Average expected score drop per move in grandmaster games', filename='../out/accuracy-density.png')
+    plotting_helper.plotFunctions([lambda x, d=distribution: calculateAccuracyFromMean((x, x), d)[0]], 0, 7, 'Expected score drop per move', 'Accuracy', 'Accuracy based on expected score drop', yMin=0, yMax=102, filename='../out/accuracy-dist.png')
+    """
+
+    distributionFunctions = list()
+    for p in [0.8, 1, 1.2]:
+        meanFunction = lambda x: calculateGeneralisedMean(x, p=p)
+        density = getMeanDensityFromGameEvaluations(referenceEvals, meanFunction=meanFunction, groupWidth=groupWidth)
+        distribution = getDistributionFromDensity(density, addZero=True)
+        distributionFunctions.append(lambda x, d=distribution: calculateAccuracyFromMean((x, x), d)[0])
+    plotting_helper.plotFunctions(distributionFunctions, 0, 7, 'Expected score drop per move', 'Accuracy', 'Accuracy based on expected score drop for different values for p', yMin=0, yMax=102, colors=plotting_helper.getColors(['orange', 'blue', 'purple']), legend=['p=0.8', 'p=1', 'p=1.2'], filename='../out/accuracy-p-values.png')
 
     # Move accuracy function
     """

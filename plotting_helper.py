@@ -286,7 +286,7 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
         plt.show()
 
 
-def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, linewidth: float = 2, xMin: float = None, xMax: float = None, filename: str = None):
+def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, refFunction = None, linewidth: float = 2, xMin: float = None, xMax: float = None, filename: str = None, grid: bool = False):
     if not colors:
         colors = getDefaultColors()
 
@@ -309,7 +309,7 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
         ax.plot(xVals, [refFunction(x) for x in xVals], label=legend[-1], linewidth=linewidth, color=colors[1])
 
     ax.set_xlim(xMin, xMax)
-    ax.set_ylim(yMin*0.95, yMax*1.05)
+    ax.set_ylim(yMin - 0.05*abs(yMin), yMax*1.05)
     # ax.set_ylim(0, yMax*1.05)
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
@@ -318,6 +318,9 @@ def plotLineChart(xValues: list, yValues: list, xLabel: str, yLabel: str, title:
     ax.legend()
     plt.title(title)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+
+    if grid:
+        ax.grid()
 
     if filename:
         plt.savefig(filename, dpi=400)
