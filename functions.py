@@ -262,3 +262,92 @@ def getEvalsFromPGN(pgnPath: str, lichessAnalysis: bool = False, startEval: int 
         return evaluations[0]
 
     return evaluations
+
+
+def getGamePhase(board: chess.Board) -> str:
+    """
+    Heuristic game phase classification from Lichess
+
+    Returns:
+        "opening", "middlegame", or "endgame"
+    """
+
+    # Count queens, rooks, bishops and knights
+    majors_and_minors = sum(
+        len(board.pieces(piece, color))
+        for piece in (chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT)
+        for color in (chess.WHITE, chess.BLACK)
+    )
+
+    # Endgame heuristic
+    if majors_and_minors <= 6:
+        return "endgame"
+
+    # Back-rank sparsity
+    white_backrank = sum(
+        piece is not None and piece.color == chess.WHITE
+        for sq in chess.SquareSet(chess.BB_RANK_1)
+        if (piece := board.piece_at(sq)) is not None
+    )
+
+    black_backrank = sum(
+        piece is not None and piece.color == chess.BLACK
+        for sq in chess.SquareSet(chess.BB_RANK_8)
+        if (piece := board.piece_at(sq)) is not None
+    )
+
+    backrank_sparse = white_backrank < 4 or black_backrank < 4
+
+    # Mixedness
+    def score(y, white, black):
+        if (white, black) == (0, 0):
+            return 0
+        if (white, black) == (1, 0):
+            return 1 + (8 - y)
+        if (white, black) == (2, 0):
+            return 2 + (y - 2) if y > 2 else 0
+        if (white, black) == (3, 0):
+            return 3 + (y - 1) if y > 1 else 0
+        if (white, black) == (4, 0):
+            return 3 + (y - 1) if y > 1 else 0
+        if (white, black) == (0, 1):
+            return 1 + y
+        if (white, black) == (1, 1):
+            return 5 + abs(4 - y)
+        if (white, black) == (2, 1):
+            return 4 + (y - 1)
+        if (white, black) == (3, 1):
+            return 5 + (y - 1)
+        if (white, black) == (0, 2):
+            return 2 + (6 - y) if y < 6 else 0
+        if (white, black) == (1, 2):
+            return 4 + (7 - y)
+        if (white, black) == (2, 2):
+            return 7
+        if (white, black) == (0, 3):
+            return 3 + (7 - y) if y < 7 else 0
+        if (white, black) == (1, 3):
+            return 5 + (7 - y)
+        if (white, black) == (0, 4):
+            return 3 + (7 - y) if y < 7 else 0
+        return 0
+
+    mixedness = 0
+    for rank in range(7):
+        for file in range(7):
+            white = black = 0
+            for dr in (0, 1):
+                for df in (0, 1):
+                    piece = board.piece_at(chess.square(file + df, rank + dr))
+                    if piece:
+                        if piece.color == chess.WHITE:
+                            white += 1
+                        else:
+                            black += 1
+            mixedness += score(rank + 1, white, black)
+
+    # Middlegame heuristics
+    if (majors_and_minors <= 10 or backrank_sparse or mixedness > 150):
+        return "middlegame"
+
+    return "opening"

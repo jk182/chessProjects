@@ -6,6 +6,7 @@ import os, sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import plotting_helper
+import functions
 import matplotlib.pyplot as plt
 
 
@@ -74,7 +75,7 @@ def extractGames(ratingBands: list, gamesPerBand: int, timeControl: str, maxRati
 
 
 def extractMoves(pgnPaths: list) -> pl.DataFrame:
-    keys = ['GameNr', 'Ply', 'WhiteElo', 'BlackElo', 'SideToMove', 'FEN', 'FromSquare', 'ToSquare', 'MovedPiece']
+    keys = ['GameNr', 'Ply', 'WhiteElo', 'BlackElo', 'SideToMove', 'FEN', 'GamePhase', 'FromSquare', 'ToSquare', 'MovedPiece']
     data = dict()
     for key in keys:
         data[key] = list()
@@ -98,6 +99,7 @@ def extractMoves(pgnPaths: list) -> pl.DataFrame:
                     data['BlackElo'].append(bElo)
                     data['SideToMove'].append(board.turn)
                     data['FEN'].append(board.fen())
+                    data['GamePhase'].append(functions.getGamePhase(board))
                     data['FromSquare'].append(chess.square_name(move.from_square))
                     data['ToSquare'].append(chess.square_name(move.to_square))
                     data['MovedPiece'].append(board.piece_type_at(move.from_square))
@@ -184,7 +186,7 @@ def plotPieceProbabilities(data: dict, filename: str = None):
     legend = list(data.keys())
 
     pieces = ['Pawn', 'Knight', 'Bishop', 'Rook', 'Queen', 'King']
-    xTicks = ['P'. 'N', 'B', 'R', 'Q', 'K']
+    xTicks = ['P', 'N', 'B', 'R', 'Q', 'K']
     fig, axs = plt.subplots(2, 3, figsize=(10, 6), sharey=True)
 
     for i in range(2):
@@ -210,6 +212,10 @@ def plotPieceProbabilities(data: dict, filename: str = None):
         plt.show()
 
 
+def isMiddlegame(FEN: str):
+    return functions.getGamePhase(chess.Board(FEN)) == 'middlegame'
+
+
 if __name__ == '__main__':
     ratingBands = [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600]
     # extractGames(ratingBands, 10000, '180+0')
@@ -218,9 +224,12 @@ if __name__ == '__main__':
     df.write_parquet('../out/lichessDBDF1200.par')
     df = extractMoves(['../out/lichessDB/rating1800.pgn'])
     df.write_parquet('../out/lichessDBDF1800.par')
+    df = extractMoves(['../out/lichessDB/rating2200.pgn'])
+    df.write_parquet('../out/lichessDBDF2200.par')
     df = extractMoves(['../out/lichessDB/rating2600.pgn'])
     df.write_parquet('../out/lichessDBDF2600.par')
     """
+
     df1200 = pl.read_parquet('../out/lichessDBDF1200.par')
     df1800 = pl.read_parquet('../out/lichessDBDF1800.par')
     df2200 = pl.read_parquet('../out/lichessDBDF2200.par')
@@ -231,8 +240,10 @@ if __name__ == '__main__':
 
     baseProbs = list()
     for i, df in enumerate([df1200, df1800, df2200, df2600]):
-        df = df.filter((pl.col("Ply") >= 20) & (pl.col("Ply") <= 60))
+        # df = df.filter((pl.col("Ply") >= 20) & (pl.col("Ply") <= 60))
         # df = df.filter(pl.col("Ply") <= 20)
+        df = df.filter(pl.col("GamePhase") == "middlegame")
+
         movedPieces = getPieceMoveProbabilities(df)
         baseProbs.append(list())
         print('Total probabilities:')
