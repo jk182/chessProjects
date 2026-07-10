@@ -118,10 +118,12 @@ def getPieceMoveProbabilities(moveData: pl.DataFrame) -> dict:
 
     wPiece = None
     bPiece = None
+    lastGameNr = 0
     for row in df.iter_rows(named=True):
-        if row['Ply'] == 0:
+        if row['GameNr'] != lastGameNr:
             wPiece = None
             bPiece = None
+            lastGameNr = row['GameNr']
 
         position = row['FEN'].split(' ')[0]
         pieces = list()
@@ -152,11 +154,12 @@ def getFlankMoveProbabilities(moveData: pl.DataFrame) -> dict:
 
     wSide = None
     bSide = None
-
+    lastGameNr = 0
     for row in df.iter_rows(named=True):
-        if row['Ply'] == 0:
+        if row['GameNr'] != lastGameNr:
             wSide = None
             bSide = None
+            lastGameNr = row['GameNr']
             continue
 
         if row['ToSquare'][0] in ['a', 'b', 'c']:
@@ -172,6 +175,47 @@ def getFlankMoveProbabilities(moveData: pl.DataFrame) -> dict:
         else:
             data[side].append((bSide, wSide))
             bSide = side
+
+    return data
+
+
+def getSamePieceMoveProbabilities(moveData: pl.DataFrame) -> dict:
+    data = dict()
+    for p in [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]:
+        data[p] = [0, 0]
+
+    wSquare = None
+    bSquare = None
+    lastGameNr = 0
+    for row in df.iter_rows(named=True):
+        if row['GameNr'] != lastGameNr:
+            wSquare = None
+            bSquare = None
+            lastGameNr = row['GameNr']
+            continue
+
+        if wSquare is None and row['SideToMove'] == chess.WHITE:
+            wSquare = row['ToSquare']
+            continue
+        if bSquare is None and row['SideToMove'] == chess.BLACK:
+            bSquare = row['ToSquare']
+            continue
+
+        if row['SideToMove'] == chess.WHITE:
+            lastSquare = wSquare
+            wSquare = row['ToSquare']
+            if bSquare == lastSquare:
+                continue
+        else:
+            lastSquare = bSquare
+            bSquare = row['ToSquare']
+            if wSquare == lastSquare:
+                continue
+        
+        if lastSquare == row['FromSquare']:
+            data[row['MovedPiece']][0] += 1
+
+        data[row['MovedPiece']][1] += 1
 
     return data
 
@@ -212,10 +256,6 @@ def plotPieceProbabilities(data: dict, filename: str = None):
         plt.show()
 
 
-def isMiddlegame(FEN: str):
-    return functions.getGamePhase(chess.Board(FEN)) == 'middlegame'
-
-
 if __name__ == '__main__':
     ratingBands = [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600]
     # extractGames(ratingBands, 10000, '180+0')
@@ -238,12 +278,20 @@ if __name__ == '__main__':
     ratings = [1200, 1800, 2200, 2600]
     pieceProbs = dict()
 
+    sideProbs = dict()
+    for side in ['queenside', 'center', 'kingside']:
+        sideProbs[side] = [list() for _ in range(3)]
+    baseSideProbs = [list() for _ in range(3)]
+
+    samePieceProbs = [list() for _ in range(6)]
+
     baseProbs = list()
     for i, df in enumerate([df1200, df1800, df2200, df2600]):
         # df = df.filter((pl.col("Ply") >= 20) & (pl.col("Ply") <= 60))
         # df = df.filter(pl.col("Ply") <= 20)
-        df = df.filter(pl.col("GamePhase") == "middlegame")
+        df = df.filter(pl.col("GamePhase") == "opening")
 
+        """
         movedPieces = getPieceMoveProbabilities(df)
         baseProbs.append(list())
         print('Total probabilities:')
@@ -270,20 +318,42 @@ if __name__ == '__main__':
             print(s)
 
         pieceProbs[ratings[i]] = iProbs
+        """
 
         """
         sides = getFlankMoveProbabilities(df)
         print('Total:')
-        for k, v in sides.items():
-            print(k, len(v)/sum([len(x) for x in sides.values()]))
-        for k, v in sides.items():
+        for j, (k, v) in enumerate(sides.items()):
+            d = len(v)/sum([len(x) for x in sides.values()])
+            print(k, d)
+            baseSideProbs[j].append(d)
+
+        for j, (k, v) in enumerate(sides.items()):
             print(f'Current side: {k}')
-            for s in ['queenside', 'center', 'kingside']:
-                print(s, round(len([x for x in v if x[0] == s])/len(v), 3), round(len([x for x in v if x[1] == s])/len(v), 3))
+            for l, s in enumerate(['queenside', 'center', 'kingside']):
+                player = len([x for x in v if x[0] == s])/len(v)
+                opponent = len([x for x in v if x[1] == s])/len(v)
+                print(s, round(player, 3), round(opponent, 3))
+
+                sideProbs[k][l].append((player, opponent))
         """
 
-    print(pieceProbs)
-    plotPieceProbabilities(pieceProbs)
+        samePiece = getSamePieceMoveProbabilities(df)
+        print(ratings[i])
+        for j, (k, v) in enumerate(samePiece.items()):
+            print(k, v[0]/v[1])
+            samePieceProbs[j].append(v[0]/v[1])
+
+    # plotPieceProbabilities(pieceProbs)
+
+    # print(sideProbs)
+    # plotting_helper.plotPlayerBarChart(baseSideProbs, ['Queenside', 'Center', 'Kingside'], 'Relative number of moves', 'Move sides', ratings)
+    """
+    for side in ["queenside", "center", "kingside"]:
+        for i, p in enumerate(['player', 'opponent']):
+            plotData = [[v[i] for v in val] for val in sideProbs[side]]
+            plotting_helper.plotPlayerBarChart(plotData, ['Queenside', 'Center', 'Kingside'], 'Relative number of moves', f'Move sides after {side} move by {p}', ratings)
+    """
 
     """
     plotData = list()
@@ -292,3 +362,5 @@ if __name__ == '__main__':
 
     plotting_helper.plotPlayerBarChart(plotData, ['Pawn', 'Knight', 'Bishop', 'Rook', 'Queen', 'King'], 'Relative number of moves', 'How often pieces got moved', ['1200', '1800', '2200', '2600'])
     """
+
+    plotting_helper.plotPlayerBarChart(samePieceProbs, ['Pawn', 'Knight', 'Bishop', 'Rook', 'Queen', 'King'], 'Relative number of moves', 'How often was the exact same piece moved twice', ['1200', '1800', '2200', '2600'])
