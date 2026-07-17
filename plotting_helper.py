@@ -119,8 +119,8 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
 
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     if legendUnderPlot:
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=5)
-        fig.subplots_adjust(bottom=0.15, top=0.95, left=0.1, right=0.95)
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=5)
+        fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     elif legendKwargs:
         ax.legend(**legendKwargs)
     else:
