@@ -8,6 +8,7 @@ import plotting_helper
 
 import matplotlib.pyplot as plt
 import time
+import pickle
 
 
 def getPlayerTimes(game: chess.pgn.Game, startTime: int = 5430, increment: int = 30) -> list:
@@ -227,6 +228,9 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
     cacheBuffer = list()
     lastDate = None
     gameNr = 0
+
+    proc = subprocess.Popen(['tkscid', script, db], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+
     for date, game in games:
         print(gameNr, date)
         gameNr += 1
@@ -249,6 +253,7 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
         
         board = game.board()
         ply = 0
+        fenBuffer = list()
         for move in game.mainline_moves():
             board.push(move)
             ply += 1
@@ -257,15 +262,30 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
             if fen in cache:
                 continue
 
-            nGames = int(subprocess.run(['tkscid', script, db, fen, searchDate], stdout=subprocess.PIPE, text=True).stdout.strip())
+            fenBuffer.append(fen)
+            if len(fenBuffer) < 5:
+                continue
+
+            proc.stdin.write(f'{fen}\t{searchDate}\n')
+            proc.stdin.flush()
+            nGames = int(proc.stdout.readline())
 
             if nGames > 0:
-                cacheBuffer.append(fen)
+                cacheBuffer.extend(fenBuffer)
+                fenBuffer = list()
             else:
-                bookPly[year].append(ply)
+                for i, f in enumerate(fenBuffer):
+                    proc.stdin.write(f'{f}\t{searchDate}\n')
+                    proc.stdin.flush()
+                    nGames = int(proc.stdout.readline())
+                    if nGames == 0:
+                        bookPly[year].append(ply-(len(fenBuffer)-i)+1)
+                        break
+                    else:
+                        cacheBuffer.append(f)
                 break
 
-        print(round(time.time()-gameStartTime, 2), ply)
+        print(round(time.time()-gameStartTime, 2), ply-len(fenBuffer)+i+1)
 
     print(bookPly)
     for k, v in bookPly.items():
@@ -276,15 +296,22 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
 if __name__ == '__main__':
     db = '/Users/julian/Library/Mobile Documents/com~apple~CloudDocs/chessDB'
     db = '/Users/julian/Desktop/classicalDB2'
+    db = '/home/julian/chess/database/gameDB/classicalDB'
     script = 'searchPosition.tcl'
+    script = 'searchPositionFast.tcl'
     pgn = '../resources/vanForeest-gukesh.pgn'
     moveScript = 'getMoveFrequencies.tcl'
     # getBookMoves(pgn, moveScript, db)
     najdorf = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
     # print(getMoveStatistics(db, moveScript, najdorf, '2025.01.01'))
-    prague = '../resources/tournaments/prague2026.pgn'
     # plotTimeSpentPerPlayer(prague, 40)
 
     pgn = '../resources/2500+gamesUTF8.pgn'
     pgn = '../resources/carlsenGames.pgn'
+    pgn = '../resources/2650gamesSince2000UTF8.pgn'
+    # pgn = '../out/carlsen-caruana-g1-WDL10000.pgn'
+    # pgn = '../resources/candidates2024.pgn'
     data = getBookMovesPerYear(pgn, script, db)
+    outFile = '../out/bookMovesByYear.pkl'
+    pickle.dump(data, open(outFile, 'wb+'))
+    data = pickle.load(open(outFile, 'rb'))
