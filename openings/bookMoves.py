@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import plotting_helper
 
 import matplotlib.pyplot as plt
+import time
 
 
 def getPlayerTimes(game: chess.pgn.Game, startTime: int = 5430, increment: int = 30) -> list:
@@ -198,8 +199,83 @@ def plotTimeSpentPerPlayer(pgnPath: str, maxMove: int = None):
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
     plt.show()
 
+
+def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
+    """
+    This gets the book moves every year in the given PGN file
+    pgnPath: str
+        Path to the PGN file one wants to analyse
+    scriptPath: str
+        Path to the TCL script that gets the number of games in the database
+    dbPath: str
+        Path to the SCID database, which is the reference for the number of games
+    return -> dict:
+        {year: [bookPlyGame1, bookPlyGame2, ...], ...}
+    """
+    games = list()
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            date = game.headers["Date"].replace('??', '00')
+
+            games.append((date, game))
+
+    games = sorted(games, key=lambda x:x[0])
+
+    bookPly = dict()
+
+    cache = list()
+    cacheBuffer = list()
+    lastDate = None
+    gameNr = 0
+    for date, game in games:
+        print(gameNr, date)
+        gameNr += 1
+        gameStartTime = time.time()
+
+        if lastDate is None:
+            lastDate = date
+
+        if date != lastDate:
+            cache.extend(cacheBuffer)
+            cacheBuffer = list()
+            lastDate = date
+        
+        if (year := int(date.split('.')[0])) not in bookPly:
+            bookPly[year] = list()
+
+        searchDate = game.headers["Date"]
+        if searchDate[-1] != '?':
+            searchDate = f'{searchDate[:-1]}{int(searchDate[-1])-1}'
+        
+        board = game.board()
+        ply = 0
+        for move in game.mainline_moves():
+            board.push(move)
+            ply += 1
+
+            fen = board.fen()
+            if fen in cache:
+                continue
+
+            nGames = int(subprocess.run(['tkscid', script, db, fen, searchDate], stdout=subprocess.PIPE, text=True).stdout.strip())
+
+            if nGames > 0:
+                cacheBuffer.append(fen)
+            else:
+                bookPly[year].append(ply)
+                break
+
+        print(round(time.time()-gameStartTime, 2), ply)
+
+    print(bookPly)
+    for k, v in bookPly.items():
+        print(k, sum(v)/len(v))
+    return bookPly
+
+
 if __name__ == '__main__':
     db = '/Users/julian/Library/Mobile Documents/com~apple~CloudDocs/chessDB'
+    db = '/Users/julian/Desktop/classicalDB2'
     script = 'searchPosition.tcl'
     pgn = '../resources/vanForeest-gukesh.pgn'
     moveScript = 'getMoveFrequencies.tcl'
@@ -207,4 +283,8 @@ if __name__ == '__main__':
     najdorf = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
     # print(getMoveStatistics(db, moveScript, najdorf, '2025.01.01'))
     prague = '../resources/tournaments/prague2026.pgn'
-    plotTimeSpentPerPlayer(prague, 40)
+    # plotTimeSpentPerPlayer(prague, 40)
+
+    pgn = '../resources/2500+gamesUTF8.pgn'
+    pgn = '../resources/carlsenGames.pgn'
+    data = getBookMovesPerYear(pgn, script, db)
