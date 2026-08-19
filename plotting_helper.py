@@ -14,7 +14,8 @@ def getAllColors() -> dict:
     colors['orange'] = '#f8a978'
     colors['blue'] = '#689bf2'
     colors['red'] = '#fa5a5a'
-    colors['green'] = '#5afa8d'
+    # colors['green'] = '#5afa8d'
+    colors['green'] = '#5CEA5C'
     colors['teal'] = '#7ed3b2'
     colors['pink'] = '#ff87ca'
     colors['purple'] = '#beadfa'
@@ -140,7 +141,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         plt.show()
 
 
-def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, hlineHeight: float = None, xTicks: list = None, filename: str = None):
+def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, hlineHeight: float = None, xTicks: list = None, linewidth: float = 2, filename: str = None):
     """
     A general function to create line charts.
     data: list
@@ -173,23 +174,23 @@ def plotLineChart(data: list, xLabel: str, yLabel: str, title: str, legend: list
 
     for i, d in enumerate(data):
         # ax.plot([(j+1)/2 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
-        ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i], linewidth=1.5)
+        ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i], linewidth=linewidth)
         xMax = max(xMax, len(d)//2)
         yMin = min(yMin, min(d))
         yMax = max(yMax, max(d))
 
-    yMin = min(0.5, yMin-0.01)
-    ax.legend()
+    ax.legend(loc='upper left')
     # ax.set_xlim(xMin, xMax)
     # ax.set_ylim(yMin-0.5, yMax+0.5)
-    ax.set_ylim(yMin, 1)
+    ax.set_ylim(yMin-1, yMax+1)
     if xTicks is not None:
-        ax.set_xlim(1, len(data[-1]))
+        ax.set_xlim(1, len(xTicks))
         # ax.set_xticks([j+1 for j in range(len(data[-1]))])
-        # ax.set_xticklabels(xTicks)
-        ax.xaxis.set_major_locator(ticker.LinearLocator(11))
-        ax.xaxis.set_minor_locator(ticker.LinearLocator(21))
-        ax.set_xticklabels([f'+{t/100}' for t in xTicks if t%100 == 0])
+        factor = 5
+        ax.set_xticklabels([x for i, x in enumerate(xTicks) if i % factor == 0])
+        ax.xaxis.set_major_locator(ticker.LinearLocator(len(xTicks)//factor + 1))
+        # ax.xaxis.set_minor_locator(ticker.LinearLocator(21))
+        # ax.set_xticklabels([f'+{t/100}' for t in xTicks if t%100 == 0])
     plt.title(title)
     if hlineHeight is not None:
         plt.axhline(hlineHeight, color='black', linewidth=0.5)
@@ -466,6 +467,27 @@ def plotFunctions(functions: list, xMin: float, xMax: float, xLabel: str, yLabel
 
     if legend:
         ax.legend()
+
+    if filename:
+        plt.savefig(filename, dpi=400)
+    else:
+        plt.show()
+
+
+def plotBoxplot(plotData: list, xLabel: str, yLabel: str, title: str, colors: list = None, filename: str = None):
+    if not colors:
+        colors = getDefaultColors()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+
+    ax.boxplot(plotData, showfliers=False)
+
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+
+    plt.title(title)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=400)

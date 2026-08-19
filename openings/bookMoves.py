@@ -9,6 +9,7 @@ import plotting_helper
 import matplotlib.pyplot as plt
 import time
 import pickle
+import numpy as np
 
 
 def getPlayerTimes(game: chess.pgn.Game, startTime: int = 5430, increment: int = 30) -> list:
@@ -201,11 +202,11 @@ def plotTimeSpentPerPlayer(pgnPath: str, maxMove: int = None):
     plt.show()
 
 
-def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
+def getBookMovesPerYear(pgnPaths: list, scriptPath: str, dbPath: str) -> dict:
     """
     This gets the book moves every year in the given PGN file
-    pgnPath: str
-        Path to the PGN file one wants to analyse
+    pgnPaths: list
+        Paths to the PGN files one wants to analyse
     scriptPath: str
         Path to the TCL script that gets the number of games in the database
     dbPath: str
@@ -214,11 +215,12 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
         {year: [bookPlyGame1, bookPlyGame2, ...], ...}
     """
     games = list()
-    with open(pgnPath, 'r') as pgn:
-        while game := chess.pgn.read_game(pgn):
-            date = game.headers["Date"].replace('??', '00')
+    for pgnPath in pgnPaths:
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                date = game.headers["Date"].replace('??', '00')
 
-            games.append((date, game))
+                games.append((date, game))
 
     games = sorted(games, key=lambda x:x[0])
 
@@ -232,9 +234,15 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
     proc = subprocess.Popen(['tkscid', script, db], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
     for date, game in games:
-        print(gameNr, date)
-        gameNr += 1
-        gameStartTime = time.time()
+        # print(gameNr, date)
+        # gameNr += 1
+        # gameStartTime = time.time()
+
+        """
+        if 'WhiteElo' not in game.headers or 'BlackElo' not in game.headers:
+            with open('../out/bookMovesLogRatings.txt', 'a+') as f:
+                f.write(f'{game.headers["White"]}-{game.headers["Black"]}, {date}\n')
+        """
 
         if lastDate is None:
             lastDate = date
@@ -247,10 +255,16 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
         if (year := int(date.split('.')[0])) not in bookPly:
             bookPly[year] = list()
 
-        searchDate = game.headers["Date"]
-        if searchDate[-1] != '?':
-            searchDate = f'{searchDate[:-1]}{int(searchDate[-1])-1}'
-        
+        searchDate = date
+        spDate = searchDate.split('.')
+        if spDate[2] == '00':
+            if spDate[1] == '00':
+                searchDate = f'{int(spDate[0])-1}.12.31'
+            else:
+                searchDate = f'{spDate[0]}.{int(spDate[1])-1}.31'
+        else:
+            searchDate = f'{spDate[0]}.{spDate[1]}.{int(spDate[2])-1}'
+
         board = game.board()
         ply = 0
         fenBuffer = list()
@@ -270,11 +284,16 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
             proc.stdin.flush()
             nGames = int(proc.stdout.readline())
 
+            i = 0
             if nGames > 0:
-                cacheBuffer.extend(fenBuffer)
+                # cacheBuffer.extend(fenBuffer)
+                cacheBuffer.append(fen)
                 fenBuffer = list()
             else:
                 for i, f in enumerate(fenBuffer):
+                    if f in cache:
+                        continue
+
                     proc.stdin.write(f'{f}\t{searchDate}\n')
                     proc.stdin.flush()
                     nGames = int(proc.stdout.readline())
@@ -285,12 +304,69 @@ def getBookMovesPerYear(pgnPath: str, scriptPath: str, dbPath: str) -> dict:
                         cacheBuffer.append(f)
                 break
 
-        print(round(time.time()-gameStartTime, 2), ply-len(fenBuffer)+i+1)
+        # print(round(time.time()-gameStartTime, 2), ply-len(fenBuffer)+i+1)
+        """
+        if ply-len(fenBuffer)+i+1 >= 50:
+            with open('../out/bookMovesLog.txt', 'a+') as f:
+                f.write(f'{game.headers["White"]}-{game.headers["Black"]}, {date}, {ply-len(fenBuffer)+i+1}\n')
+        """
 
-    print(bookPly)
-    for k, v in bookPly.items():
-        print(k, sum(v)/len(v))
     return bookPly
+
+
+def analyseOpeningData(data: dict):
+    for year, moveNrs in data.items():
+        print(f'{year}: min={min(moveNrs)}\tq1={round(np.quantile(moveNrs, 0.25), 2)}\tq2={round(np.quantile(moveNrs, 0.5), 2)}\tq3={round(np.quantile(moveNrs, 0.75), 2)}\tmax={max(moveNrs)}')
+
+
+def plotOpeningData(dataPaths: list, title: str, filename: str = None):
+    rawData = dict()
+    for path in dataPaths:
+        data = pickle.load(open(path, 'rb'))
+        for k, v in data.items():
+            if max(v) > 80:
+                v.remove(max(v))
+            if k not in rawData:
+                rawData[k] = v
+            else:
+                rawData[k].extend(v)
+
+    rawData = dict(sorted(rawData.items())[:-1])
+
+    plotData = list()
+    plotData.append([(sum(v)/len(v))/2 if len(v) > 0 else 0 for v in rawData.values()])
+    percentiles = [0.25, 0.5, 0.75]
+    percentiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    percentiles = [0.2, 0.4, 0.6, 0.8]
+    legend = ['Average']
+    legend.extend([f'{int(p*100)}th percentile' for p in percentiles])
+    for p in percentiles:
+        plotData.append([np.quantile(v, p)/2 for v in rawData.values()])
+
+    plotting_helper.plotLineChartSingleX(plotData, 'Year', 'Number of moves', title, legend, xTicks=list(rawData.keys()), colors=plotting_helper.getColors(['green', 'red', 'orange', 'blue', 'purple']), filename=filename)
+    # plotting_helper.plotBoxplot(list(rawData.values()), 'Year', 'Number of moves', title)
+
+
+def plotDifferentPlayerGroups(dataPaths: list, title: str, legend: list, filename: str = None):
+    rawData = dict()
+    for i, paths in enumerate(dataPaths):
+        for path in paths:
+            data = pickle.load(open(path, 'rb'))
+            for k, v in data.items():
+                if max(v) > 80:
+                    v.remove(max(v))
+
+                if k not in rawData:
+                    rawData[k] = [v]
+                elif len(rawData[k]) == i+1:
+                    rawData[k][-1].extend(v)
+                else:
+                    rawData[k].append(v)
+
+    rawData = dict(sorted(rawData.items())[:-1])
+    plotData = [[(sum(v[i])/len(v[i]))/2 if len(v) > 0 else 0 for v in rawData.values()] for i in range(len(dataPaths))]
+
+    plotting_helper.plotLineChartSingleX(plotData, 'Year', 'Number of moves', title, legend, xTicks=list(rawData.keys()), filename=filename)
 
 
 if __name__ == '__main__':
@@ -311,7 +387,33 @@ if __name__ == '__main__':
     pgn = '../resources/2650gamesSince2000UTF8.pgn'
     # pgn = '../out/carlsen-caruana-g1-WDL10000.pgn'
     # pgn = '../resources/candidates2024.pgn'
-    data = getBookMovesPerYear(pgn, script, db)
-    outFile = '../out/bookMovesByYear.pkl'
-    pickle.dump(data, open(outFile, 'wb+'))
-    data = pickle.load(open(outFile, 'rb'))
+    pgn = '../resources/2650gamesClassical2023.pgn'
+    pgn = '../resources/2600games1980-2000.pgn'
+    pgns = ['../resources/matches/lasker-schlechter1910.pgn', '../resources/tournaments/hamburg1910.pgn', '../resources/tournaments/sanSebastian1911.pgn', '../resources/tournaments/newYork1911.pgn', '../resources/tournaments/carlsbad1911.pgn']
+    tFolder = '../resources/tournaments'
+    pgns = [f'{tFolder}/{fileName}' for fileName in os.listdir(tFolder)]
+    # outFile = '../out/bookMoves1980-2000.pkl'
+    # outFile = '../out/bookMoves1910-29.pkl'
+    # outFile = '../out/bookMovesByYear.pkl'
+    pgn = '../resources/top20games1980-2026.pgn'
+    outFile = '../out/bookMovesTop20_1980-2026.pkl'
+    # outFile = '../out/bookMoves2012-2026.pkl'
+    # data = getBookMovesPerYear([pgn], script, db)
+    # data = getBookMovesPerYear(pgns, script, db)
+    # pickle.dump(data, open(outFile, 'wb+'))
+    # data = pickle.load(open(outFile, 'rb'))
+    top100files = ['../out/bookMoves1980-1993.pkl', '../out/bookMoves1994-2011.pkl', '../out/bookMoves2012-2026.pkl']
+    top50files = ['../out/bookMovesTop50_1980-1999.pkl', '../out/bookMovesTop50_2000-2015.pkl', '../out/bookMovesTop50_2016-2026.pkl']
+    top20files = ['../out/bookMovesTop20_1980-2026.pkl']
+    plotOpeningData(top100files, 'Number of moves until the first new position in games between players in the top 100', filename='../out/bookMovesTop100.png')
+    plotOpeningData(top50files, 'Number of moves until the first new position in games between players in the top 50', filename='../out/bookMovesTop50.png')
+    plotOpeningData(top20files, 'Number of moves until the first new position in games between players in the top 20', filename='../out/bookMovesTop20.png')
+    plotDifferentPlayerGroups([top100files, top50files, top20files], 'Average number of moves before reaching a new position for different levels', ['Top 100', 'Top 50', 'Top 20'], filename='../out/bookMovesAvg.png')
+    """
+    analyseOpeningData(data)
+    for k, v in data.items():
+        if len(v) == 0:
+            print(k)
+        else:
+            print(k, sum(v)/len(v))
+    """
