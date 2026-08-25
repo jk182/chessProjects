@@ -2,6 +2,10 @@ import chess
 import chess.pgn
 import io
 
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import functions
+
 
 def extractGamesByRating(ratingBands: list, gamesPerBand: int, maxRatingDiff: int = 50, outPath: str = '../out/lichessDB/rating'):
     pgns = list()
@@ -138,8 +142,86 @@ def extractAnalysedGames(ratings: list, gamesPerBand: int, timeControls: list, m
                 nextIsEnd = True
 
 
+def extractEndgameResults(ratings: list, gamesPerBand: int, timeControls: list, maxRatingDiff: int = 50, maxRatingDeviation: int = 100, outPath: str = '../out/lichessDB/analysed_endgames_rating'):
+    nextIsEnd = False
+    pgn = ""
+    wElo = None
+    bElo = None
+    ratingIndex = None
+    date = None
+    hasEval = False
+    isEndgame = False
+    tcIndex = None
+    nGames = list()
+    for r in ratings:
+        nGames.append([0] * len(timeControls))
+
+    while True:
+        line = input()
+        pgn = f'{pgn}{line.strip()}\n'
+        if "[WhiteElo " in line:
+            wElo = int(line.split('"')[1])
+        if "[BlackElo " in line:
+            bElo = int(line.split('"')[1])
+            avgElo = (wElo+bElo)/2
+            if abs(wElo-bElo) <= maxRatingDiff:
+                for i in range(len(ratings)):
+                    if abs(ratings[i] - avgElo) < maxRatingDeviation:
+                        ratingIndex = i
+                        break
+
+        if '[WhiteTitle "BOT"]' in line or '[BlackTitle "BOT"]' in line:
+            ratingIndex = None
+        if 'TimeControl' in line:
+            tc = line.split('"')[1]
+            if tc == '-':
+                ratingIndex = None
+            elif tc in timeControls:
+                tcIndex = timeControls.index(tc)
+            else:
+                tcIndex = None
+        if 'UTCDate' in line:
+            date = line.split('"')[1]
+        if '%eval' in line:
+            hasEval = True
+        if not line.strip():
+            if nextIsEnd:
+                if ratingIndex is not None and tcIndex is not None and nGames[ratingIndex][tcIndex] < gamesPerBand and hasEval:
+                    game = chess.pgn.read_game(io.StringIO(pgn))
+                    board = game.board()
+
+                    for move in game.mainline_moves():
+                        board.push(move)
+                        if functions.getGamePhase(board) == "endgame":
+                            isEndgame = True
+                            break
+
+                    if isEndgame:
+                        nGames[ratingIndex][tcIndex] += 1
+                        print(ratings[ratingIndex], timeControls[tcIndex], nGames[ratingIndex][tcIndex], date)
+                        with open(f'{outPath}{ratings[ratingIndex]}_{timeControls[tcIndex]}.pgn', 'a+') as f:
+                            print(f'{pgn}\n', file=f)
+                        end = True
+                        for games in nGames:
+                            for g in games:
+                                if g < gamesPerBand:
+                                    end = False
+                                    break
+                        if end:
+                            print('Finished')
+                            return
+                pgn = ""
+                nextIsEnd = False
+                hasEval = False
+                tcIndex = None
+                ratingIndex = None
+                isEndgame = False
+            else:
+                nextIsEnd = True
+
 
 # extractGamesByRating([1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600], 5000)
 # extractGamesByRating([2600, 2700], 5000, maxRatingDiff=80)
 # extractAnalysedGames([1200, 1600, 2000, 2400], 2000, ["60+0", "180+0", "300+0", "600+0"])
-extractAnalysedGames([1200, 1600, 2000, 2200], 3000, ["600+0", "600+5", "900+10"])
+# extractAnalysedGames([1200, 1600, 2000, 2200], 3000, ["600+0", "600+5", "900+10"])
+extractEndgameResults([1200, 1400, 1600, 1800, 2000, 2200, 2400], 3000, ["180+0", "180+2", "600+0"])
