@@ -198,7 +198,8 @@ def extractEndgameResults(ratings: list, gamesPerBand: int, timeControls: list, 
 
                     if isEndgame:
                         nGames[ratingIndex][tcIndex] += 1
-                        print(ratings[ratingIndex], timeControls[tcIndex], nGames[ratingIndex][tcIndex], date)
+                        if nGames[ratingIndex][tcIndex] % 100 == 0:
+                            print(ratings[ratingIndex], timeControls[tcIndex], nGames[ratingIndex][tcIndex], date)
                         with open(f'{outPath}{ratings[ratingIndex]}_{timeControls[tcIndex]}.pgn', 'a+') as f:
                             print(f'{pgn}\n', file=f)
                         end = True
@@ -224,4 +225,5 @@ def extractEndgameResults(ratings: list, gamesPerBand: int, timeControls: list, 
 # extractGamesByRating([2600, 2700], 5000, maxRatingDiff=80)
 # extractAnalysedGames([1200, 1600, 2000, 2400], 2000, ["60+0", "180+0", "300+0", "600+0"])
 # extractAnalysedGames([1200, 1600, 2000, 2200], 3000, ["600+0", "600+5", "900+10"])
-extractEndgameResults([1200, 1400, 1600, 1800, 2000, 2200, 2400], 3000, ["180+0", "180+2", "600+0"])
+extractEndgameResults([1800, 2000, 2200, 2400], 100000, ["180+0", "180+2"])
+# extractEndgameResults([1200, 1400, 1600, 1800, 2000, 2200, 2400], 100000, ["180+0", "180+2", "600+0"])
