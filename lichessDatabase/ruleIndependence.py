@@ -1,5 +1,6 @@
 import chess
 import chess.pgn
+import pickle
 
 
 def castlingFrequency(basePath: str, ratings: list) -> dict:
@@ -9,21 +10,29 @@ def castlingFrequency(basePath: str, ratings: list) -> dict:
     data = dict()
     for rating in ratings:
         # list of castling moves, [games where 0 players castled, 1 player castled, both players castled]
-        data[rating] = [list(), [0, 0, 0]]
+        data[rating] = [list(), [0, 0, 0], list()]
         with open(f'{basePath}{rating}.pgn', 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
                 whiteCastle = False
                 blackCastle = False
 
+                lastEval = None
+                node = game
                 board = game.board()
                 for ply, move in enumerate(game.mainline_moves()):
+                    node = node.variations[0]
+                    if node.eval():
+                        currentEval = node.eval().white().score(mate_score=1000)
                     if 'O-O' in board.san(move):
                         data[rating][0].append(int(ply/2)+1)
                         if board.turn:
                             whiteCastle = True
+                            data[rating][2].append(currentEval-lastEval)
                         else:
                             blackCastle = True
+                            data[rating][2].append(lastEval-currentEval)
                     board.push(move)
+                    lastEval = currentEval
                 if whiteCastle and blackCastle:
                     data[rating][1][2] += 1
                 elif whiteCastle or blackCastle:
@@ -36,13 +45,26 @@ def castlingFrequency(basePath: str, ratings: list) -> dict:
 def earlyQueenMoves(basePath: str, ratings: list, moveCutoff: int = 10) -> dict:
     data = dict()
     for rating in ratings:
-        data[rating] = 0
+        data[rating] = [[0, 0], list()]
         with open(f'{basePath}{rating}.pgn', 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
+                lastEval = 20
+                node = game
                 board = game.board()
                 for ply, move in enumerate(game.mainline_moves()):
+                    node = node.variations[0]
+                    if node.eval():
+                        currentEval = node.eval().white().score(mate_score=1000)
+                    else:
+                        currentEval = lastEval
+
+                    data[rating][0][1] += 1
                     if board.san(move)[0] == 'Q':
-                        data[rating] += 1
+                        data[rating][0][0] += 1
+                        if board.turn:
+                            data[rating][1].append(currentEval-lastEval)
+                        else:
+                            data[rating][1].append(lastEval-currentEval)
                     if ply/2 >= moveCutoff:
                         break
                     board.push(move)
@@ -52,16 +74,29 @@ def earlyQueenMoves(basePath: str, ratings: list, moveCutoff: int = 10) -> dict:
 def knightsOnTheRim(basePath: str, ratings: list) -> dict:
     data = dict()
     for rating in ratings:
-        data[rating] = [0, 0]
+        data[rating] = [0, 0, list()]
         with open(f'{basePath}{rating}.pgn', 'r') as pgn:
             while game := chess.pgn.read_game(pgn):
+                lastEval = 20
+                node = game
                 board = game.board()
                 for move in game.mainline_moves():
+                    node = node.variations[0]
+                    if node.eval():
+                        currentEval = node.eval().white().score(mate_score=1000)
+                    else:
+                        currentEval = lastEval
+
                     data[rating][1] += 1
                     if board.san(move)[0] == 'N':
                         if move.uci()[2] == 'a' or move.uci()[2] == 'h':
                             data[rating][0] += 1
+                            if board.turn:
+                                data[rating][2].append(currentEval-lastEval)
+                            else:
+                                data[rating][2].append(lastEval-currentEval)
                     board.push(move)
+                    lastEval = currentEval
     return data
 
 
@@ -128,27 +163,36 @@ def isolatedPawns(basePath: str, ratings: list, moveCutoff: int = 20) -> dict:
 
 if __name__ == '__main__':
     basePath = '../out/lichessDB/rating'
-    ratings = [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2700]
+    ratings = [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600] # , 2700]
+    ratings = [1000, 1400, 1800, 2000, 2200, 2400, 2600]
+    basePath = '../out/lichessDB/analysedGames_3+0_rating'
 
     """
-    castlingData = castlingFrequency(basePath, ratings)
+    outPath = '../out/castlingData.pkl'
+    # castlingData = castlingFrequency(basePath, ratings)
+    # pickle.dump(castlingData, open(outPath, 'wb+'))
+    castlingData = pickle.load(open(outPath, 'rb'))
     print('Castling data:')
     for rating, data in castlingData.items():
-        print(rating, sum(data[0])/len(data[0]), data[1])
+        print(rating, sum(data[0])/len(data[0]), data[1], sum(data[2])/len(data[2]))
     """
 
-    """
+    outPath = '../out/earlyQueenMoves.pkl'
     queenMoves = earlyQueenMoves(basePath, ratings)
+    pickle.dump(queenMoves, open(outPath, 'wb+'))
+    queenMoves = pickle.load(open(outPath, 'rb'))
     print('Queen move data:')
     for k, v in queenMoves.items():
-        print(k, v)
-    """
+        print(k, v[0][0]/v[0][1], sum(v[1])/len(v[1]))
 
     """
+    outPath = '../out/knightsOnTheRim.pkl'
     knightData = knightsOnTheRim(basePath, ratings)
+    pickle.dump(knightData, open(outPath, 'wb+'))
+    knightData = pickle.load(open(outPath, 'rb'))
     print('Knight data:')
     for k, v in knightData.items():
-        print(k, v[0]/v[1])
+        print(k, v[0]/v[1], sum(v[2])/len(v[2]))
     """
 
     """
@@ -158,6 +202,8 @@ if __name__ == '__main__':
         print(k, v)
     """
 
+    """
     dp = doubledPawns(basePath, ratings, moveCutoff=15)
     for k, v in dp.items():
         print(k, v[0]/v[1])
+    """

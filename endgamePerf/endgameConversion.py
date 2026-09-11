@@ -238,10 +238,9 @@ def plotConversionData(data: dict, endingType: str = '-'):
     plt.show()
 
 
-def plotTimeConversion(data: dict):
-    endings = ['R-r', 'Q-q', 'N-n', '-']
+def plotTimeConversion(data: dict, evalGroupWidth: int = 10):
+    endings = ['R-r', 'Q-q', 'N-n', '-', 'B-b', 'RR-rr']
     tRating = 2000
-    evalGroupWidth = 10
     plotData = list()
     for ending, eData in data.items():
         if ending not in endings:
@@ -251,6 +250,8 @@ def plotTimeConversion(data: dict):
                 continue
             data = dict()
             for x in d:
+                if x[1] < 10:
+                    continue
                 evaluation = int(min(x[0], 500) / evalGroupWidth)
                 if evaluation not in data:
                     data[evaluation] = [0, 0]
@@ -291,7 +292,7 @@ if __name__ == '__main__':
 
     with open(outFile, 'rb') as f:
         df = pickle.load(f)
-    data = analyseEndgameData(df, timeControl='180+0')
-    # plotTimeConversion(data)
+    data = analyseEndgameData(df, timeControl='180+2')
+    plotTimeConversion(data, evalGroupWidth=20)
     heatmapData = getHeatmapData(data, 180, timeGroupWidth=3, evalGroupWidth=10)
-    plotConversionData(heatmapData, endingType='-')
+    # plotConversionData(heatmapData, endingType='-')

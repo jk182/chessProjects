@@ -44,10 +44,12 @@ def getAccuraciesByYear(pgnPath: str, player: str, lichessAnalysis: bool = False
                     if node.eval():
                         cp = int(node.eval().white().score(mate_score=10000))
                     else:
-                        print('No evaluation found')
+                        cp = evals[-1]
+                        # print('No evaluation found')
                 else:
                     if not functions.readComment(node, True, True):
-                        print('No evaluation found')
+                        cp = evals[-1]
+                        # print('No evaluation found')
                     else:
                         cp = functions.readComment(node, True, True)[1]
 
@@ -63,19 +65,27 @@ def getAccuraciesByYear(pgnPath: str, player: str, lichessAnalysis: bool = False
 
             accData[year].append((playerAcc, oppAcc))
 
+    accData = dict(sorted(accData.items()))
     return accData
 
 
 if __name__ == '__main__':
     pgn = '../out/carlsenClassicalAnalysed.pgn'
-    accData = getAccuraciesByYear(pgn, 'Carlsen')
-    pgn = '../out/capablancaTournamentGames_analysed.pgn'
-    accData = getAccuraciesByYear(pgn, 'Capablanca')
-    for k, v in accData.items():
-        p = sum([x[0] for x in v])/len(v)
-        o = sum([x[1] for x in v])/len(v)
-        print(k, round(p, 2), round(o, 2), round(p-o, 2))
+    # accData = getAccuraciesByYear(pgn, 'Carlsen')
+    # pgn = '../out/capablancaTournamentGames_analysed.pgn'
+    pgns = ['../out/capablancaTournamentGames_analysed.pgn', '../out/alekhineTournamentGames_analysed.pgn', '../out/botvinnikGamesAnalysed.pgn', '../out/talGamesAnalysed.pgn', '../out/carlsenClassicalAnalysed.pgn']
+    names = ['Capablanca', 'Alekhine', 'Botvinnik', 'Tal', 'Carlsen']
+    # accData = getAccuraciesByYear(pgn, 'Capablanca')
+    for i in range(len(pgns)):
+        pgn = pgns[i]
+        name = names[i]
+        accData = getAccuraciesByYear(pgn, name)
+        print(name)
+        for k, v in accData.items():
+            p = sum([x[0] for x in v])/len(v)
+            o = sum([x[1] for x in v])/len(v)
+            print(k, round(p, 2), round(o, 2), round(p-o, 2))
 
-    for i in range(2):
-        total = sum([sum([x[i] for x in v])/len(v) for v in accData.values()]) / len(accData)
-        print(round(total, 3))
+        for i in range(2):
+            total = sum([sum([x[i] for x in v])/len(v) for v in accData.values()]) / len(accData)
+            print(round(total, 3))
