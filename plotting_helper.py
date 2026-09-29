@@ -107,14 +107,15 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     ax.set_ylabel(ylabel)
 
     nBars = len(data[0])
-    width = 0.8/nBars
-    offset = width * (1/2 - nBars/2)
+    totalWidth = 0.8
+    barWidth = totalWidth/nBars
+    offset = barWidth * (1/2 - nBars/2)
 
     yMin = 0
     yMax = 0
 
     for j in range(nBars):
-        ax.bar([i+1+offset+(width*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=width, label=legend[j])
+        ax.bar([i+1+offset+(barWidth*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=barWidth, label=legend[j])
         yMax = max(yMax, max([d[j] for d in data]))
         yMin = min(yMin, min([d[j] for d in data]))
 
@@ -130,7 +131,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     if yTicks:
         ax.set_yticks(yTicks)
 
-    ax.set_xlim(1+2*offset, len(data)-2*offset)
+    ax.set_xlim(1-totalWidth*3/4, len(data)+totalWidth*3/4)
     ax.set_ylim(yMin*1.05, yMax * 1.05)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
@@ -141,7 +142,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         plt.show()
 
 
-def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, hlineHeight: float = None, xTicks: list = None, linewidth: float = 2, filename: str = None):
+def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, hlineHeight: float = None, xTicks: list = None, linewidth: float = 2, xTickFactor: int = 5, multipleY: bool = False, secondYLabel: str = None, filename: str = None):
     """
     A general function to create line charts.
     data: list
@@ -155,6 +156,19 @@ def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legen
     colors: list
         Colors to be used of the lines.
         If no value is given, a default color palette will be chosen.
+    hlineHeight: float
+        If this is set, there will be a horizontal line at the specified height
+    xTicks: list
+        Labels for the x ticks
+    linewidth: float
+        Width of the lines in the graph
+    xTickFactor: int
+        How many labels get shown. A factor of 5 means that every 5th label gets shown
+    multipleY: bool
+        If this is set, there will be two different scaled y-axes
+        This currently only works for 2 data lists
+    secondYLabel: str
+        The label for the second y axis, when multipleY is set
     filename: str
         Then path to save the plot.
         If no name is given, the plot will be shown instead of saved.
@@ -165,12 +179,15 @@ def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legen
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
     ax.set_xlabel(xLabel)
-    ax.set_ylabel(yLabel)
 
     xMin = 0
     xMax = 0
     yMin = 100
     yMax = -100
+
+    if multipleY:
+        data2 = data[1]
+        data = [data[0]]
 
     for i, d in enumerate(data):
         # ax.plot([(j+1)/2 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
@@ -179,22 +196,39 @@ def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legen
         yMin = min(yMin, min(d))
         yMax = max(yMax, max(d))
 
-    ax.legend(loc='upper left')
     # ax.set_xlim(xMin, xMax)
     # ax.set_ylim(yMin-0.5, yMax+0.5)
     ax.set_ylim(yMin-1, yMax+1)
     if xTicks is not None:
         ax.set_xlim(1, len(xTicks))
         # ax.set_xticks([j+1 for j in range(len(data[-1]))])
-        factor = 5
-        ax.set_xticklabels([x for i, x in enumerate(xTicks) if i % factor == 0])
-        ax.xaxis.set_major_locator(ticker.LinearLocator(len(xTicks)//factor + 1))
+        ax.set_xticklabels([x for i, x in enumerate(xTicks) if i % xTickFactor == 0])
+        ax.xaxis.set_major_locator(ticker.LinearLocator(len(xTicks)//xTickFactor + 1))
         # ax.xaxis.set_minor_locator(ticker.LinearLocator(21))
         # ax.set_xticklabels([f'+{t/100}' for t in xTicks if t%100 == 0])
     plt.title(title)
     if hlineHeight is not None:
         plt.axhline(hlineHeight, color='black', linewidth=0.5)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.95)
+
+    if multipleY:
+        ax2 = ax.twinx()
+        ax2.set_ylabel(secondYLabel)
+        ax2.plot([j+1 for j in range(len(data2))], data2, color=colors[1], label=legend[1], linewidth=linewidth)
+        ax2.tick_params(axis='y', labelcolor=colors[1])
+
+        ax.tick_params(axis='y', labelcolor=colors[0])
+        ax.set_ylabel(yLabel)
+
+        fig.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.93)
+
+        # Get both legends in one box
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels + labels2)# , loc='upper left')
+    else:
+        ax.set_ylabel(yLabel)
+        ax.legend()
+        fig.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=400)
@@ -243,7 +277,7 @@ def plotAvgLinePlot(data: list, playerNames: list, ylabel: str, title: str, lege
         plt.show()
 
 
-def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, scatterColors: list = None, legend: list = None, refFunction = None, filename: str = None):
+def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, title: str, scatterColors: list = None, legend: list = None, refFunction = None, alpha: float = 1, filename: str = None):
     """
     A general function to generate scatter plots
     """
@@ -257,9 +291,9 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
     xMax = max(xValues[0])
     for i in range(len(xValues)):
         if legend:
-            ax.scatter(xValues[i], yValues[i], color=scatterColors[i%len(scatterColors)], label=legend[i])
+            ax.scatter(xValues[i], yValues[i], color=scatterColors[i%len(scatterColors)], alpha=alpha, label=legend[i])
         else:
-            ax.scatter(xValues[i], yValues[i], color=scatterColors[i%len(scatterColors)])
+            ax.scatter(xValues[i], yValues[i], color=scatterColors[i%len(scatterColors)], alpha=alpha)
         xMin = min(xMin, min(xValues[i]))
         xMax = max(xMax, max(xValues[i]))
 

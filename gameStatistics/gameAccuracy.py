@@ -222,11 +222,11 @@ def getGameEvaluationsFromDF(df: pl.DataFrame) -> list:
     return gameEvaluations
 
 
-def calculateGeneralisedMean(evaluations: list, expectedScoreFunction=functions.expectedScore, p: float = 1) -> tuple:
+def calculateGeneralisedMean(evaluations: list, expectedScoreFunction=functions.expectedScore, p: float = 1, whiteStart: bool = True) -> tuple:
     if len(evaluations) < 3:
-        return None
+        return (None, None)
 
-    expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(evaluations, expectedScoreFunction)
+    expectedScoreDropsWhite, expectedScoreDropsBlack = getExpectedScoreDropsFromEvaluations(evaluations, expectedScoreFunction, whiteStart=whiteStart)
 
     if p < 0:
         expectedScoreDropsWhite = [max(0.1, xsDrop) for xsDrop in expectedScoreDropsWhite]
@@ -282,18 +282,27 @@ def getMeanDensityFromGameEvaluations(gameEvals: list, groupWidth: float = 0.1, 
     return density
 
 
-def getExpectedScoreDropsFromEvaluations(evals: list, expectedScoreFunction = functions.expectedScore) -> tuple:
+def getExpectedScoreDropsFromEvaluations(evals: list, expectedScoreFunction = functions.expectedScore, whiteStart: bool = True) -> tuple:
     """
     This function calculates the expected score drops for both colors from a list of evaluations
     evals: list
         The evaluations before each move
     expectedScoreFunction
         The functions to calculate the expected score from an evaluation
+    whiteStart: bool
+        If this is set, the list starts with a white move, otherwise with a black move
     return -> tuple(list(), list())
         The expected score drops for white and black
     """
-    expectedScoreDropsWhite = [max(0, expectedScoreFunction(evals[i]) - expectedScoreFunction(evals[i+1])) for i in range(0, len(evals)-1, 2)]
-    expectedScoreDropsBlack = [max(0, expectedScoreFunction(-evals[i]) - expectedScoreFunction(-evals[i+1])) for i in range(1, len(evals)-1, 2)]
+    if whiteStart:
+        whiteStartIndex = 0
+        blackStartIndex = 1
+    else:
+        whiteStartIndex = 1
+        blackStartIndex = 0
+
+    expectedScoreDropsWhite = [max(0, expectedScoreFunction(evals[i]) - expectedScoreFunction(evals[i+1])) for i in range(whiteStartIndex, len(evals)-1, 2)]
+    expectedScoreDropsBlack = [max(0, expectedScoreFunction(-evals[i]) - expectedScoreFunction(-evals[i+1])) for i in range(blackStartIndex, len(evals)-1, 2)]
 
     return (expectedScoreDropsWhite, expectedScoreDropsBlack)
 

@@ -180,6 +180,9 @@ def gameAccuracy(AXSL: float) -> float:
     This function calculates the accuracy of a game given the average expected score loss (AXSL)
     See gameStatistics/gameStats.py
     """
+    if AXSL is None:
+        return None
+
     sigma = 1.55
     offset = 0.25
     if AXSL <= offset:
@@ -187,7 +190,7 @@ def gameAccuracy(AXSL: float) -> float:
     return 100 * np.exp(-(AXSL-offset)**2/(2*sigma**2))
 
 
-def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, moveAccuracyFunction = accuracy) -> tuple:
+def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, moveAccuracyFunction = accuracy, whiteStart: bool = True) -> tuple:
     """
     This calculates the game accuracy as used by Lichess (as of May 2026)
     """
@@ -213,12 +216,17 @@ def lichessGameAccuracy(moveEvaluations: list, expectedScoreFunction = winP, mov
     accuraciesWhite = list()
     accuraciesBlack = list()
 
+    if whiteStart:
+        mod = 0
+    else:
+        mod = 1
+
     for i in range(len(expectedScores)-1):
         xsBefore = expectedScores[i]
         xsAfter = expectedScores[i+1]
         weight = stDevs[i]
 
-        if i % 2 == 0:
+        if i % 2 == mod:
             accuracy = moveAccuracyFunction(xsBefore, xsAfter)
             accuraciesWhite.append((accuracy, weight))
         else:
