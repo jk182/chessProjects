@@ -6,6 +6,7 @@ import scipy.integrate as integrate
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
 import pandas as pd
+import polars as pl
 import statistics
 import matplotlib.pyplot as plt
 
@@ -39,7 +40,10 @@ def analyseLegalMoves(board: chess.Board, engine: chess.engine, maxDepth: int) -
         moves[move.uci()] = list()
         for depth in range(1, maxDepth+1):
             info = engine.analyse(board, limit=chess.engine.Limit(depth=depth), root_moves=[move])
-            moves[move.uci()].append(info["score"].white().score(mate_score=1000))
+            if board.turn:
+                moves[move.uci()].append(info["score"].white().score(mate_score=1000))
+            else:
+                moves[move.uci()].append(info["score"].black().score(mate_score=1000))
         
     return dict(reversed(sorted(moves.items(), key=lambda x: x[1][-1])))
 
@@ -148,19 +152,17 @@ def psiWSL(L: list, wSwingList: list, e: int, weights: list) -> float:
     """
     Implementation of the psi function with the weighted swing list
     """
-    return (sum(wSwingList[:e]) - 1/2 * sum(wSwingList)) / (weights[e-2] * dampenedSwing(L, e-1, e))
+    return (sum(wSwingList[:e]) - 1/2 * sum(wSwingList)) / (weights[e-1] * dampenedSwing(L, e, e+1)) # different indices in the denominator than the paper, but this should be correct
 
 
 def roh(L: list, weights: list, maxDepth: int) -> float:
     wSwingList = weightedSwingList(L, weights, maxDepth)
-    # for e in range(maxDepth-2, 0, -1):
+    # this calculates the minimum (which should be correct), not the maximum as stated in the paper
     for e in range(1, maxDepth):
-        # if weightedSwing(L, weights, e+1) >= 1/2 * weightedSwing(L, weights, maxDepth):
         if sum(wSwingList[:e]) >= 1/2 * sum(wSwingList):
             finalE = e
             break
 
-    # return finalE - psi(L, finalE, weights, maxDepth)
     return finalE - psiWSL(L, wSwingList, finalE, weights)
 
 
@@ -169,6 +171,42 @@ def difficultyBR(board: chess.Board, engine: chess.engine, maxDepth: int):
     weights = [depth/sum([d for d in range(1, maxDepth)]) for depth in range(1, maxDepth)]
 
     return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
+
+
+def getTestData(pgnPath: str, engineConfig: dict, maxDepth: int) -> pl.DataFrame:
+    data = dict()
+    keys = ['White', 'Black', 'WhiteElo', 'BlackElo', 'FEN', 'MovePlayed', 'Moves', 'Evaluations']
+    for key in keys:
+        data[key] = list()
+
+    moveNumbers = [20]#, 25, 30]
+    with open(pgnPath, 'r') as pgn:
+        while game := chess.pgn.read_game(pgn):
+            board = game.board()
+
+            for move in game.mainline_moves():
+                if board.fullmove_number in moveNumbers:
+                    engine = functions.configureEngine(*engineConfig)
+                    moveEvaluations = analyseLegalMoves(board, engine, maxDepth)
+                        
+                    engine.quit()
+                    
+                    moveData = [game.headers["White"],
+                            game.headers["Black"],
+                            game.headers["WhiteElo"],
+                            game.headers["BlackElo"],
+                            board.fen(),
+                            move.uci(),
+                            list(moveEvaluations.keys()),
+                            list(moveEvaluations.values())]
+
+                    for i, key in enumerate(keys):
+                        data[key].append(moveData[i])
+
+            
+                board.push(move)
+
+    return pl.DataFrame(data, strict=False)
 
 
 def findTrapMoves(board: chess.Board, engineOptions: tuple, maxDepth: int, minDepth: int = 5, referenceDepth: int = 25) -> list:
@@ -276,15 +314,21 @@ if __name__ == '__main__':
     poisonedPawn2 = chess.Board('rnb1kb1r/1p3ppp/p2ppn2/6B1/3NPP2/q1N5/P1PQ2PP/1R2KB1R w Kkq - 2 10')
     ruyLopez = chess.Board('r1bq1rk1/2ppbppp/p1n2n2/1p2p3/4P3/1B3N2/PPPP1PPP/RNBQR1K1 w - - 2 8')
     startPos = chess.Board()
-    sf = functions.configureEngine(*sfConfig)
-    # print(analyseLegalMoves(chess.Board(posMoves[0][0]), sf, 15))
-    print(difficultyBR(startPos, sf, 18))
-    sf.configure({'Clear Hash': True})
-    print(difficultyBR(poisonedPawn, sf, 18))
-    sf.configure({'Clear Hash': True})
-    print(difficultyBR(poisonedPawn2, sf, 18))
-    sf.configure({'Clear Hash': True})
-    print(difficultyBR(ruyLopez, sf, 18))
+    e4e5 = chess.Board('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2')
+    e4e5Black = chess.Board('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2')
+    # for position in [startPos, poisonedPawn, poisonedPawn2, ruyLopez]:
+    """
+    for position in [e4e5, e4e5Black]:
+        sf = functions.configureEngine(*sfConfig)
+        print(difficultyBR(position, sf, 18))
+        sf.quit()
+    """
+
+    df = getTestData('../resources/bernstein-capablanca.pgn', sfConfig, 15)
+
+    for row in df.iter_rows(named=True):
+        print(len(row['Moves']))
+        print(len(row['Evaluations']))
 
     """
     testL = [[-10, 0, 30], [30, 20, 10], [10, 10, 10]]
@@ -312,7 +356,6 @@ if __name__ == '__main__':
     """
 
 
-    sf.quit()
     """
     for name, fen in openingTraps.items():
         print(name, findTrapMoves(chess.Board(fen), sfConfig, 23))
