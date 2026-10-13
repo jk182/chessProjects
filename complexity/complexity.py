@@ -1,5 +1,7 @@
 import chess
 import os, sys
+import math
+import scipy.integrate as integrate
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
@@ -29,6 +31,144 @@ def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -
         data["Evaluation"].append(i["score"].white().score(mate_score=10000))
     df = pd.DataFrame(data)
     return df
+
+
+def analyseLegalMoves(board: chess.Board, engine: chess.engine, maxDepth: int) -> dict:
+    moves = dict()
+    for move in board.legal_moves:
+        moves[move.uci()] = list()
+        for depth in range(1, maxDepth+1):
+            info = engine.analyse(board, limit=chess.engine.Limit(depth=depth), root_moves=[move])
+            moves[move.uci()].append(info["score"].white().score(mate_score=1000))
+        
+    return dict(reversed(sorted(moves.items(), key=lambda x: x[1][-1])))
+
+
+def mu(x: int, y: int) -> float:
+    if x == 0 and y == 0:
+        return 0
+    return (x-y) / (x**2 + y**2)
+
+
+def absDiff(diffFunction, X: list) -> float:
+    val = 0
+    for i in range(len(X)):
+        for j in range(len(X)):
+            val += diffFunction(X[i], X[j])**2
+    return val**(1/2)
+
+
+def tau(muFunction, X: list, Y: list, muX: float = None, muY: float = None) -> float:
+    val = 0
+    for i in range(len(X)):
+        for j in range(len(Y)):
+            val += muFunction(X[i], X[j]) * muFunction(Y[i], Y[j])
+
+    if muX is None:
+        muX = absDiff(muFunction, X)
+    if muY is None:
+        muY = absDiff(muFunction, Y)
+
+    if muX == 0 or muY == 0:
+        return 0
+
+    val /= (muX * muY)
+    return val
+
+
+def complexityBR(L: list, depth: int, muFunction=mu, tauFunction=tau) -> float:
+    """
+    This is an implementation of the complexity function in the paper 'Quantifying Depth and Complexity of Thinking and Knowledge' by Biswas and Regan
+    """
+    comp = 1
+
+    for d in range(1, depth):
+        ld = [v[d-1] for v in L]
+        ld1 = [v[d] for v in L]
+        comp -= 1/(depth-1) * tauFunction(muFunction, ld, ld1)
+
+    return comp
+
+
+def delta(L: list, i: int, d: int, a: float = 1) -> float:
+    vMax = max([L[j][d-1] for j in range(len(L))])
+    v = L[i][d-1]
+
+    if vMax < 0 and v < 0:
+        return math.log(abs(v)+1) - math.log(abs(vMax)+1)
+    if v < 0:
+        return math.log(abs(v)+1) + math.log(abs(vMax)+1)
+
+    return math.log(vMax+1) - math.log(v+1)
+
+
+def vFunction(a: float, b: float, c: float = 1) -> float:
+    if a == 0 and b == 0:
+        return 1
+    return math.exp((-2 * a * b) / (c * (a + b)))
+
+
+def dampenedSwing(L: list, d: int, e: int) -> float:
+    swing = 0
+    for i in range(len(L)):
+        deltaID = delta(L, i, d)
+        deltaIE = delta(L, i, e)
+        swing += vFunction(deltaID, deltaIE) * abs(deltaID - deltaIE)
+    return swing
+
+
+def aggregateSwing(L: list, maxDepth: int) -> float:
+    swing = 0
+    for d in range(1, maxDepth):
+        swing += dampenedSwing(L, d, maxDepth)
+
+    return swing
+
+
+def weightedSwing(L: list, weights: list, maxDepth: int) -> float:
+    swing = 0
+    for d in range(1, maxDepth):
+        swing += weights[d-1] * dampenedSwing(L, d, d+1)
+
+    return swing
+
+
+def weightedSwingList(L: list, weights: list, maxDepth: int) -> list:
+    """
+    This function returns the weighted swings as a list, to only call this function once
+    """
+    return [weights[d-1] * dampenedSwing(L, d, d+1) for d in range(1, maxDepth)]
+
+
+def psi(L: list, e: int, weights: list, maxDepth: int) -> float:
+    return (weightedSwing(L, weights, e+1) -  (1/2) * weightedSwing(L, weights, maxDepth)) / (weights[e-2] * dampenedSwing(L, e-1, e))
+
+
+def psiWSL(L: list, wSwingList: list, e: int, weights: list) -> float:
+    """
+    Implementation of the psi function with the weighted swing list
+    """
+    return (sum(wSwingList[:e]) - 1/2 * sum(wSwingList)) / (weights[e-2] * dampenedSwing(L, e-1, e))
+
+
+def roh(L: list, weights: list, maxDepth: int) -> float:
+    wSwingList = weightedSwingList(L, weights, maxDepth)
+    # for e in range(maxDepth-2, 0, -1):
+    for e in range(1, maxDepth):
+        # if weightedSwing(L, weights, e+1) >= 1/2 * weightedSwing(L, weights, maxDepth):
+        if sum(wSwingList[:e]) >= 1/2 * sum(wSwingList):
+            finalE = e
+            break
+
+    # return finalE - psi(L, finalE, weights, maxDepth)
+    return finalE - psiWSL(L, wSwingList, finalE, weights)
+
+
+def difficultyBR(board: chess.Board, engine: chess.engine, maxDepth: int):
+    L = list(analyseLegalMoves(board, engine, maxDepth).values())
+    weights = [depth/sum([d for d in range(1, maxDepth)]) for depth in range(1, maxDepth)]
+
+    return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
 
 
 def findTrapMoves(board: chess.Board, engineOptions: tuple, maxDepth: int, minDepth: int = 5, referenceDepth: int = 25) -> list:
@@ -131,7 +271,48 @@ if __name__ == '__main__':
                 ('8/p2rk3/R7/P3p3/5p2/4KP2/8/8 w - - 0 2', 'e3f2')]
     posMoves = [('8/8/8/P1p2pp1/2P2k2/2PK1P2/r3R3/8 b - - 1 1', 'a2a5'),
                 ('8/8/8/P1p2pp1/2P2k2/2PK1P2/r3R3/8 b - - 1 1', 'a2a3')]
-    plotExpectedScoreChangeByDepth(posMoves, sfConfig, 25, filename='../out/trapStalemate.png')
+    # plotExpectedScoreChangeByDepth(posMoves, sfConfig, 25, filename='../out/trapStalemate.png')
+    poisonedPawn = chess.Board('rnb1kb1r/1p3ppp/p2ppn2/6B1/3NPP2/2N5/PqPQ2PP/R3KB1R w KQkq - 0 9')
+    poisonedPawn2 = chess.Board('rnb1kb1r/1p3ppp/p2ppn2/6B1/3NPP2/q1N5/P1PQ2PP/1R2KB1R w Kkq - 2 10')
+    ruyLopez = chess.Board('r1bq1rk1/2ppbppp/p1n2n2/1p2p3/4P3/1B3N2/PPPP1PPP/RNBQR1K1 w - - 2 8')
+    startPos = chess.Board()
+    sf = functions.configureEngine(*sfConfig)
+    # print(analyseLegalMoves(chess.Board(posMoves[0][0]), sf, 15))
+    print(difficultyBR(startPos, sf, 18))
+    sf.configure({'Clear Hash': True})
+    print(difficultyBR(poisonedPawn, sf, 18))
+    sf.configure({'Clear Hash': True})
+    print(difficultyBR(poisonedPawn2, sf, 18))
+    sf.configure({'Clear Hash': True})
+    print(difficultyBR(ruyLopez, sf, 18))
+
+    """
+    testL = [[-10, 0, 30], [30, 20, 10], [10, 10, 10]]
+    testL = [[-10, 30, 10], [0, 20, 10], [30, 10, 10]]
+    for l in testL:
+        print(absDiff(mu, l))
+
+    print(tau(mu, testL[0], testL[1]))
+    print(tau(mu, testL[1], testL[2]))
+
+
+    for i in range(3):
+        for d in range(3):
+            print(delta(testL, i, d+1))
+
+    print(dampenedSwing(testL, 1, 2))
+    print(dampenedSwing(testL, 2, 3))
+
+    weights = [depth/sum([d for d in range(1, 3)]) for depth in range(1, 3)]
+
+    print(weightedSwing(testL, weights, 3))
+    print(weightedSwing(testL, weights, 2))
+
+    print(roh(testL, weights, 3))
+    """
+
+
+    sf.quit()
     """
     for name, fen in openingTraps.items():
         print(name, findTrapMoves(chess.Board(fen), sfConfig, 23))
