@@ -2,6 +2,7 @@ import chess
 import os, sys
 import math
 import scipy.integrate as integrate
+import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
@@ -9,6 +10,8 @@ import pandas as pd
 import polars as pl
 import statistics
 import matplotlib.pyplot as plt
+import pickle
+import time
 
 
 def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -> pd.DataFrame:
@@ -173,40 +176,94 @@ def difficultyBR(board: chess.Board, engine: chess.engine, maxDepth: int):
     return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
 
 
-def getTestData(pgnPath: str, engineConfig: dict, maxDepth: int) -> pl.DataFrame:
+async def analyseLegalMovesAsync(board: chess.Board, maxDepth: int) -> dict:
+    # engine = functions.configureEngine(*engineConfig)
+    transport, engine = await chess.engine.popen_uci('stockfish')
+    await engine.configure({"Threads": 1, "Hash": 1})
+    moves = dict()
+    for move in board.legal_moves:
+        moves[move.uci()] = list()
+        for depth in range(1, maxDepth+1):
+            info = await engine.analyse(board, limit=chess.engine.Limit(depth=depth), root_moves=[move])
+            if board.turn:
+                moves[move.uci()].append(info["score"].white().score(mate_score=1000))
+            else:
+                moves[move.uci()].append(info["score"].black().score(mate_score=1000))
+        
+    await engine.quit()
+
+    return dict(reversed(sorted(moves.items(), key=lambda x: x[1][-1])))
+
+
+async def analysisWorker(workerID: int, queue: asyncio.Queue, results: dict, maxDepth: int):
+    while True:
+        item = await queue.get()
+        print(queue.qsize())
+
+        try:
+            if item is None:
+                return
+
+            posID, fen = item
+            result = await analyseLegalMovesAsync(chess.Board(fen), maxDepth)
+            results[posID] = result
+
+        finally:
+            queue.task_done()
+
+
+async def runMultipleThreads(fens: list, depth: int, nThreads: int) -> list:
+    queue = asyncio.Queue()
+    results = dict()
+
+    for posID, fen in enumerate(fens):
+        queue.put_nowait((posID, fen))
+
+    workers = [asyncio.create_task(analysisWorker(workerID, queue, results, depth)) for workerID in range(nThreads)]
+
+    await queue.join()
+    for _ in range(nThreads):
+        queue.put_nowait(None)
+
+    await asyncio.gather(*workers)
+    return [result for result in sorted(results.items())]
+
+
+def getTestData(pgnPath: str, engineConfig: dict, maxDepth: int, threads: int = 6) -> pl.DataFrame:
     data = dict()
-    keys = ['White', 'Black', 'WhiteElo', 'BlackElo', 'FEN', 'MovePlayed', 'Moves', 'Evaluations']
+    keys = ['White', 'Black', 'WhiteElo', 'BlackElo', 'FEN', 'MovePlayed']
     for key in keys:
         data[key] = list()
 
-    moveNumbers = [20]#, 25, 30]
+    moveNumbers = [20, 25, 30]
+    fens = list()
     with open(pgnPath, 'r') as pgn:
         while game := chess.pgn.read_game(pgn):
             board = game.board()
 
             for move in game.mainline_moves():
                 if board.fullmove_number in moveNumbers:
-                    engine = functions.configureEngine(*engineConfig)
-                    moveEvaluations = analyseLegalMoves(board, engine, maxDepth)
-                        
-                    engine.quit()
+                    fens.append(board.fen())
                     
                     moveData = [game.headers["White"],
                             game.headers["Black"],
                             game.headers["WhiteElo"],
                             game.headers["BlackElo"],
                             board.fen(),
-                            move.uci(),
-                            list(moveEvaluations.keys()),
-                            list(moveEvaluations.values())]
+                            move.uci()]
 
                     for i, key in enumerate(keys):
                         data[key].append(moveData[i])
 
-            
                 board.push(move)
 
-    return pl.DataFrame(data, strict=False)
+    fens = data['FEN']
+    moveEvaluations = asyncio.run(runMultipleThreads(fens, maxDepth, threads))
+
+    data['Moves'] = [list(moves[1].keys()) for moves in sorted(moveEvaluations)]
+    data['Evaluations'] = [list(moves[1].values()) for moves in sorted(moveEvaluations)]
+
+    return pl.DataFrame(data)
 
 
 def findTrapMoves(board: chess.Board, engineOptions: tuple, maxDepth: int, minDepth: int = 5, referenceDepth: int = 25) -> list:
@@ -295,7 +352,6 @@ if __name__ == '__main__':
                     'Englund': 'rnbqk2r/ppp1nppp/3P4/2b5/8/5N2/PPP1PPPP/RNBQKB1R w KQkq - 1 5',
                     'Lasker Trap': 'rnbqk1nr/ppp2ppp/8/4P3/1bP5/4p3/PP1B1PPP/RN1QKBNR w KQkq - 0 6',
                     'Blackburne Shilling Gambit': 'r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4'}
-    sfConfig = ('stockfish', {'Threads': '1', 'Hash': '1'})
     posMoves = [('1Q2R3/5qpk/7p/8/6P1/1p3P2/1P1r2PK/8 b - - 3 2', 'f7f3'),
                 ('1Q2R3/5qpk/7p/8/6P1/1p3P2/1P1r2PK/8 b - - 3 2', 'd2b2'),
                 ('1Q2R3/5qpk/7p/8/6P1/1p3P2/1P1r2PK/8 b - - 3 2', 'h7g6')]
@@ -324,11 +380,33 @@ if __name__ == '__main__':
         sf.quit()
     """
 
-    df = getTestData('../resources/bernstein-capablanca.pgn', sfConfig, 15)
+    sfConfig = ('stockfish', {'Threads': '1', 'Hash': '1'})
+    """"
+    sf = functions.configureEngine(*sfConfig)
+    boards = [startPos, ruyLopez, startPos]
+    start = time.time()
+    moveEvaluations = asyncio.run(runMultipleThreads(boards, sfConfig, 15))
+    print(moveEvaluations)
+    print(time.time()-start)
+    start = time.time()
+    for board in boards:
+        analyseLegalMoves(board, sf, 15)
+        print(time.time()-start)
+    print(time.time()-start)
+    sf.quit()
+    """
 
-    for row in df.iter_rows(named=True):
-        print(len(row['Moves']))
-        print(len(row['Evaluations']))
+
+    df = getTestData('../resources/bundesliga2026R3.pgn', sfConfig, 17, threads=8)
+    # df = getTestData('../resources/Ding-Nepo-G12.pgn', sfConfig, 15)
+
+    with open('../out/complexityDataD17.pkl', 'wb+') as f:
+        pickle.dump(df, f)
+
+    with open('../out/complexityDataD17.pkl', 'rb') as f:
+        df = pickle.load(f)
+
+    print(df)
 
     """
     testL = [[-10, 0, 30], [30, 20, 10], [10, 10, 10]]
