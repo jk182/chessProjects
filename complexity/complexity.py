@@ -3,15 +3,18 @@ import os, sys
 import math
 import scipy.integrate as integrate
 import asyncio
+import ast
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functions
+import plotting_helper
 import pandas as pd
 import polars as pl
 import statistics
 import matplotlib.pyplot as plt
 import pickle
 import time
+from scipy.stats import pearsonr
 
 
 def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -> pd.DataFrame:
@@ -41,6 +44,7 @@ def analyseLegalMoves(board: chess.Board, engine: chess.engine, maxDepth: int) -
     moves = dict()
     for move in board.legal_moves:
         moves[move.uci()] = list()
+        print(move.uci())
         for depth in range(1, maxDepth+1):
             info = engine.analyse(board, limit=chess.engine.Limit(depth=depth), root_moves=[move])
             if board.turn:
@@ -155,6 +159,8 @@ def psiWSL(L: list, wSwingList: list, e: int, weights: list) -> float:
     """
     Implementation of the psi function with the weighted swing list
     """
+    if weights[e-1] * dampenedSwing(L, e, e+1) == 0:
+        return 0
     return (sum(wSwingList[:e]) - 1/2 * sum(wSwingList)) / (weights[e-1] * dampenedSwing(L, e, e+1)) # different indices in the denominator than the paper, but this should be correct
 
 
@@ -169,8 +175,17 @@ def roh(L: list, weights: list, maxDepth: int) -> float:
     return finalE - psiWSL(L, wSwingList, finalE, weights)
 
 
-def difficultyBR(board: chess.Board, engine: chess.engine, maxDepth: int):
+def difficultyBREngine(board: chess.Board, engine: chess.engine, maxDepth: int):
+    """
+    This calculates the difficulty while analysing a position
+    """
     L = list(analyseLegalMoves(board, engine, maxDepth).values())
+    weights = [depth/sum([d for d in range(1, maxDepth)]) for depth in range(1, maxDepth)]
+
+    return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
+
+
+def difficultyBR(L: list, maxDepth: int) -> float:
     weights = [depth/sum([d for d in range(1, maxDepth)]) for depth in range(1, maxDepth)]
 
     return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
@@ -195,17 +210,21 @@ async def analyseLegalMovesAsync(board: chess.Board, maxDepth: int) -> dict:
     return dict(reversed(sorted(moves.items(), key=lambda x: x[1][-1])))
 
 
-async def analysisWorker(workerID: int, queue: asyncio.Queue, results: dict, maxDepth: int):
+async def analysisWorker(workerID: int, queue: asyncio.Queue, results: dict, maxDepth: int, logPath: str = None):
     while True:
         item = await queue.get()
-        print(queue.qsize())
 
         try:
             if item is None:
                 return
 
             posID, fen = item
+            print(queue.qsize(), workerID, fen)
             result = await analyseLegalMovesAsync(chess.Board(fen), maxDepth)
+
+            if logPath:
+                with open(f'{logPath}-{workerID}.log', 'a+') as f:
+                    print(f'{fen};{result}', file=f)
             results[posID] = result
 
         finally:
@@ -219,7 +238,8 @@ async def runMultipleThreads(fens: list, depth: int, nThreads: int) -> list:
     for posID, fen in enumerate(fens):
         queue.put_nowait((posID, fen))
 
-    workers = [asyncio.create_task(analysisWorker(workerID, queue, results, depth)) for workerID in range(nThreads)]
+    logPath = '../out/compAnalysisOlympiadWorker'
+    workers = [asyncio.create_task(analysisWorker(workerID, queue, results, depth, logPath=logPath)) for workerID in range(nThreads)]
 
     await queue.join()
     for _ in range(nThreads):
@@ -257,13 +277,48 @@ def getTestData(pgnPath: str, engineConfig: dict, maxDepth: int, threads: int = 
 
                 board.push(move)
 
-    fens = data['FEN']
-    moveEvaluations = asyncio.run(runMultipleThreads(fens, maxDepth, threads))
+    if threads is not None:
+        fens = data['FEN']
+        moveEvaluations = asyncio.run(runMultipleThreads(fens, maxDepth, threads))
 
-    data['Moves'] = [list(moves[1].keys()) for moves in sorted(moveEvaluations)]
-    data['Evaluations'] = [list(moves[1].values()) for moves in sorted(moveEvaluations)]
+        data['Moves'] = [list(moves[1].keys()) for moves in sorted(moveEvaluations)]
+        data['Evaluations'] = [list(moves[1].values()) for moves in sorted(moveEvaluations)]
 
     return pl.DataFrame(data)
+
+
+def combineData(df: pl.DataFrame, analysisData: dict) -> pl.DataFrame:
+    moves = list()
+    evaluations = list()
+    for row in df.iter_rows(named=True):
+        if row['FEN'] in analysisData:
+            moves.append(list(analysisData[row['FEN']].keys()))
+            evaluations.append(list(analysisData[row['FEN']].values()))
+        else:
+            moves.append(None)
+            evaluations.append(None)
+
+    m = pl.Series('Moves', moves)
+    e = pl.Series('Evaluations', evaluations)
+
+    df.insert_column(df.shape[1], m)
+    df.insert_column(df.shape[1], e)
+
+    return df
+
+
+def calculateDifficultyForDF(df: pl.DataFrame, maxDepth: int) -> pl.DataFrame:
+    difficulties = list()
+    for row in df.iter_rows(named=True):
+        if row['Evaluations'] is not None:
+            difficulties.append(difficultyBR(row['Evaluations'], maxDepth))
+        else:
+            difficulties.append(None)
+
+    diffs = pl.Series('Difficulty', difficulties)
+
+    df.insert_column(df.shape[1], diffs)
+    return df
 
 
 def findTrapMoves(board: chess.Board, engineOptions: tuple, maxDepth: int, minDepth: int = 5, referenceDepth: int = 25) -> list:
@@ -332,6 +387,56 @@ def plotExpectedScoreChangeByDepth(posMoves: list, engineOptions: tuple, maxDept
         plt.show()
 
 
+def analyseDifficulty(df: pl.DataFrame):
+    difficulties = list()
+    cpls = list()
+    bestMoves = list()
+    ratings = list()
+    for row in df.iter_rows(named=True):
+        if row['Difficulty'] is not None:
+            difficulties.append(row['Difficulty'])
+            moveIndex = row['Moves'].index(row['MovePlayed'])
+            bestEval = row['Evaluations'][0][-1]
+            moveEval = row['Evaluations'][moveIndex][-1]
+            sideToMove = row['FEN'].split()[1]
+            if sideToMove == 'w':
+                ratings.append(int(row['WhiteElo']))
+            elif sideToMove == 'b':
+                ratings.append(int(row['BlackElo']))
+            if moveIndex == 0:
+                bestMoves.append(True)
+            else:
+                bestMoves.append(False)
+            cpls.append(functions.expectedScore(bestEval)-functions.expectedScore(moveEval))
+    
+    print(pearsonr(difficulties, cpls))
+    diffData = dict()
+    for i in range(15):
+        diffData[i/2+0.5] = [0, 0, 0]
+
+    for i, diff in enumerate(difficulties):
+        if ratings[i] < 2400:
+            continue
+        index = 7.5
+        for j in diffData.keys():
+            if diff < j:
+                index = j
+                break
+
+        diffData[index][1] += cpls[i]
+        diffData[index][2] += 1
+        if bestMoves[i]:
+            diffData[index][0] += 1
+
+    plotData = list()
+    for k, v in diffData.items():
+        print(k, v[0]/max(1, v[2]), v[1]/max(1, v[2]), v[2])
+        plotData.append([v[1]/max(1, v[2])])
+
+    # plotting_helper.plotScatterPlot([difficulties], [cpls], 'Difficulty', 'Expected score loss', 'Difficulty vs XS loss')
+    plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty', filename='../out/difficulty.png')
+
+
 if __name__ == '__main__':
     """
     openings = {'Starting position': 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 
@@ -366,12 +471,14 @@ if __name__ == '__main__':
     posMoves = [('8/8/8/P1p2pp1/2P2k2/2PK1P2/r3R3/8 b - - 1 1', 'a2a5'),
                 ('8/8/8/P1p2pp1/2P2k2/2PK1P2/r3R3/8 b - - 1 1', 'a2a3')]
     # plotExpectedScoreChangeByDepth(posMoves, sfConfig, 25, filename='../out/trapStalemate.png')
+    """
     poisonedPawn = chess.Board('rnb1kb1r/1p3ppp/p2ppn2/6B1/3NPP2/2N5/PqPQ2PP/R3KB1R w KQkq - 0 9')
     poisonedPawn2 = chess.Board('rnb1kb1r/1p3ppp/p2ppn2/6B1/3NPP2/q1N5/P1PQ2PP/1R2KB1R w Kkq - 2 10')
     ruyLopez = chess.Board('r1bq1rk1/2ppbppp/p1n2n2/1p2p3/4P3/1B3N2/PPPP1PPP/RNBQR1K1 w - - 2 8')
     startPos = chess.Board()
     e4e5 = chess.Board('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2')
     e4e5Black = chess.Board('rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2')
+    """
     # for position in [startPos, poisonedPawn, poisonedPawn2, ruyLopez]:
     """
     for position in [e4e5, e4e5Black]:
@@ -381,8 +488,7 @@ if __name__ == '__main__':
     """
 
     sfConfig = ('stockfish', {'Threads': '1', 'Hash': '1'})
-    """"
-    sf = functions.configureEngine(*sfConfig)
+    """
     boards = [startPos, ruyLopez, startPos]
     start = time.time()
     moveEvaluations = asyncio.run(runMultipleThreads(boards, sfConfig, 15))
@@ -396,17 +502,74 @@ if __name__ == '__main__':
     sf.quit()
     """
 
+    # sf = functions.configureEngine(*sfConfig)
+    # This position doesn't work for the move e2e4
+    # print(analyseLegalMoves(chess.Board('1r2k1r1/pq3p1p/4pB2/3pP2R/Rn4P1/8/4QP2/4K3 w - - 0 30'), sf, 19))
 
-    df = getTestData('../resources/bundesliga2026R3.pgn', sfConfig, 17, threads=8)
+    # df = getTestData('../resources/bundesliga2026R1-2.pgn', sfConfig, 19, threads=8)
     # df = getTestData('../resources/Ding-Nepo-G12.pgn', sfConfig, 15)
 
-    with open('../out/complexityDataD17.pkl', 'wb+') as f:
+    """
+    start = time.time()
+    print(difficultyBREngine(chess.Board('2r2r1k/2q1pp2/3p3p/p2BPb1P/1p3Q2/8/PPP3P1/1K1R3R b - - 2 23'), sf, 18))
+    print(time.time()-start)
+    start = time.time()
+    print(difficultyBREngine(chess.Board('2r2r1k/4pp2/3p3p/p2BPb1P/1p3Q2/8/PPq3P1/1K1R3R w - - 0 24'), sf, 18))
+    print(time.time()-start)
+    start = time.time()
+    print(difficultyBREngine(chess.Board('2r2r1k/4pp2/3p3p/p2BPb1P/1p3Q2/8/PPq3P1/K2R3R b - - 1 24'), sf, 18))
+    print(time.time()-start)
+    """
+
+    """
+    with open('../out/complexityDataD19.pkl', 'wb+') as f:
         pickle.dump(df, f)
 
-    with open('../out/complexityDataD17.pkl', 'rb') as f:
+    with open('../out/complexityDataD19.pkl', 'rb') as f:
+        df = pickle.load(f)
+    """
+
+    # print(df)
+    # sf.quit()
+
+    """
+    analysisData = dict()
+    for i in range(7):
+        with open(f'../out/compAnalysisWorker-{i}.log', 'r') as f:
+            for line in f.readlines():
+                fen = line.split(';')[0]
+                moveData = ast.literal_eval(line.split(';')[1])
+                analysisData[fen] = moveData
+    """
+    pgn = '../resources/olympiad2026-R11.pgn'
+    df = getTestData(pgn, sfConfig, 19, threads=8)
+    # df = getTestData(pgn, sfConfig, 19, threads=None)
+    # df = combineData(df, analysisData)
+    # df = calculateDifficultyForDF(df, 19)
+    with open('../out/complexityOlympiadD19Analysed.pkl', 'wb+') as f:
+        pickle.dump(df, f)
+
+    with open('../out/complexityOlympiadD19Analysed.pkl', 'rb') as f:
+        df = pickle.load(f)
+
+    """
+    with open('../out/complexityDataD19Analysed-3.pkl', 'rb') as f:
+        df = pickle.load(f)
+    print(df)
+    df = df.drop('Difficulty')
+    df = calculateDifficultyForDF(df, 19)
+    print(df)
+    with open('../out/complexityDataD19Analysed-3.pkl', 'wb+') as f:
+        pickle.dump(df, f)
+    """
+
+    """
+    with open('../out/complexityDataD19Analysed-3.pkl', 'rb') as f:
         df = pickle.load(f)
 
     print(df)
+    analyseDifficulty(df)
+    """
 
     """
     testL = [[-10, 0, 30], [30, 20, 10], [10, 10, 10]]
