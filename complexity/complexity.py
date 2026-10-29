@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import pickle
 import time
 from scipy.stats import pearsonr
+import re
 
 
 def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -> pd.DataFrame:
@@ -191,6 +192,19 @@ def difficultyBR(L: list, maxDepth: int) -> float:
     return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
 
 
+def calculateEase(evaluations: list, policies: list, expectedScoreFunction = functions.expectedScore, alpha: float = 0.333, beta: float = 1.5) -> float:
+    """
+    This calculates the ease value of a position.
+    Note that all moves need to be in the same order
+    """
+    total = 0
+    xsMax = max([expectedScoreFunction(e) for e in evaluations])
+    for i in range(len(policies)):
+        total += (policies[i]/100)**beta * (xsMax - expectedScoreFunction(evaluations[i]))
+
+    return (total/100)**alpha
+
+
 async def analyseLegalMovesAsync(board: chess.Board, maxDepth: int) -> dict:
     # engine = functions.configureEngine(*engineConfig)
     transport, engine = await chess.engine.popen_uci('stockfish')
@@ -249,13 +263,13 @@ async def runMultipleThreads(fens: list, depth: int, nThreads: int) -> list:
     return [result for result in sorted(results.items())]
 
 
-def getTestData(pgnPath: str, engineConfig: dict, maxDepth: int, threads: int = 6) -> pl.DataFrame:
+def getTestData(pgnPath: str, engineConfig: dict, maxDepth: int, threads: int = 6, moveNumbers: list = [15, 20, 25, 30, 35, 40]) -> pl.DataFrame:
     data = dict()
     keys = ['White', 'Black', 'WhiteElo', 'BlackElo', 'FEN', 'MovePlayed']
     for key in keys:
         data[key] = list()
 
-    moveNumbers = [20, 25, 30]
+    # moveNumbers = [15, 20, 25, 30, 35, 40]
     fens = list()
     with open(pgnPath, 'r') as pgn:
         while game := chess.pgn.read_game(pgn):
@@ -307,17 +321,78 @@ def combineData(df: pl.DataFrame, analysisData: dict) -> pl.DataFrame:
     return df
 
 
+def lc0Analysis(df: pl.DataFrame, lc0Config: tuple, nodes: int) -> pl.DataFrame:
+    wdls = list()
+    policies = list()
+    lc0 = functions.configureEngine(*lc0Config)
+    for row in df.iter_rows(named=True):
+        phead = dict()
+        board = chess.Board(row['FEN'])
+        print(board.fen())
+        info = lc0.analysis(board, chess.engine.Limit(nodes=nodes))
+        for i in info:
+            if 'wdl' in i.keys():
+                wdl = [i['wdl'].white().wins, i['wdl'].white().draws, i['wdl'].white().losses]
+            elif 'string' in i.keys():
+                l = list(i.values())[0]
+                move = l.split()[0]
+                if move == 'node':
+                    continue
+                pString = re.findall(r'P: *\d*\.\d*%', list(i.values())[0])
+                p = float(pString[0].split(' ')[-1][:-1])
+                phead[move] = p
+
+        wdls.append(wdl)
+        if row['Moves'] is None:
+            policies.append(None)
+        else:
+            pheads = list()
+            for m in row['Moves']:
+                if m in phead.keys():
+                    pheads.append(phead[m])
+                # Handling different castling notation for policy heads
+                elif m == 'e1g1':
+                    pheads.append(phead['e1h1'])
+                elif m == 'e1c1':
+                    pheads.append(phead['e1a1'])
+                elif m == 'e8g8':
+                    pheads.append(phead['e8h8'])
+                elif m == 'e8c8':
+                    pheads.append(phead['e8a8'])
+            policies.append(pheads)
+
+    lc0.quit()
+
+    w = pl.Series('WDL', wdls)
+    p = pl.Series('PHead', policies)
+    df.insert_column(df.shape[1], w)
+    df.insert_column(df.shape[1], p)
+
+    return df
+
+
+
 def calculateDifficultyForDF(df: pl.DataFrame, maxDepth: int) -> pl.DataFrame:
     difficulties = list()
+    eases = list()
+    sharpnesses = list()
     for row in df.iter_rows(named=True):
+        sharpnesses.append(functions.sharpnessLC0(row['WDL']))
         if row['Evaluations'] is not None:
             difficulties.append(difficultyBR(row['Evaluations'], maxDepth))
+            eases.append(calculateEase([e[-1] for e in row['Evaluations']], row['PHead']))
         else:
             difficulties.append(None)
+            eases.append(None)
 
-    diffs = pl.Series('Difficulty', difficulties)
+    diffs = pl.Series('DifficultyBR', difficulties)
+    e = pl.Series('Ease', eases)
+    s = pl.Series('Sharpness', sharpnesses)
 
     df.insert_column(df.shape[1], diffs)
+    df.insert_column(df.shape[1], e)
+    df.insert_column(df.shape[1], s)
+
     return df
 
 
@@ -389,12 +464,16 @@ def plotExpectedScoreChangeByDepth(posMoves: list, engineOptions: tuple, maxDept
 
 def analyseDifficulty(df: pl.DataFrame):
     difficulties = list()
+    eases = list()
+    sharpnesses = list()
     cpls = list()
     bestMoves = list()
     ratings = list()
     for row in df.iter_rows(named=True):
-        if row['Difficulty'] is not None:
-            difficulties.append(row['Difficulty'])
+        if row['DifficultyBR'] is not None:
+            difficulties.append(row['DifficultyBR'])
+            eases.append(row['Ease'])
+            sharpnesses.append(row['Sharpness'])
             moveIndex = row['Moves'].index(row['MovePlayed'])
             bestEval = row['Evaluations'][0][-1]
             moveEval = row['Evaluations'][moveIndex][-1]
@@ -410,6 +489,8 @@ def analyseDifficulty(df: pl.DataFrame):
             cpls.append(functions.expectedScore(bestEval)-functions.expectedScore(moveEval))
     
     print(pearsonr(difficulties, cpls))
+    print(pearsonr(eases, cpls))
+    print(pearsonr(sharpnesses, cpls))
     diffData = dict()
     for i in range(15):
         diffData[i/2+0.5] = [0, 0, 0]
@@ -434,7 +515,7 @@ def analyseDifficulty(df: pl.DataFrame):
         plotData.append([v[1]/max(1, v[2])])
 
     # plotting_helper.plotScatterPlot([difficulties], [cpls], 'Difficulty', 'Expected score loss', 'Difficulty vs XS loss')
-    plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty', filename='../out/difficulty.png')
+    plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty')
 
 
 if __name__ == '__main__':
@@ -532,25 +613,84 @@ if __name__ == '__main__':
     # print(df)
     # sf.quit()
 
+    lc0Config = ('lc0', {'WeightsFile': '/home/julian/Desktop/weights2026.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+
+    outFile = '../out/complexityOlympiadD19Analysed-R6-11.pkl'
+    # Combining all analysis data
+    """
+    df = None
+    for pgn in ['../resources/olympiad2026-R6.pgn', '../resources/olympiad2026-R7-8.pgn', '../resources/olympiad2026-R9-10.pgn', '../resources/olympiad2026-R11.pgn']:
+        if df is None:
+            df = getTestData(pgn, sfConfig, 19, threads=None)
+        else:
+            if pgn.split('-')[1][:3] == 'R11':
+                df1 = getTestData(pgn, sfConfig, 19, threads=None, moveNumbers=[15, 35, 40])
+            else:
+                df1 = getTestData(pgn, sfConfig, 19, threads=None)
+            df = pl.concat([df, df1])
+
+    print(df)
+    with open(outFile, 'wb+') as f:
+        pickle.dump(df, f)
+    """
+
+    with open(outFile, 'rb') as f:
+        df = pickle.load(f)
+
+    
+    # Combining analysed data from the logs with the DF
     """
     analysisData = dict()
-    for i in range(7):
-        with open(f'../out/compAnalysisWorker-{i}.log', 'r') as f:
+    for i in range(10):
+        with open(f'../out/compAnalysisOlympiadWorker-{i}.log', 'r') as f:
             for line in f.readlines():
                 fen = line.split(';')[0]
                 moveData = ast.literal_eval(line.split(';')[1])
                 analysisData[fen] = moveData
-    """
-    pgn = '../resources/olympiad2026-R11.pgn'
-    df = getTestData(pgn, sfConfig, 19, threads=8)
+
+    # pgn = '../resources/olympiad2026-R6.pgn'
+    # df = getTestData(pgn, sfConfig, 19, threads=10)
     # df = getTestData(pgn, sfConfig, 19, threads=None)
-    # df = combineData(df, analysisData)
+    df = combineData(df, analysisData)
     # df = calculateDifficultyForDF(df, 19)
-    with open('../out/complexityOlympiadD19Analysed.pkl', 'wb+') as f:
+    with open(outFile, 'wb+') as f:
         pickle.dump(df, f)
 
-    with open('../out/complexityOlympiadD19Analysed.pkl', 'rb') as f:
+    with open(outFile, 'rb') as f:
         df = pickle.load(f)
+
+    print(df)
+
+    # Adding information deleted from the Logs
+    with open('../out/complexityOlympiadD19Analysed.pkl', 'rb') as f:
+        df = pl.concat([df, pickle.load(f)])
+
+    print(df)
+
+    with open(outFile, 'wb+') as f:
+        pickle.dump(df, f)
+
+    """
+
+    outFile2 =  '../out/complexityOlympiadD19Analysed-R6-11-diff.pkl'
+    """
+    df = calculateDifficultyForDF(df, 19)
+
+    with open(outFile2, 'wb+') as f:
+        pickle.dump(df, f)
+    """
+
+    with open(outFile2, 'rb') as f:
+        df = pickle.load(f)
+
+    analyseDifficulty(df)
+
+    """
+    df = lc0Analysis(df, lc0Config, 10000)
+    print(df)
+    with open(outFile, 'wb+') as f:
+        pickle.dump(df, f)
+    """
 
     """
     with open('../out/complexityDataD19Analysed-3.pkl', 'rb') as f:
@@ -568,7 +708,6 @@ if __name__ == '__main__':
         df = pickle.load(f)
 
     print(df)
-    analyseDifficulty(df)
     """
 
     """
