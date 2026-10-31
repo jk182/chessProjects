@@ -473,7 +473,7 @@ def analyseDifficulty(df: pl.DataFrame):
         if row['DifficultyBR'] is not None:
             difficulties.append(row['DifficultyBR'])
             eases.append(row['Ease'])
-            sharpnesses.append(row['Sharpness'])
+            sharpnesses.append(row['Sharpness']/max(row['WDL'][0], row['WDL'][2]))
             moveIndex = row['Moves'].index(row['MovePlayed'])
             bestEval = row['Evaluations'][0][-1]
             moveEval = row['Evaluations'][moveIndex][-1]
@@ -487,6 +487,7 @@ def analyseDifficulty(df: pl.DataFrame):
             else:
                 bestMoves.append(False)
             cpls.append(functions.expectedScore(bestEval)-functions.expectedScore(moveEval))
+            print(row['WDL'], row['Sharpness'])
     
     print(pearsonr(difficulties, cpls))
     print(pearsonr(eases, cpls))
@@ -515,7 +516,7 @@ def analyseDifficulty(df: pl.DataFrame):
         plotData.append([v[1]/max(1, v[2])])
 
     # plotting_helper.plotScatterPlot([difficulties], [cpls], 'Difficulty', 'Expected score loss', 'Difficulty vs XS loss')
-    plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty')
+    # plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty')
 
 
 if __name__ == '__main__':
