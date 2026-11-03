@@ -41,19 +41,44 @@ def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -
     return df
 
 
-def analyseLegalMoves(board: chess.Board, engine: chess.engine, maxDepth: int) -> dict:
+def analyseLegalMoves(board: chess.Board, engine: chess.engine, maxDepth: int, allDepths: bool = True) -> dict:
+    """
+    This function analyses all legal moves in a given chess position.
+    The score is for the current POV
+    board: chess.Board
+        The position to analyse
+    engine: chess.engine
+        The engine to analyse the positions with (usually SF)
+    maxDepth: int
+        The maximum depth for the engine analysis
+    allDepths: bool
+        If this is set, the moves will be analysed for all depths less than or equal to maxDepth
+        Otherwise, the moves will be analysed at maxDepth
+    return -> dict
+        Dictionary indexed my moves with the evaluations as lists if allDepths is true or just as numbers.
+        The dict is sorted from highest to lowest evaluation
+    """
     moves = dict()
     for move in board.legal_moves:
-        moves[move.uci()] = list()
         print(move.uci())
-        for depth in range(1, maxDepth+1):
-            info = engine.analyse(board, limit=chess.engine.Limit(depth=depth), root_moves=[move])
+        if allDepths:
+            moves[move.uci()] = list()
+            for depth in range(1, maxDepth+1):
+                info = engine.analyse(board, limit=chess.engine.Limit(depth=depth), root_moves=[move])
+                if board.turn:
+                    moves[move.uci()].append(info["score"].white().score(mate_score=1000))
+                else:
+                    moves[move.uci()].append(info["score"].black().score(mate_score=1000))
+        else:
+            info = engine.analyse(board, limit=chess.engine.Limit(depth=maxDepth), root_moves=[move])
             if board.turn:
-                moves[move.uci()].append(info["score"].white().score(mate_score=1000))
+                moves[move.uci()] = info["score"].white().score(mate_score=1000)
             else:
-                moves[move.uci()].append(info["score"].black().score(mate_score=1000))
+                moves[move.uci()] = info["score"].black().score(mate_score=1000)
         
-    return dict(reversed(sorted(moves.items(), key=lambda x: x[1][-1])))
+    if allDepths:
+        return dict(reversed(sorted(moves.items(), key=lambda x: x[1][-1])))
+    return dict(reversed(sorted(moves.items(), key=lambda x: x[1])))
 
 
 def mu(x: int, y: int) -> float:
@@ -192,10 +217,30 @@ def difficultyBR(L: list, maxDepth: int) -> float:
     return complexityBR(L, maxDepth) * roh(L, weights, maxDepth)
 
 
+def calculateEaseFromFEN(fen: str, engineEvals: chess.engine, enginePolicies: chess.engine, depth: int, expectedScoreFunction=functions.expectedScore, alpha: float = 0.333, beta: float = 1.5) -> float:
+    """
+    This calculates the ease metric from FEN
+    fen: str
+        The FEN of the position to analyse
+    engineEvals: chess.engine
+        The engine to get the move evaluations (usually SF)
+    enginePolicies: chess.engine
+        The engine to get the move policies (usually LC0 or Maia)
+    depth: int
+        The depth for the evaluation engine
+    """
+    evaluationDict = analyseLegalMoves(chess.Board(fen), engineEvals, depth, allDepths=False)
+    wdl, p = lc0Analysis(fen, enginePolicies, 1)
+    evaluations = list(evaluationDict.values())
+    policies = [p[move] for move in evaluationDict.keys()]
+
+    return calculateEase(evaluations, policies, expectedScoreFunction, alpha, beta)
+
+
 def calculateEase(evaluations: list, policies: list, expectedScoreFunction = functions.expectedScore, alpha: float = 0.333, beta: float = 1.5) -> float:
     """
     This calculates the ease value of a position.
-    Note that all moves need to be in the same order
+    Note that evaluations and policies need to be ordered by moves
     """
     total = 0
     xsMax = max([expectedScoreFunction(e) for e in evaluations])
@@ -203,6 +248,11 @@ def calculateEase(evaluations: list, policies: list, expectedScoreFunction = fun
         total += (policies[i]/100)**beta * (xsMax - expectedScoreFunction(evaluations[i]))
 
     return (total/100)**alpha
+
+
+def calculateSharpness(fen: str, engine: chess.engine, nodes: int) -> float:
+    wdl, policies = lc0Analysis(fen, engine, nodes)
+    return functions.sharpnessLC0(wdl)
 
 
 async def analyseLegalMovesAsync(board: chess.Board, maxDepth: int) -> dict:
@@ -321,27 +371,44 @@ def combineData(df: pl.DataFrame, analysisData: dict) -> pl.DataFrame:
     return df
 
 
-def lc0Analysis(df: pl.DataFrame, lc0Config: tuple, nodes: int) -> pl.DataFrame:
+def lc0Analysis(fen: str, lc0: chess.engine, nodes: int) -> tuple:
+    """
+    This function analyses a position using LC0
+    return -> tuple
+        (wdl: list, phead: dict)
+    """
+    board = chess.Board(fen)
+    phead = dict()
+    info = lc0.analysis(board, chess.engine.Limit(nodes=nodes))
+    for i in info:
+        if 'wdl' in i.keys():
+            wdl = [i['wdl'].white().wins, i['wdl'].white().draws, i['wdl'].white().losses]
+        elif 'string' in i.keys():
+            l = list(i.values())[0]
+            move = l.split()[0]
+            if move == 'node':
+                continue
+            if board.castling_rights & chess.BB_A1 and move == 'e1a1':
+                move = 'e1c1'
+            elif board.castling_rights & chess.BB_H1 and move == 'e1h1':
+                move = 'e1g1'
+            elif board.castling_rights & chess.BB_A8 and move == 'e8a8':
+                move = 'e8c8'
+            elif board.castling_rights & chess.BB_H8 and move == 'e8h8':
+                move = 'e8g8'
+            pString = re.findall(r'P: *\d*\.\d*%', list(i.values())[0])
+            p = float(pString[0].split(' ')[-1][:-1])
+            phead[move] = p
+
+    return (wdl, phead)
+
+
+def lc0AnalysisDF(df: pl.DataFrame, lc0Config: tuple, nodes: int) -> pl.DataFrame:
     wdls = list()
     policies = list()
     lc0 = functions.configureEngine(*lc0Config)
     for row in df.iter_rows(named=True):
-        phead = dict()
-        board = chess.Board(row['FEN'])
-        print(board.fen())
-        info = lc0.analysis(board, chess.engine.Limit(nodes=nodes))
-        for i in info:
-            if 'wdl' in i.keys():
-                wdl = [i['wdl'].white().wins, i['wdl'].white().draws, i['wdl'].white().losses]
-            elif 'string' in i.keys():
-                l = list(i.values())[0]
-                move = l.split()[0]
-                if move == 'node':
-                    continue
-                pString = re.findall(r'P: *\d*\.\d*%', list(i.values())[0])
-                p = float(pString[0].split(' ')[-1][:-1])
-                phead[move] = p
-
+        wdl, phead = lc0Analysis(row['FEN'], lc0, nodes)
         wdls.append(wdl)
         if row['Moves'] is None:
             policies.append(None)
@@ -350,15 +417,9 @@ def lc0Analysis(df: pl.DataFrame, lc0Config: tuple, nodes: int) -> pl.DataFrame:
             for m in row['Moves']:
                 if m in phead.keys():
                     pheads.append(phead[m])
-                # Handling different castling notation for policy heads
-                elif m == 'e1g1':
-                    pheads.append(phead['e1h1'])
-                elif m == 'e1c1':
-                    pheads.append(phead['e1a1'])
-                elif m == 'e8g8':
-                    pheads.append(phead['e8h8'])
-                elif m == 'e8c8':
-                    pheads.append(phead['e8a8'])
+                else:
+                    print(f'Move not found: {m}')
+
             policies.append(pheads)
 
     lc0.quit()
@@ -369,7 +430,6 @@ def lc0Analysis(df: pl.DataFrame, lc0Config: tuple, nodes: int) -> pl.DataFrame:
     df.insert_column(df.shape[1], p)
 
     return df
-
 
 
 def calculateDifficultyForDF(df: pl.DataFrame, maxDepth: int) -> pl.DataFrame:
@@ -524,6 +584,12 @@ def analyseDifficulty(df: pl.DataFrame):
     # plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty')
 
 
+def testComplexityFunctions(compFunctions: list):
+    startPos = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    for compFunc in compFunctions:
+        print(f'Complexity of start position: {compFunc(startPos)}')
+
+
 if __name__ == '__main__':
     """
     openings = {'Starting position': 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 
@@ -595,6 +661,15 @@ if __name__ == '__main__':
     # sf.quit()
 
     lc0Config = ('lc0', {'WeightsFile': '/home/julian/Desktop/weights2026.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    lc0Config = ('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+
+    sf = functions.configureEngine(*sfConfig)
+    lc0 = functions.configureEngine(*lc0Config)
+    complexityFunctions = [lambda fen: difficultyBREngine(chess.Board(fen), sf, 19), lambda fen: calculateEaseFromFEN(fen, sf, lc0, 19), lambda fen: calculateSharpness(fen, lc0, 10000)]
+    testComplexityFunctions(complexityFunctions)
+
+    sf.quit()
+    lc0.quit()
 
     outFile = '../out/complexityOlympiadD19Analysed-R6-11.pkl'
     outFile = '../out/complexityOlympiadD19Analysed-R5.pkl'
@@ -630,7 +705,6 @@ if __name__ == '__main__':
                 moveData = ast.literal_eval(line.split(';')[1])
                 analysisData[fen] = moveData
 
-    """
     pgn = '../resources/olympiad2026-R6.pgn'
     df = getTestData(pgn, sfConfig, 19, threads=10)
     # df = getTestData(pgn, sfConfig, 19, threads=None)
@@ -645,6 +719,7 @@ if __name__ == '__main__':
     print(df)
     """
 
+    """
     # Adding information deleted from the Logs
     with open('../out/complexityOlympiadD19Analysed.pkl', 'rb') as f:
         df = pl.concat([df, pickle.load(f)])
@@ -672,7 +747,7 @@ if __name__ == '__main__':
     """
 
     """
-    df = lc0Analysis(df, lc0Config, 10000)
+    df = lc0AnalysisDF(df, lc0Config, 10000)
     print(df)
     with open(outFile, 'wb+') as f:
         pickle.dump(df, f)
