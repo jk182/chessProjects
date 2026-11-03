@@ -471,9 +471,10 @@ def analyseDifficulty(df: pl.DataFrame):
     ratings = list()
     for row in df.iter_rows(named=True):
         if row['DifficultyBR'] is not None:
-            difficulties.append(row['DifficultyBR'])
+            difficulties.append(row['DifficultyBR']/10)
             eases.append(row['Ease'])
-            sharpnesses.append(row['Sharpness']/max(row['WDL'][0], row['WDL'][2]))
+            # sharpnesses.append(row['Sharpness']/max(row['WDL'][0], row['WDL'][2]))
+            sharpnesses.append(min(row['Sharpness'], 5)/5)
             moveIndex = row['Moves'].index(row['MovePlayed'])
             bestEval = row['Evaluations'][0][-1]
             moveEval = row['Evaluations'][moveIndex][-1]
@@ -487,11 +488,15 @@ def analyseDifficulty(df: pl.DataFrame):
             else:
                 bestMoves.append(False)
             cpls.append(functions.expectedScore(bestEval)-functions.expectedScore(moveEval))
-            print(row['WDL'], row['Sharpness'])
+
+    indices = [i for i in range(len(cpls)) if cpls[i] != 0 and ratings[i] >= 2500]
+    print(len(indices))
+    for values in [difficulties, eases, sharpnesses]:
+        print(pearsonr([values[i] for i in indices], [cpls[i] for i in indices]))
+
+    # plotting_helper.plotScatterPlot([cpls]*3, [difficulties, eases, sharpnesses], 'Expected score loss', 'Difficulty', 'Difficulty vs XS loss', legend=['Difficulty', 'Ease', 'Sharpness'], alpha=0.5)
+    plotting_helper.plotScatterPlot([[cpls[i] for i in indices]]*3, [[difficulties[i] for i in indices], [eases[i] for i in indices], [sharpnesses[i] for i in indices]], 'Expected score loss', 'Difficulty', 'Difficulty vs XS loss', legend=['Difficulty', 'Ease', 'Sharpness'], alpha=0.5)
     
-    print(pearsonr(difficulties, cpls))
-    print(pearsonr(eases, cpls))
-    print(pearsonr(sharpnesses, cpls))
     diffData = dict()
     for i in range(15):
         diffData[i/2+0.5] = [0, 0, 0]
@@ -570,19 +575,6 @@ if __name__ == '__main__':
     """
 
     sfConfig = ('stockfish', {'Threads': '1', 'Hash': '1'})
-    """
-    boards = [startPos, ruyLopez, startPos]
-    start = time.time()
-    moveEvaluations = asyncio.run(runMultipleThreads(boards, sfConfig, 15))
-    print(moveEvaluations)
-    print(time.time()-start)
-    start = time.time()
-    for board in boards:
-        analyseLegalMoves(board, sf, 15)
-        print(time.time()-start)
-    print(time.time()-start)
-    sf.quit()
-    """
 
     # sf = functions.configureEngine(*sfConfig)
     # This position doesn't work for the move e2e4
@@ -590,18 +582,6 @@ if __name__ == '__main__':
 
     # df = getTestData('../resources/bundesliga2026R1-2.pgn', sfConfig, 19, threads=8)
     # df = getTestData('../resources/Ding-Nepo-G12.pgn', sfConfig, 15)
-
-    """
-    start = time.time()
-    print(difficultyBREngine(chess.Board('2r2r1k/2q1pp2/3p3p/p2BPb1P/1p3Q2/8/PPP3P1/1K1R3R b - - 2 23'), sf, 18))
-    print(time.time()-start)
-    start = time.time()
-    print(difficultyBREngine(chess.Board('2r2r1k/4pp2/3p3p/p2BPb1P/1p3Q2/8/PPq3P1/1K1R3R w - - 0 24'), sf, 18))
-    print(time.time()-start)
-    start = time.time()
-    print(difficultyBREngine(chess.Board('2r2r1k/4pp2/3p3p/p2BPb1P/1p3Q2/8/PPq3P1/K2R3R b - - 1 24'), sf, 18))
-    print(time.time()-start)
-    """
 
     """
     with open('../out/complexityDataD19.pkl', 'wb+') as f:
@@ -617,6 +597,7 @@ if __name__ == '__main__':
     lc0Config = ('lc0', {'WeightsFile': '/home/julian/Desktop/weights2026.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
 
     outFile = '../out/complexityOlympiadD19Analysed-R6-11.pkl'
+    outFile = '../out/complexityOlympiadD19Analysed-R5.pkl'
     # Combining all analysis data
     """
     df = None
@@ -633,10 +614,10 @@ if __name__ == '__main__':
     print(df)
     with open(outFile, 'wb+') as f:
         pickle.dump(df, f)
-    """
 
     with open(outFile, 'rb') as f:
         df = pickle.load(f)
+    """
 
     
     # Combining analysed data from the logs with the DF
@@ -649,8 +630,9 @@ if __name__ == '__main__':
                 moveData = ast.literal_eval(line.split(';')[1])
                 analysisData[fen] = moveData
 
-    # pgn = '../resources/olympiad2026-R6.pgn'
-    # df = getTestData(pgn, sfConfig, 19, threads=10)
+    """
+    pgn = '../resources/olympiad2026-R6.pgn'
+    df = getTestData(pgn, sfConfig, 19, threads=10)
     # df = getTestData(pgn, sfConfig, 19, threads=None)
     df = combineData(df, analysisData)
     # df = calculateDifficultyForDF(df, 19)
@@ -661,6 +643,7 @@ if __name__ == '__main__':
         df = pickle.load(f)
 
     print(df)
+    """
 
     # Adding information deleted from the Logs
     with open('../out/complexityOlympiadD19Analysed.pkl', 'rb') as f:
@@ -681,10 +664,12 @@ if __name__ == '__main__':
         pickle.dump(df, f)
     """
 
+    """
     with open(outFile2, 'rb') as f:
         df = pickle.load(f)
 
     analyseDifficulty(df)
+    """
 
     """
     df = lc0Analysis(df, lc0Config, 10000)
@@ -709,45 +694,4 @@ if __name__ == '__main__':
         df = pickle.load(f)
 
     print(df)
-    """
-
-    """
-    testL = [[-10, 0, 30], [30, 20, 10], [10, 10, 10]]
-    testL = [[-10, 30, 10], [0, 20, 10], [30, 10, 10]]
-    for l in testL:
-        print(absDiff(mu, l))
-
-    print(tau(mu, testL[0], testL[1]))
-    print(tau(mu, testL[1], testL[2]))
-
-
-    for i in range(3):
-        for d in range(3):
-            print(delta(testL, i, d+1))
-
-    print(dampenedSwing(testL, 1, 2))
-    print(dampenedSwing(testL, 2, 3))
-
-    weights = [depth/sum([d for d in range(1, 3)]) for depth in range(1, 3)]
-
-    print(weightedSwing(testL, weights, 3))
-    print(weightedSwing(testL, weights, 2))
-
-    print(roh(testL, weights, 3))
-    """
-
-
-    """
-    for name, fen in openingTraps.items():
-        print(name, findTrapMoves(chess.Board(fen), sfConfig, 23))
-    """
-    """
-    for name, fen in traps.items():
-        sf = functions.configureEngine('stockfish', {'Threads': '1', 'Hash': '1'})
-        board = chess.Board(fen)
-        df = getEngineAnalysis(board, sf, 25)
-        comp = calculateComplexity(df)
-        print(name, comp)
-        print(df)
-        sf.quit()
     """
