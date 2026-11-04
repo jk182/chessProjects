@@ -663,6 +663,7 @@ if __name__ == '__main__':
     lc0Config = ('lc0', {'WeightsFile': '/home/julian/Desktop/weights2026.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
     lc0Config = ('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
 
+    """
     sf = functions.configureEngine(*sfConfig)
     lc0 = functions.configureEngine(*lc0Config)
     complexityFunctions = [lambda fen: difficultyBREngine(chess.Board(fen), sf, 19), lambda fen: calculateEaseFromFEN(fen, sf, lc0, 19), lambda fen: calculateSharpness(fen, lc0, 10000)]
@@ -670,9 +671,10 @@ if __name__ == '__main__':
 
     sf.quit()
     lc0.quit()
+    """
 
     outFile = '../out/complexityOlympiadD19Analysed-R6-11.pkl'
-    outFile = '../out/complexityOlympiadD19Analysed-R5.pkl'
+    outFile = '../out/complexityOlympiadD19Analysed-R4-5.pkl'
     # Combining all analysis data
     """
     df = None
@@ -705,10 +707,11 @@ if __name__ == '__main__':
                 moveData = ast.literal_eval(line.split(';')[1])
                 analysisData[fen] = moveData
 
-    pgn = '../resources/olympiad2026-R6.pgn'
+    """
+    pgn = '../resources/olympiad2026-R4-5.pgn'
     df = getTestData(pgn, sfConfig, 19, threads=10)
     # df = getTestData(pgn, sfConfig, 19, threads=None)
-    df = combineData(df, analysisData)
+    # df = combineData(df, analysisData)
     # df = calculateDifficultyForDF(df, 19)
     with open(outFile, 'wb+') as f:
         pickle.dump(df, f)
@@ -717,7 +720,6 @@ if __name__ == '__main__':
         df = pickle.load(f)
 
     print(df)
-    """
 
     """
     # Adding information deleted from the Logs
