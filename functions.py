@@ -75,7 +75,7 @@ def sharpnessLC0(wdl: list) -> float:
     L = min(max(wdl[2]/1000, 0.0001), 0.9999)
 
     # max() in order to prevent negative values
-    return (max(2/(np.log((1/W)-1) + np.log((1/L)-1)), 0))**2
+    return (max(2/max(np.log((1/W)-1) + np.log((1/L)-1), 0.00001), 0))**2
 
 
 def accuracy(winPercentBefore: float, winPercentAfter: float) -> float:

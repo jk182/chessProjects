@@ -60,7 +60,7 @@ def analyseLegalMoves(board: chess.Board, engine: chess.engine, maxDepth: int, a
     """
     moves = dict()
     for move in board.legal_moves:
-        print(move.uci())
+        # print(move.uci())
         if allDepths:
             moves[move.uci()] = list()
             for depth in range(1, maxDepth+1):
@@ -584,10 +584,27 @@ def analyseDifficulty(df: pl.DataFrame):
     # plotting_helper.plotPlayerBarChart(plotData, list(diffData.keys()), 'Expected score loss', 'Expected score loss by difficulty of the position', ['XSL'], xlabel='Difficulty')
 
 
-def testComplexityFunctions(compFunctions: list):
+def testComplexityFunctions(compFunctions: list, names: list):
     startPos = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-    for compFunc in compFunctions:
-        print(f'Complexity of start position: {compFunc(startPos)}')
+    berlinEndgameBeforeQex = 'r1bQkb1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 b kq - 0 8'
+    berlinEndgame = 'r1bk1b1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 w - - 0 9'
+    najdorf = 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6'
+    pgnPath = '../resources/queenSac.pgn'
+    for i, compFunc in enumerate(compFunctions):
+        startTime = time.time()
+        # print(f'{names[i]} of the start position: {compFunc(startPos)}')
+        # print(f'{names[i]} of the Berlin endgame before KKxd8: {compFunc(berlinEndgameBeforeQex)}')
+        # print(f'{names[i]} of the Berlin endgame: {compFunc(berlinEndgame)}')
+        # print(f'{names[i]} of the Najdorf: {compFunc(najdorf)}')
+        with open(pgnPath, 'r') as pgn:
+            while game := chess.pgn.read_game(pgn):
+                board = game.board()
+
+                for move in game.mainline_moves():
+                    board.push(move)
+                    print(move, compFunc(board.fen()))
+
+        print(f'{names[i]} total time: {round(time.time()-startTime, 2)}')
 
 
 if __name__ == '__main__':
@@ -663,15 +680,13 @@ if __name__ == '__main__':
     lc0Config = ('lc0', {'WeightsFile': '/home/julian/Desktop/weights2026.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
     lc0Config = ('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
 
-    """
     sf = functions.configureEngine(*sfConfig)
     lc0 = functions.configureEngine(*lc0Config)
     complexityFunctions = [lambda fen: difficultyBREngine(chess.Board(fen), sf, 19), lambda fen: calculateEaseFromFEN(fen, sf, lc0, 19), lambda fen: calculateSharpness(fen, lc0, 10000)]
-    testComplexityFunctions(complexityFunctions)
+    testComplexityFunctions(complexityFunctions, ['Difficulty', 'Ease', 'Sharpness'])
 
     sf.quit()
     lc0.quit()
-    """
 
     outFile = '../out/complexityOlympiadD19Analysed-R6-11.pkl'
     outFile = '../out/complexityOlympiadD19Analysed-R4-5.pkl'
@@ -707,7 +722,6 @@ if __name__ == '__main__':
                 moveData = ast.literal_eval(line.split(';')[1])
                 analysisData[fen] = moveData
 
-    """
     pgn = '../resources/olympiad2026-R4-5.pgn'
     df = getTestData(pgn, sfConfig, 19, threads=10)
     # df = getTestData(pgn, sfConfig, 19, threads=None)
@@ -720,6 +734,7 @@ if __name__ == '__main__':
         df = pickle.load(f)
 
     print(df)
+    """
 
     """
     # Adding information deleted from the Logs
