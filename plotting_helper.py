@@ -102,6 +102,9 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
     plt.xticks(ticks=range(1, len(data)+1), labels=xTickLabels)
+
+    plt.axhline(1, color='black', linewidth=0.5, zorder=-1)
+
     if xlabel:
         ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -115,7 +118,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
     yMax = 0
 
     for j in range(nBars):
-        ax.bar([i+1+offset+(barWidth*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=barWidth, label=legend[j])
+        ax.bar([i+1+offset+(barWidth*j) for i in range(len(data))], [d[j] for d in data], color=colors[j%len(colors)], edgecolor='black', linewidth=0.5, width=barWidth, label=legend[j], zorder=1)
         yMax = max(yMax, max([d[j] for d in data]))
         yMin = min(yMin, min([d[j] for d in data]))
 
@@ -180,7 +183,7 @@ def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legen
     ax.set_facecolor(getColor('background'))
     ax.set_xlabel(xLabel)
 
-    xMin = 0
+    xMin = 1
     xMax = 0
     yMin = 100
     yMax = -100
@@ -192,18 +195,19 @@ def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legen
     for i, d in enumerate(data):
         # ax.plot([(j+1)/2 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i])
         ax.plot([j+1 for j in range(len(d))], d, color=colors[i%len(colors)], label=legend[i], linewidth=linewidth)
-        xMax = max(xMax, len(d)//2)
+        xMax = max(xMax, len(d))
         yMin = min(yMin, min(d))
         yMax = max(yMax, max(d))
 
-    # ax.set_xlim(xMin, xMax)
+    ax.set_xlim(xMin, xMax)
     # ax.set_ylim(yMin-0.5, yMax+0.5)
-    ax.set_ylim(yMin-1, yMax+1)
+    # ax.set_ylim(yMin*0.95, yMax*1.05)
+    ax.set_ylim(0, yMax*1.05)
     if xTicks is not None:
         ax.set_xlim(1, len(xTicks))
         # ax.set_xticks([j+1 for j in range(len(data[-1]))])
         ax.set_xticklabels([x for i, x in enumerate(xTicks) if i % xTickFactor == 0])
-        ax.xaxis.set_major_locator(ticker.LinearLocator(len(xTicks)//xTickFactor + 1))
+        ax.xaxis.set_major_locator(ticker.LinearLocator((len(xTicks)-1)//xTickFactor + 1))
         # ax.xaxis.set_minor_locator(ticker.LinearLocator(21))
         # ax.set_xticklabels([f'+{t/100}' for t in xTicks if t%100 == 0])
     plt.title(title)

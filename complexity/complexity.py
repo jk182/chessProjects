@@ -16,6 +16,8 @@ import pickle
 import time
 from scipy.stats import pearsonr
 import re
+import testRescales
+import numpy as np
 
 
 def getEngineAnalysis(board: chess.Board, engine: chess.engine, maxDepth: int) -> pd.DataFrame:
@@ -403,6 +405,11 @@ def lc0Analysis(fen: str, lc0: chess.engine, nodes: int) -> tuple:
     return (wdl, phead)
 
 
+def lc0RescaleComplexity(fen: str, lc0: chess.engine, nodes: int) -> float:
+    wdl = lc0Analysis(fen, lc0, nodes)[0]
+    return testRescales.lc0Rescale(wdl, 1, 0.5)
+
+
 def lc0AnalysisDF(df: pl.DataFrame, lc0Config: tuple, nodes: int) -> pl.DataFrame:
     wdls = list()
     policies = list()
@@ -522,6 +529,17 @@ def plotExpectedScoreChangeByDepth(posMoves: list, engineOptions: tuple, maxDept
         plt.show()
 
 
+def expectedScoreStdDev(moveEvaluations: list):
+    maxDepth = len(moveEvaluations[0])
+    highestXS = [max([functions.expectedScore(evals[i]) for evals in moveEvaluations])*(i+1)/((maxDepth*(maxDepth+1))/2) for i in range(maxDepth)]
+    # return statistics.stdev(highestXS)
+    val = 0
+    for xs in highestXS:
+        val += (xs - highestXS[-1])**2
+    val /= len(highestXS)
+    return val
+
+
 def analyseDifficulty(df: pl.DataFrame):
     difficulties = list()
     eases = list()
@@ -529,8 +547,18 @@ def analyseDifficulty(df: pl.DataFrame):
     cpls = list()
     bestMoves = list()
     ratings = list()
+    lc0Rescales = list()
+    stdevs = list()
     for row in df.iter_rows(named=True):
         if row['DifficultyBR'] is not None:
+            sideToMove = row['FEN'].split()[1]
+            if sideToMove == 'w':
+                rating = int(row['WhiteElo'])
+            elif sideToMove == 'b':
+                rating = int(row['BlackElo'])
+            if rating < 2500:
+                continue
+            ratings.append(rating)
             difficulties.append(row['DifficultyBR']/10)
             eases.append(row['Ease'])
             # sharpnesses.append(row['Sharpness']/max(row['WDL'][0], row['WDL'][2]))
@@ -538,25 +566,41 @@ def analyseDifficulty(df: pl.DataFrame):
             moveIndex = row['Moves'].index(row['MovePlayed'])
             bestEval = row['Evaluations'][0][-1]
             moveEval = row['Evaluations'][moveIndex][-1]
-            sideToMove = row['FEN'].split()[1]
-            if sideToMove == 'w':
-                ratings.append(int(row['WhiteElo']))
-            elif sideToMove == 'b':
-                ratings.append(int(row['BlackElo']))
             if moveIndex == 0:
                 bestMoves.append(True)
             else:
                 bestMoves.append(False)
             cpls.append(functions.expectedScore(bestEval)-functions.expectedScore(moveEval))
 
-    indices = [i for i in range(len(cpls)) if cpls[i] != 0 and ratings[i] >= 2500]
+            lc0Rescales.append(testRescales.lc0Rescale(row['WDL'], 1, 0.5))
+            stdevs.append(expectedScoreStdDev(row['Evaluations']))
+
+    indices = [i for i in range(len(cpls)) if cpls[i] != 0]# and ratings[i] >= 2500]
     print(len(indices))
-    for values in [difficulties, eases, sharpnesses]:
+    for values in [difficulties, eases, sharpnesses, lc0Rescales, stdevs]:
         print(pearsonr([values[i] for i in indices], [cpls[i] for i in indices]))
 
     # plotting_helper.plotScatterPlot([cpls]*3, [difficulties, eases, sharpnesses], 'Expected score loss', 'Difficulty', 'Difficulty vs XS loss', legend=['Difficulty', 'Ease', 'Sharpness'], alpha=0.5)
-    plotting_helper.plotScatterPlot([[cpls[i] for i in indices]]*3, [[difficulties[i] for i in indices], [eases[i] for i in indices], [sharpnesses[i] for i in indices]], 'Expected score loss', 'Difficulty', 'Difficulty vs XS loss', legend=['Difficulty', 'Ease', 'Sharpness'], alpha=0.5)
+    # plotting_helper.plotScatterPlot([[cpls[i] for i in indices]]*4, [[difficulties[i] for i in indices], [eases[i] for i in indices], [sharpnesses[i] for i in indices], [lc0Rescales[i] for i in indices]], 'Expected score loss', 'Difficulty', 'Difficulty vs XS loss', legend=['Difficulty', 'Ease', 'Sharpness', 'LC0 Rescale'], alpha=0.5)
     
+    q = 10
+    plotData = list()
+    mistakeData = list()
+    for i in range(q):
+        plotData.append(list())
+        mistakeData.append(list())
+        for d in [difficulties, eases, sharpnesses, lc0Rescales, stdevs]:
+            js = [j for j, v in enumerate(d) if np.quantile(d, i/q) <= v <= np.quantile(d, (i+1)/q)]
+            c = [cpls[j] for j in js]
+            plotData[-1].append(sum(c)/len(c))
+            mistakeData[-1].append(len([x for x in c if x >= 10])/len(c))
+
+    # plotting_helper.plotPlayerBarChart(plotData, [i/q for i in range(q)], 'Expected score loss', 'Expected score loss based on difficulty', ['Difficulty', 'Ease', 'Sharpness', 'LC0 Rescale'])
+    plotData = [[p[i] for p in plotData] for i in range(len(plotData[0]))]
+    plotting_helper.plotLineChartSingleX(plotData, 'Complexity decile', 'Expected score loss', 'Expected score loss based on different complexity measures', ['Difficulty', 'Inverted Ease', 'Sharpness', 'WDL Sensitivity', 'xS Deviation'], xTicks=[i for i in range(1, q+1)], xTickFactor=1, colors=plotting_helper.getColors(['red', 'orange', 'green', 'blue', 'purple']), filename='../out/complexityXSL.png')
+    mistakeData = [[p[i] for p in mistakeData] for i in range(len(mistakeData[0]))]
+    plotting_helper.plotLineChartSingleX(mistakeData, 'Complexity decile', 'Relative number of mistakes', 'Mistakes based based on different complexity measures', ['Difficulty', 'Inverted Ease', 'Sharpness', 'WDL Sensitivity', 'xS Deviation'], xTicks=[i for i in range(1, q+1)], xTickFactor=1, colors=plotting_helper.getColors(['red', 'orange', 'green', 'blue', 'purple']), filename='../out/complexityMistakes.png')
+
     diffData = dict()
     for i in range(15):
         diffData[i/2+0.5] = [0, 0, 0]
@@ -605,6 +649,26 @@ def testComplexityFunctions(compFunctions: list, names: list):
                     print(move, compFunc(board.fen()))
 
         print(f'{names[i]} total time: {round(time.time()-startTime, 2)}')
+
+
+def testPositionComplexity(complexityFunctions: list, functionNames: list, positions: list, positionNames: list, plotTitles: list, rescaleFEN: str = None, filenames: list = None):
+    """
+    positions: list
+        A list of lists containing the FENs. The FENs of each list will be plotted together
+    """
+    if filenames is None:
+        filenames = [None] * len(plotTitles)
+
+    if rescaleFEN:
+        rescaleValues = [c(rescaleFEN) for c in complexityFunctions]
+    else:
+        rescaleValues = [1 for _ in complexityFunctions]
+
+    for i in range(len(positions)):
+        plotData = [[c(pos)/rescaleValues[j] for j, c in enumerate(complexityFunctions)] for pos in positions[i]]
+
+        print(plotData)
+        plotting_helper.plotPlayerBarChart(plotData, positionNames[i], 'Complexity', plotTitles[i], functionNames, colors=plotting_helper.getColors(['red', 'orange', 'green', 'blue', 'purple']), filename=filenames[i])
 
 
 if __name__ == '__main__':
@@ -678,18 +742,78 @@ if __name__ == '__main__':
     # sf.quit()
 
     lc0Config = ('lc0', {'WeightsFile': '/home/julian/Desktop/weights2026.gz', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
-    lc0Config = ('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+    # lc0Config = ('lc0', {'WeightsFile': '/Users/julian/chess/nets/largeNet', 'UCI_ShowWDL': 'true', 'VerboseMoveStats': 'true'})
+
+    openings = [['rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', 
+                 'rnbqkbnr/ppp2ppp/4p3/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3', 
+                 'rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3', 
+                 'rnbqkbnr/pp2pppp/3p4/8/3NP3/8/PPP2PPP/RNBQKB1R b KQkq - 0 4', 
+                 'rnbqkbnr/pppp1ppp/8/4p3/4PP2/8/PPPP2PP/RNBQKBNR b KQkq - 0 2', 
+                 'r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3',
+                 'r1bk1b1r/ppp2ppp/2p5/4Pn2/8/5N2/PPP2PPP/RNB2RK1 w - - 0 9'], 
+                ['rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1',
+                 'rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4', 
+                 'rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4',
+                 'rnbqkb1r/pp2pppp/2p2n2/3p4/2PP4/5N2/PP2PPPP/RNBQKB1R w KQkq - 2 4',
+                 'rnbqkb1r/ppp1pp1p/5np1/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 4',
+                 'rnbqk2r/ppp1ppbp/3p1np1/8/2PPP3/2N5/PP3PPP/R1BQKBNR w KQkq - 0 5',
+                 'rnbqkbnr/ppppp1pp/8/5p2/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2',
+                 'rnbqkb1r/pp1ppppp/5n2/2pP4/2P5/8/PP2PPPP/RNBQKBNR b KQkq - 0 3',
+                 'rnbqkb1r/p2ppppp/5n2/1ppP4/2P5/8/PP2PPPP/RNBQKBNR w KQkq - 0 4']]
+
+    openingNames = [['1. e4', 'French Defense', 'Caro-Kann', 'Open Sicilian', "King's Gambit", 'Ruy Lopez', 'Berlin Endgame'], 
+            ['1. d4', 'QGD', 'Nimzo-Indian', 'Slav', 'Grünfeld', 'KID', 'Dutch Defense', 'Benoni', 'Benko Gambit']]
+    openingFileNames = ['../out/complexity1e4.png', '../out/complexity1d4.png']
+
+    endgames = [['5k2/8/5pK1/3B1PbP/3n4/8/8/8 w - - 7 68', '8/5k2/2R5/6Np/5P2/4P1P1/5K2/1q6 b - - 32 98', '7K/8/k1P5/7p/8/8/8/8 w - - 0 1']]
+    endgameNames = [['Carlsen-Caruana', 'Carlsen-Nepo', 'Reti study']]
 
     sf = functions.configureEngine(*sfConfig)
     lc0 = functions.configureEngine(*lc0Config)
-    complexityFunctions = [lambda fen: difficultyBREngine(chess.Board(fen), sf, 19), lambda fen: calculateEaseFromFEN(fen, sf, lc0, 19), lambda fen: calculateSharpness(fen, lc0, 10000)]
-    testComplexityFunctions(complexityFunctions, ['Difficulty', 'Ease', 'Sharpness'])
+    complexityFunctions = [lambda fen: difficultyBREngine(chess.Board(fen), sf, 19), 
+                           lambda fen: calculateEaseFromFEN(fen, sf, lc0, 19), 
+                           lambda fen: calculateSharpness(fen, lc0, 30000), 
+                           lambda fen: lc0RescaleComplexity(fen, lc0, 30000), 
+                           lambda fen: expectedScoreStdDev(list(analyseLegalMoves(chess.Board(fen), sf, 19).values()))]
+    # complexityFunctions = [lambda fen: calculateSharpness(fen, lc0, 20000), lambda fen: lc0RescaleComplexity(fen, lc0, 20000)]
+    functionNames = ['Difficulty', 'Inverted Ease', 'Sharpness', 'WDL Sensitivity', 'xS Deviation']
+    # functionNames = ['Sharpness', 'LC0 Rescale']
+    # testComplexityFunctions(complexityFunctions, ['Difficulty', 'Ease', 'Sharpness'])
+
+    # testPositionComplexity(complexityFunctions, functionNames, openings, openingNames, ['Complexity of 1.e4 openings', 'Complexity of 1.d4 openings'], rescaleFEN='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', filenames=openingFileNames)
+    # testPositionComplexity(complexityFunctions, functionNames, endgames, endgameNames, ['Endings'])
 
     sf.quit()
     lc0.quit()
 
     outFile = '../out/complexityOlympiadD19Analysed-R6-11.pkl'
     outFile = '../out/complexityOlympiadD19Analysed-R4-5.pkl'
+    outFile3 =  '../out/complexityOlympiadD19Analysed-R4-11-diff.pkl'
+
+    with open(outFile3, 'rb') as f:
+        df = pickle.load(f)
+
+    analyseDifficulty(df)
+
+    testPGNPath = '../resources/complexityTest.pgn'
+    outTest = '../out/complexityTest.pkl'
+
+    """
+    df = getTestData(testPGNPath, sfConfig, 19, threads=8, moveNumbers=list(range(100)))
+    df = lc0AnalysisDF(df, lc0Config, 10000)
+    df = calculateDifficultyForDF(df, 19)
+
+    with open(outTest, 'wb+') as f:
+        pickle.dump(df, f)
+
+    print(df)
+    with open(outTest, 'rb') as f:
+        df = pickle.load(f)
+
+    for row in df.iter_rows(named=True):
+        print(row['MovePlayed'], round(row['Ease'], 3), round(row['DifficultyBR'], 3), round(row['Sharpness'], 3), round(testRescales.lc0Rescale(row['WDL'], 1, 0.5), 3), row['WDL'])
+    """
+
     # Combining all analysis data
     """
     df = None
@@ -756,20 +880,54 @@ if __name__ == '__main__':
         pickle.dump(df, f)
     """
 
+    names = ['Start pos', 'Petrov', 'Spanish: Morphy', 'Spanish: Berlin', "King's Gambit", 'Najdorf', 'Caruana Najdorf', 'Ending']
+    positions = ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 
+                 'rnbqkb1r/pppp1ppp/5n2/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 
+                 'r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4',
+                 'r1bqkb1r/pppp1ppp/2n2n2/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4',
+                 'rnbqkbnr/pppp1ppp/8/4p3/4PP2/8/PPPP2PP/RNBQKBNR b KQkq - 0 2',
+                 'rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6',
+                 'rnb1k2r/1p1n1pp1/p3p2p/2bq4/2BNN3/2P1Q1B1/6PP/3RK2R b Kkq - 4 18', 
+                 '8/5k2/5p1n/8/5K2/6R1/6P1/8 w - - 13 57']
+
     """
-    with open(outFile2, 'rb') as f:
+    lc0 = functions.configureEngine(*lc0Config)
+    wdls = list()
+    for p in positions:
+        wdls.append(lc0Analysis(p, lc0, 20000)[0])
+        print(wdls[-1])
+    print(wdls)
+
+    for i in range(len(wdls)):
+        print(names[i], round(testRescales.lc0Rescale(wdls[i], 1, 0.5), 4))
+
+    lc0.quit()
+    """
+
+    """
+    with open(outFile, 'rb') as f:
         df = pickle.load(f)
+    
+    # df = lc0AnalysisDF(df, lc0Config, 10000)
+    # df = calculateDifficultyForDF(df, 19)
 
-    analyseDifficulty(df)
-    """
-
-    """
-    df = lc0AnalysisDF(df, lc0Config, 10000)
     print(df)
     with open(outFile, 'wb+') as f:
         pickle.dump(df, f)
-    """
 
+    with open(outFile, 'rb') as f:
+        df1 = pickle.load(f)
+
+    with open(outFile2, 'rb') as f:
+        df2 = pickle.load(f)
+    
+    df = pl.concat([df1, df2])
+    print(df)
+
+    with open(outFile3, 'wb+') as f:
+        pickle.dump(df, f)
+    """
+    
     """
     with open('../out/complexityDataD19Analysed-3.pkl', 'rb') as f:
         df = pickle.load(f)
