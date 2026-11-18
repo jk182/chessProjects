@@ -318,6 +318,9 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
     ax.set_ylabel(yLabel)
     plt.title(title)
     fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    ax.set_xticks([i for i in range(1890, 2030, 10)])
+    ax.set_axisbelow(True)
+    ax.grid()
 
     if filename:
         plt.savefig(filename, dpi=400)
@@ -525,7 +528,8 @@ def plotBoxplot(plotData: list, xLabel: str, yLabel: str, title: str, colors: li
     ax.set_ylabel(yLabel)
     
     if xTickLabels:
-        plt.xticks(ticks=range(1, len(xTickLabels)+1), labels=xTickLabels, rotation=45, ha='right')
+        ax.set_xticks(ticks=range(1, len(xTickLabels)+1), labels=xTickLabels, rotation=45, ha='right', rotation_mode='anchor')
+        ax.tick_params('x', length=4, labelsize=9, pad=0)
 
     plt.title(title)
     fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
@@ -563,6 +567,7 @@ def plotStackedBarChart(plotData: list, xLabel: str, yLabel: str, title: str, le
 
     if len(plotData) > 10:
         plt.xticks(rotation=45, ha='right', rotation_mode='anchor')
+        ax.tick_params('x', length=4, labelsize=9, pad=0)
         bottom = 0.2
     else:
         bottom = 0.1
@@ -582,7 +587,6 @@ def plotStackedBarChart(plotData: list, xLabel: str, yLabel: str, title: str, le
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=5)
         fig.subplots_adjust(bottom=bottom, top=0.95, left=0.09, right=0.95)
 
-    ax.tick_params('x', length=4, labelsize=9, pad=0)
 
     if filename:
         plt.savefig(filename, dpi=300)

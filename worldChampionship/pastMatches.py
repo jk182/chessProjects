@@ -141,7 +141,7 @@ def extractMoveData(gamePaths: list, matchNames: list) -> pl.DataFrame:
     return pl.DataFrame(data)
 
 
-def plotGameData(gameData: pl.DataFrame, rowName: str):
+def plotGameData(gameData: pl.DataFrame, rowName: str, filename: str = None):
     plotData = dict()
     for row in gameData.iter_rows(named=True):
         if (match := row['Match']) not in plotData:
@@ -150,10 +150,10 @@ def plotGameData(gameData: pl.DataFrame, rowName: str):
         plotData[match].append(row[rowName])
 
     plotData = dict(sorted(plotData.items(), key=lambda x: int(x[0][-4:])))
-    plotting_helper.plotBoxplot(list(plotData.values()), 'Match', 'Game length', 'Game lenghts for each WCC match', xTickLabels=[m.split(',')[0].replace('Nepomniachtchi', 'Nepo') for m in plotData.keys()])
+    plotting_helper.plotBoxplot(list(plotData.values()), 'Match', 'Game length', 'Game lenghts for each world championship match', xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], filename=filename)
 
 
-def plotGameDataAsScatterPlot(gameData: pl.DataFrame):
+def plotGameDataAsScatterPlot(gameData: pl.DataFrame, filename: str = None):
     plotData = dict()
     for row in gameData.iter_rows(named=True):
         if (match := row['Match']) not in plotData:
@@ -163,15 +163,13 @@ def plotGameDataAsScatterPlot(gameData: pl.DataFrame):
 
     plotData = dict(sorted(plotData.items(), key=lambda x: int(x[0][-4:])))
     pdMoves = dict()
-    pdGames = dict()
     for k, v in plotData.items():
         pdMoves[k] = sum([x[0]*x[1] for x in v])/sum([x[1] for x in v])
-        pdGames[k] = sum([x[0]*x[1] for x in v])/(len(v)*100)
 
-    plotting_helper.plotScatterPlot([[int(m[-4:]) for m in pdMoves.keys()]]*2, [list(pdMoves.values()), list(pdGames.values())], 'Match', 'Expected score loss per move', 'Expected score loss per move')
+    plotting_helper.plotScatterPlot([[int(m[-4:]) for m in pdMoves.keys()]], [list(pdMoves.values())], 'Match year', 'Expected score loss per move', 'Average expected score loss per move in world championship matches over the years', filename=filename)
 
 
-def plotGameResults(gameData: pl.DataFrame):
+def plotGameResults(gameData: pl.DataFrame, filename: str = None):
     plotData = dict()
     for row in gameData.iter_rows(named=True):
         if (match := row['Match']) not in plotData:
@@ -185,10 +183,10 @@ def plotGameResults(gameData: pl.DataFrame):
             plotData[match][2] += 1
 
     plotData = dict(sorted(plotData.items(), key=lambda x: int(x[0][-4:])))
-    plotting_helper.plotStackedBarChart(list(plotData.values()), '', '% of games', 'Relative number of game results', ['White\nwins', 'Draws', 'Black\nwins'], colors=['white', 'grey', 'black'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True)
+    plotting_helper.plotStackedBarChart(list(plotData.values()), '', 'Percentage of games', 'Relative number of each game result in world championship matches', ['White\nwins', 'Draws', 'Black\nwins'], colors=['white', 'grey', 'black'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True, filename=filename)
 
 
-def plotFirstMoves(gameData: pl.DataFrame):
+def plotFirstMoves(gameData: pl.DataFrame, filename: str = None):
     plotData = dict()
     moves = ['e2e4', 'd2d4', 'c2c4', 'g1f3', 'g2g3']
     for row in gameData.iter_rows(named=True):
@@ -206,7 +204,7 @@ def plotFirstMoves(gameData: pl.DataFrame):
     for m, v in plotData.items():
         pd[m] = [x/sum(v) for x in v]
 
-    plotting_helper.plotStackedBarChart(list(pd.values()), '', '% of games', 'Relative number of each opening move', ['1.e4', '1.d4', '1.c4', '1.Nf3', '1.g3'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True)
+    plotting_helper.plotStackedBarChart(list(pd.values()), '', 'Percentage of games', 'Relative number of every opening move in world championship matches', ['1.e4', '1.d4', '1.c4', '1.Nf3', '1.g3'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True, filename=filename)
 
 
 def findLongestResultStreaks(results: dict) -> list:
@@ -263,13 +261,18 @@ def findLongestResultStreaks(results: dict) -> list:
 def analyseMatchTrajectory(gameData: pl.DataFrame):
     matchData = dict()
     gameLengths = dict()
+    results = dict()
     for row in gameData.iter_rows(named=True):
         if (match := row['Match']) not in matchData:
             matchData[match] = list()
             gameLengths[match] = list()
+            results[match] = list()
 
         gameNr = row['GameNr']
         gameLength = row['MoveNr']
+
+        if "2006" in match:
+            print(gameNr)
 
         if (result := row['Result']) == '1/2-1/2':
             points = 0.5
@@ -287,16 +290,31 @@ def analyseMatchTrajectory(gameData: pl.DataFrame):
         if gameNr <= len(matchData[match]):
             matchData[match][gameNr-1] = points
             gameLengths[match][gameNr-1] = gameLength
+            results[match][gameNr-1] = result
         else:
             nl = [0 for _ in range(gameNr-len(matchData[match]))]
             nl[-1] = points
             matchData[match].extend(nl)
             nl[-1] = gameLength
             gameLengths[match].extend(nl)
+            nl[-1] = result
+            results[match].extend(nl)
 
     matchData = dict(sorted(matchData.items(), key=lambda x: int(x[0][-4:])))
+    gameLengths = dict(sorted(gameLengths.items(), key=lambda x: int(x[0][-4:])))
+    results = dict(sorted(results.items(), key=lambda x: int(x[0][-4:])))
     
     pData = [[sum([int(2*x-1) for x in d[:i+1]]) for i in range(len(d))] for d in matchData.values()]
+    winningMargins = dict()
+
+    for d in pData:
+        if d[-1] not in winningMargins:
+            winningMargins[d[-1]] = 0
+
+        winningMargins[d[-1]] += 1
+
+    winningMargins = dict(sorted(winningMargins.items(), key=lambda x: x[0]))
+    print(f'Winning margins: {winningMargins}')
 
     biggestDeficit = min([min(d) for d in pData])
     print(f'Biggest overcome deficit: {biggestDeficit} in {[m for i, m in enumerate(list(matchData.keys())) if min(pData[i]) == biggestDeficit]}')
@@ -312,7 +330,32 @@ def analyseMatchTrajectory(gameData: pl.DataFrame):
         print(f'Longest {names[i]} streak: {l} in {[m for j, m in enumerate(list(matchData.keys())) if streak[j] == l]}')
 
     longestGames = [max(v) for v in gameLengths.values()]
-    print(longestGames)
+    # print(longestGames)
+
+    totalGames = sum([len(v) for v in results.values()])
+    print(f'Total games: {totalGames}')
+    gameResults = [len([r for v in results.values() for r in v if r == "1-0"]), len([r for v in results.values() for r in v if r == "0-1"]), len([r for v in results.values() for r in v if r == "1/2-1/2"])]
+    print(f'White wins: {gameResults[0]} ({round(gameResults[0]/totalGames, 3)}), black wins: {gameResults[1]} ({round(gameResults[1]/totalGames, 3)}), draws: {gameResults[2]} ({round(gameResults[2]/totalGames, 3)})')
+
+    resultsByMatchSituation = [[0, 0], [0, 0]]
+    for d in pData:
+        for i in range(len(d)-1):
+            if d[i] == 0 or i == 0:
+                index = 0
+            else:
+                index = 1
+
+            if i == 0 and d[i] == 0:
+                resultsByMatchSituation[index][0] += 1
+            elif i == 0 and d[i] != 0:
+                resultsByMatchSituation[index][1] += 1
+            if d[i] == d[i+1]:
+                resultsByMatchSituation[index][0] += 1
+            else:
+                resultsByMatchSituation[index][1] += 1
+    print(resultsByMatchSituation)
+    for x in resultsByMatchSituation:
+        print([y/sum(x) for y in x])
     
     # plotting_helper.plotLineChartSingleX(pData, 'Game number', 'Score of eventual winner', 'Score of the eventual winner by game number', list(matchData.keys()))
 
@@ -335,7 +378,7 @@ def plotComplexity(moveData: dict):
     plotting_helper.plotScatterPlot([[int(m[-4:]) for m in data.keys()]], [plotData], 'Match', 'Average complexity', 'Average complexity for each match')
 
 
-def findOpeningDeviations(gameData: pl.DataFrame):
+def findOpeningDeviations(gameData: pl.DataFrame, filename: str = None):
     data = dict()
     for row in gameData.iter_rows(named=True):
         if (match := row['Match']) not in data:
@@ -351,18 +394,23 @@ def findOpeningDeviations(gameData: pl.DataFrame):
 
     data = dict(sorted(data.items(), key=lambda x: int(x[0][-4:])))
 
+    plotData = dict()
+
     for match, d in data.items():
         print(match)
+        plotData[match] = list()
         moves = [x[2] for x in d]
         for i, m in enumerate(moves):
             players = (d[i][0], d[i][1])
-            repeated = False
             for j in range(1, len(m)):
                 if m[:j] not in [x[:j] for x in moves[:i]]:
                     player = players[(j-1)%2]
                     print(f'{j-1} moves repeated in game {i+1}, {player} deviated')
-                    repeated = True
+                    plotData[match].append(j-1)
                     break
+
+    plotting_helper.plotScatterPlot([[int(m[-4:]) for m in plotData.keys()]], [[sum(v)/(len(v)*2) for v in plotData.values()]], 'Match', 'Number of repeated moves', 'Number of repeated moves', filename=filename)
+
 
 if __name__ == '__main__':
     matchNames = ['Steinitz-Zukertort, 1886', 'Steinitz-Chigorin, 1889', 'Steinitz-Gunsberg, 1890', 'Steinitz-Chigorin, 1892', 
@@ -376,7 +424,7 @@ if __name__ == '__main__':
                   'Kramnik-Topalov, 2006', 'Anand-Kramnik, 2008', 'Anand-Topalov, 2010', 'Anand-Gelfand, 2012', 'Carlsen-Anand, 2013',
                   'Carlsen-Anand, 2014', 'Carlsen-Karjakin, 2016', 'Carlsen-Caruana, 2018', 'Carlsen-Nepomniachtchi, 2021', 
                   'Ding-Nepomniachtchi, 2023', 'Gukesh-Ding, 2024']
-    pgnPaths = ['../out/wcc1886-1908_analysed.pgn', '../out/wcc1910-1921_analysed.pgn', '../out/wcc1927-1929_analysed.pgn', '../out/wcc1934-1960_analysed.pgn', '../out/wcc1961-1981_analysed.pgn', '../out/wcc1984-1995_analysed.pgn', '../out/wcc2000-2024_analysed.pgn']
+    pgnPaths = ['../out/wcc1886-1908_analysed.pgn', '../out/wcc1910-1921_analysed.pgn', '../out/wcc1927-1929_analysed.pgn', '../out/wcc1934-1960_analysed.pgn', '../out/wcc1961-1981_analysed.pgn', '../out/wcc1984-1995_analysed.pgn', '../out/wcc2000-2024_analysed.pgn', '../out/wcc2006_analysed.pgn']
     mDataPath = '../out/wccMatchData.pkl'
     moveDataPath =  '../out/wccMoveData.pkl'
 
@@ -399,19 +447,19 @@ if __name__ == '__main__':
         wccMoveData = pickle.load(f)
 
 
-    # plotGameData(wccMatchData, 'MoveNr')
+    # plotGameData(wccMatchData, 'MoveNr', filename='../out/pastWccMoveCount.png')
     # plotGameData(wccMatchData, 'WhiteAccuracy')
     # plotGameData(wccMatchData, 'BlackAccuracy')
     # plotGameData(wccMatchData, 'XSLperMove')
 
-    # plotGameDataAsScatterPlot(wccMatchData)
+    # plotGameDataAsScatterPlot(wccMatchData, filename='../out/pastWccXSL.png')
 
-    # plotGameResults(wccMatchData)
+    # plotGameResults(wccMatchData, filename='../out/pastWccResults.png')
 
-    # analyseMatchTrajectory(wccMatchData)
+    analyseMatchTrajectory(wccMatchData)
 
     # plotComplexity(wccMoveData)
 
-    # plotFirstMoves(wccMatchData)
+    # plotFirstMoves(wccMatchData, filename='../out/pastWccFirstMoves.png')
 
-    findOpeningDeviations(wccMatchData)
+    # findOpeningDeviations(wccMatchData)
