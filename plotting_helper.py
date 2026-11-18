@@ -168,7 +168,7 @@ def plotLineChartSingleX(data: list, xLabel: str, yLabel: str, title: str, legen
     xTickFactor: int
         How many labels get shown. A factor of 5 means that every 5th label gets shown
     multipleY: bool
-        If this is set, there will be two different scaled y-axes
+        If this is set, there will be two differently scaled y-axes
         This currently only works for 2 data lists
     secondYLabel: str
         The label for the second y axis, when multipleY is set
@@ -512,22 +512,80 @@ def plotFunctions(functions: list, xMin: float, xMax: float, xLabel: str, yLabel
         plt.show()
 
 
-def plotBoxplot(plotData: list, xLabel: str, yLabel: str, title: str, colors: list = None, filename: str = None):
+def plotBoxplot(plotData: list, xLabel: str, yLabel: str, title: str, colors: list = None, xTickLabels: list = None, filename: str = None):
     if not colors:
         colors = getDefaultColors()
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
 
-    ax.boxplot(plotData, showfliers=False)
+    ax.boxplot(plotData, whis=100)# , showfliers=False)
 
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
+    
+    if xTickLabels:
+        plt.xticks(ticks=range(1, len(xTickLabels)+1), labels=xTickLabels, rotation=45, ha='right')
 
     plt.title(title)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.2, top=0.95, left=0.1, right=0.95)
 
     if filename:
         plt.savefig(filename, dpi=400)
     else:
         plt.show()
+
+
+def plotStackedBarChart(plotData: list, xLabel: str, yLabel: str, title: str, legend: list, colors: list = None, xTickLabels: list = None, legendOnRight: bool = False, filename: str = None):
+    if not colors:
+        colors = getDefaultColors()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor(getColor('background'))
+    noLegend = False
+    
+    for i, data in enumerate(plotData):
+        bottom = 0
+        factor = 100/sum(data)
+
+        for j, d in enumerate(data):
+            if noLegend:
+                label = '_nolegend_'
+            else:
+                label = legend[j]
+
+            ax.bar(i, d*factor, bottom=bottom, color=colors[j], edgecolor='black', linewidth=0.2, label=label)
+            bottom += d*factor
+        noLegend = True
+
+    if xTickLabels:
+        ax.set_xticks(ticks=range(len(xTickLabels)), labels=xTickLabels)
+
+    if len(plotData) > 10:
+        plt.xticks(rotation=45, ha='right', rotation_mode='anchor')
+        bottom = 0.2
+    else:
+        bottom = 0.1
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.04), ncol=5)
+
+    ax.yaxis.set_major_formatter(ticker.PercentFormatter())
+    plt.title(title)
+    ax.set_xlim(-0.5, len(plotData)-0.5)
+    ax.set_ylim(0, 100)
+    ax.set_xlabel(xLabel)
+    ax.set_ylabel(yLabel)
+    if legendOnRight:
+        middle = 0.5 + 0.06*len(legend)/2
+        ax.legend(loc='upper center', bbox_to_anchor=(1.06, 0.64), ncol=1)
+        fig.subplots_adjust(bottom=bottom, top=0.95, left=0.09, right=0.9)
+    else:
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=5)
+        fig.subplots_adjust(bottom=bottom, top=0.95, left=0.09, right=0.95)
+
+    ax.tick_params('x', length=4, labelsize=9, pad=0)
+
+    if filename:
+        plt.savefig(filename, dpi=300)
+    else:
+        plt.show()
+

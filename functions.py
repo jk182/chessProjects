@@ -78,6 +78,34 @@ def sharpnessLC0(wdl: list) -> float:
     return (max(2/max(np.log((1/W)-1) + np.log((1/L)-1), 0.00001), 0))**2
 
 
+def lc0Rescale(wdl: list, wdl_rescale_ratio: float = 1, wdl_rescale_diff: float = 0.5, max_s: float = 2):
+    W = min(max(wdl[0]/1000, 0.0001), 0.9999)
+    L = min(max(wdl[2]/1000, 0.0001), 0.9999)
+
+    a = max(np.log((1/L)-1), 0.0001)
+    b = max(np.log((1/W)-1), 0.0001)
+
+    mu = (a-b)/(a+b)
+    s = 2 / (a+b)
+    s = min(s, max_s)
+
+    mu_upper = mu + s*s * wdl_rescale_diff
+    mu_lower = mu - s*s * wdl_rescale_diff
+    s_new = s * wdl_rescale_ratio
+
+    w_upper = 1 / (1 + np.exp(-(-1 + mu_upper)/s_new))
+    l_upper = 1 / (1 + np.exp(-(-1 - mu_upper)/s_new))
+
+    w_lower = 1 / (1 + np.exp(-(-1 + mu_lower)/s_new))
+    l_lower = 1 / (1 + np.exp(-(-1 - mu_lower)/s_new))
+
+    weight = 1 - abs(W-L)*max(W, L)
+    # weight = 1 - abs(W-L)*(1-min(W, L))
+    # weight = 1 - abs(W-L)
+
+    return abs((w_upper-l_upper) - (w_lower-l_lower)) * weight
+
+
 def accuracy(winPercentBefore: float, winPercentAfter: float) -> float:
     """
     This function returns the accuracy score for a given move. The formula for the
