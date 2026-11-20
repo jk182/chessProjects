@@ -135,7 +135,7 @@ def plotPlayerBarChart(data: list, xTickLabels: list, ylabel: str, title: str, l
         ax.set_yticks(yTicks)
 
     ax.set_xlim(1-totalWidth*3/4, len(data)+totalWidth*3/4)
-    ax.set_ylim(yMin*1.05, yMax * 1.05)
+    ax.set_ylim(yMin*1.05, yMax * 1.07)
     plt.title(title)
     plt.axhline(0, color='black', linewidth=0.5)
 
@@ -317,7 +317,7 @@ def plotScatterPlot(xValues: list, yValues: list, xLabel: str, yLabel: str, titl
     ax.set_xlabel(xLabel)
     ax.set_ylabel(yLabel)
     plt.title(title)
-    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.1, right=0.95)
+    fig.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.95)
     ax.set_xticks([i for i in range(1890, 2030, 10)])
     ax.set_axisbelow(True)
     ax.grid()
@@ -546,7 +546,10 @@ def plotStackedBarChart(plotData: list, xLabel: str, yLabel: str, title: str, le
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(getColor('background'))
-    noLegend = False
+    if legend is None:
+        noLegend = True
+    else:
+        noLegend = False
     
     for i, data in enumerate(plotData):
         bottom = 0
@@ -583,8 +586,10 @@ def plotStackedBarChart(plotData: list, xLabel: str, yLabel: str, title: str, le
         middle = 0.5 + 0.06*len(legend)/2
         ax.legend(loc='upper center', bbox_to_anchor=(1.06, 0.64), ncol=1)
         fig.subplots_adjust(bottom=bottom, top=0.95, left=0.09, right=0.9)
-    else:
+    elif legend:
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=5)
+        fig.subplots_adjust(bottom=bottom, top=0.95, left=0.09, right=0.95)
+    else:
         fig.subplots_adjust(bottom=bottom, top=0.95, left=0.09, right=0.95)
 
 

@@ -171,19 +171,34 @@ def plotGameDataAsScatterPlot(gameData: pl.DataFrame, filename: str = None):
 
 def plotGameResults(gameData: pl.DataFrame, filename: str = None):
     plotData = dict()
+    gamesWonByMatchWinner = dict()
     for row in gameData.iter_rows(named=True):
         if (match := row['Match']) not in plotData:
             plotData[match] = [0, 0, 0]
+            gamesWonByMatchWinner[match] = [0, 0, 0]
+
+        matchWinner = match.split('-')[0]
 
         if (result := row['Result']) == '1-0':
             plotData[match][0] += 1
+            if matchWinner in row["White"]:
+                gamesWonByMatchWinner[match][0] += 1
+            else:
+                gamesWonByMatchWinner[match][2] += 1
         elif result == '1/2-1/2':
             plotData[match][1] += 1
+            gamesWonByMatchWinner[match][1] += 1
         elif result == '0-1':
             plotData[match][2] += 1
+            if matchWinner in row["Black"]:
+                gamesWonByMatchWinner[match][0] += 1
+            else:
+                gamesWonByMatchWinner[match][2] += 1
 
     plotData = dict(sorted(plotData.items(), key=lambda x: int(x[0][-4:])))
+    gamesWonByMatchWinner = dict(sorted(gamesWonByMatchWinner.items(), key=lambda x: int(x[0][-4:])))
     plotting_helper.plotStackedBarChart(list(plotData.values()), '', 'Percentage of games', 'Relative number of each game result in world championship matches', ['White\nwins', 'Draws', 'Black\nwins'], colors=['white', 'grey', 'black'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True, filename=filename)
+    # plotting_helper.plotStackedBarChart(list(gamesWonByMatchWinner.values()), '', 'Percentage of games', 'Relative number of each game result in world championship matches', ['White\nwins', 'Draws', 'Black\nwins'], colors=['white', 'grey', 'black'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True, filename=filename)
 
 
 def plotFirstMoves(gameData: pl.DataFrame, filename: str = None):
@@ -204,7 +219,7 @@ def plotFirstMoves(gameData: pl.DataFrame, filename: str = None):
     for m, v in plotData.items():
         pd[m] = [x/sum(v) for x in v]
 
-    plotting_helper.plotStackedBarChart(list(pd.values()), '', 'Percentage of games', 'Relative number of every opening move in world championship matches', ['1.e4', '1.d4', '1.c4', '1.Nf3', '1.g3'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True, filename=filename)
+    plotting_helper.plotStackedBarChart(list(pd.values()), '', 'Percentage of games', 'Percentage of different opening moves in every world championship match', ['1.e4', '1.d4', '1.c4', '1.Nf3', '1.g3'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in plotData.keys()], legendOnRight=True, filename=filename)
 
 
 def findLongestResultStreaks(results: dict) -> list:
@@ -270,9 +285,6 @@ def analyseMatchTrajectory(gameData: pl.DataFrame):
 
         gameNr = row['GameNr']
         gameLength = row['MoveNr']
-
-        if "2006" in match:
-            print(gameNr)
 
         if (result := row['Result']) == '1/2-1/2':
             points = 0.5
@@ -357,6 +369,36 @@ def analyseMatchTrajectory(gameData: pl.DataFrame):
     for x in resultsByMatchSituation:
         print([y/sum(x) for y in x])
     
+    bestOfMatches = ['Steinitz-Chigorin, 1889', 'Steinitz-Gunsberg, 1890', 'Steinitz-Chigorin, 1892', 'Lasker-Schlechter, 1910',
+                  'Capablanca-Lasker, 1921', 'Botvinnik-Bronstein, 1951', 'Botvinnik-Smyslov, 1954',
+                  'Smyslov-Botvinnik, 1957', 'Botvinnik-Smyslov, 1958', 'Tal-Botvinnik, 1960', 'Botvinnik-Tal, 1961', 'Petrosian-Botvinnik, 1963', 
+                  'Petrosian-Spassky, 1966', 'Spassky-Petrosian, 1969', 'Fischer-Spassky, 1972', 
+                  'Kasparov-Karpov, 1985', 'Kasparov-Karpov, 1986', 'Kasparov-Karpov, 1987',
+                  'Kasparov-Karpov, 1990', 'Kasparov-Short, 1993', 'Kasparov-Anand, 1995', 'Kramnik-Kasparov, 2000', 'Kramnik-Leko, 2004', 
+                  'Kramnik-Topalov, 2006', 'Anand-Kramnik, 2008', 'Anand-Topalov, 2010', 'Anand-Gelfand, 2012', 'Carlsen-Anand, 2013',
+                  'Carlsen-Anand, 2014', 'Carlsen-Karjakin, 2016', 'Carlsen-Caruana, 2018', 'Carlsen-Nepomniachtchi, 2021', 
+                  'Ding-Nepomniachtchi, 2023', 'Gukesh-Ding, 2024']
+
+    gamePhaseResults = [[list() for _ in range(4)], [list() for _ in range(4)]]
+    for match, r in results.items():
+        if match not in bestOfMatches:
+            continue
+        breaks = [0, len(r)//4, (2*len(r))//4, (3*len(r))//4, len(r)]
+        for i in range(len(breaks)-1):
+            gamePhaseResults[0][i].extend(r[breaks[i]:breaks[i+1]])
+            if match in bestOfMatches[-13:]:
+                gamePhaseResults[1][i].extend(r[breaks[i]:breaks[i+1]])
+
+    plotData = [list() for _ in range(4)]
+    for i in range(2):
+        totalGames = sum([len(r) for r in gamePhaseResults[i]])
+        # print(len([r for results in gamePhaseResults[i] for r in results if r == '1/2-1/2'])/totalGames)
+        for j, results in enumerate(gamePhaseResults[i]):
+            print(len([r for r in results if r == '1/2-1/2'])/len(results))
+            plotData[j].append(len([r for r in results if r == '1/2-1/2'])/len(results))
+
+    plotting_helper.plotPlayerBarChart(plotData, ['First quarter', 'Second quarter', 'Third quarter', 'Fourth quarter'], 'Relative number of draws', 'Relative number of draws in best-of-x matches based on the stage of the match', ['All matches', 'Matches since 2000'], filename='../out/pastWccGameResultsByMatchQuarter.png')
+
     # plotting_helper.plotLineChartSingleX(pData, 'Game number', 'Score of eventual winner', 'Score of the eventual winner by game number', list(matchData.keys()))
 
 
@@ -395,10 +437,16 @@ def findOpeningDeviations(gameData: pl.DataFrame, filename: str = None):
     data = dict(sorted(data.items(), key=lambda x: int(x[0][-4:])))
 
     plotData = dict()
+    playerData = dict()
+    colorData = dict()
 
     for match, d in data.items():
         print(match)
         plotData[match] = list()
+        playerData[match] = dict()
+        playerData[match][match.split('-')[0]] = [0, 0]
+        playerData[match][match.split('-')[1].split(',')[0]] = [0, 0]
+        colorData[match] = [[0, 0], [0, 0]]
         moves = [x[2] for x in d]
         for i, m in enumerate(moves):
             players = (d[i][0], d[i][1])
@@ -406,10 +454,18 @@ def findOpeningDeviations(gameData: pl.DataFrame, filename: str = None):
                 if m[:j] not in [x[:j] for x in moves[:i]]:
                     player = players[(j-1)%2]
                     print(f'{j-1} moves repeated in game {i+1}, {player} deviated')
-                    plotData[match].append(j-1)
+                    playerData[match][player.split(',')[0].split()[0]][0] += j-1
+                    playerData[match][player.split(',')[0].split()[0]][1] += 1
+                    if j-1 >= 2:
+                        plotData[match].append(j-1)
+                        colorData[match][(j-1)%2][0] += j-1
+                        colorData[match][(j-1)%2][1] += 1
                     break
 
-    plotting_helper.plotScatterPlot([[int(m[-4:]) for m in plotData.keys()]], [[sum(v)/(len(v)*2) for v in plotData.values()]], 'Match', 'Number of repeated moves', 'Number of repeated moves', filename=filename)
+    # plotting_helper.plotScatterPlot([[int(m[-4:]) for m in plotData.keys()]], [[sum(v)/(len(v)*2) for v in plotData.values()]], 'Match', 'Average number of repeated moves per game', 'Average number of repeated moves per game in world championship matches', filename='../out/pastWccRepeatedMoves.png')
+    # plotting_helper.plotScatterPlot([[int(m[-4:]) for m in playerData.keys()]]*2, [[x[list(x.keys())[0]][1]/sum([y[1] for y in x.values()]) for x in playerData.values()], [x[list(x.keys())[1]][1]/sum([y[1] for y in x.values()]) for x in playerData.values()]], 'Match year', 'Games where player was the first to deviate', 'Games where player was first to deviate', alpha=0.5)
+    # plotting_helper.plotScatterPlot([[int(m[-4:]) for m in colorData.keys()]]*2, [[v[0][1]/(v[0][1]+v[1][1]) for v in colorData.values()], [v[1][1]/(v[0][1]+v[1][1]) for v in colorData.values()]], 'Match year', 'Relative number of games where each side was first to deviate', 'Games where player was first to deviate', legend=['White', 'Black'], scatterColors=plotting_helper.getColors(['orange', 'black']), alpha=0.6)
+    plotting_helper.plotStackedBarChart([[v[i][1]/(v[0][1]+v[1][1]) for i in range(2)] for v in colorData.values()], '', 'Percentage of games', 'Percentage of games where white or black was the first to deviate from previous games', legend=None, colors=['white', 'black'], xTickLabels=[f'{m.split(",")[0].replace("Nepomniachtchi", "Nepo")},{m[-2:]}' for m in colorData.keys()])#, filename='../out/pastWccOpeningDeviations.png')
 
 
 if __name__ == '__main__':
@@ -454,12 +510,12 @@ if __name__ == '__main__':
 
     # plotGameDataAsScatterPlot(wccMatchData, filename='../out/pastWccXSL.png')
 
-    # plotGameResults(wccMatchData, filename='../out/pastWccResults.png')
+    # plotGameResults(wccMatchData)#, filename='../out/pastWccResults.png')
 
-    analyseMatchTrajectory(wccMatchData)
+    # analyseMatchTrajectory(wccMatchData)
 
     # plotComplexity(wccMoveData)
 
-    # plotFirstMoves(wccMatchData, filename='../out/pastWccFirstMoves.png')
+    plotFirstMoves(wccMatchData, filename='../out/pastWccFirstMoves.png')
 
     # findOpeningDeviations(wccMatchData)
